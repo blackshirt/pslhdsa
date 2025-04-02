@@ -110,7 +110,7 @@ fn mgf1_sha256(seed []u8, length int) ![]u8 {
     mut result := []u8{}
     mut counter := u32(0)
    
-    for result.len < length length {
+    for result.len < length {
         mut b := []u8{len: 4}
         big_endian_put_u32(mut b, counter)
         data := seed << b 
@@ -129,7 +129,7 @@ fn mgf1_sha256(seed []u8, length int) ![]u8 {
     mut result := []u8{}
     mut counter := u32(0)
    
-    for result.len < length length {
+    for result.len < length {
         mut b := []u8{len: 4}
         big_endian_put_u32(mut b, counter)
         data := seed << b 

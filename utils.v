@@ -67,6 +67,7 @@ fn base_2exp_b(x []u8, b u32, out_len int) []u32 {
 // Chaining function used in WOTS+.
 // Input: Input string 𝑋, start index 𝑖, number of steps 𝑠, public seed PK.seed, address ADRS.
 // Output: Value of F iterated 𝑠 times on 𝑋.
+// (where 𝑖 + 𝑠 < w
 fn chain(x []u8, idx int, step int, pk PublicKey, address Adrs) []u8 {
 	tmp := x.clone()
 	for j := idx; j < idx + step; j++ {
@@ -76,16 +77,13 @@ fn chain(x []u8, idx int, step int, pk PublicKey, address Adrs) []u8 {
 	return tmp
 }
 
-// F(PK.seed, ADRS, 𝑀1) (𝔹𝑛 × 𝔹32 × 𝔹𝑛 → 𝔹𝑛) is a hash function that takes an 𝑛-byte
-// message as input and produces an 𝑛-byte output.
-fn hash_fn(pk PublicKey, address Adrs, m1 []u8) []u8 {}
-
 //  revert if not big endian
 @[inline]
 fn rev8_be32(x u32) u32 {
 	$if !big_endian {
 		return ((x & 0xFF000000) >> 24) | ((x & 0x00FF0000) >> 8) | ((x & 0x0000FF00) << 8) | ((x & 0x000000FF) << 24)
 	}
+
 	// otherwise not changed
 	return x
 }
@@ -98,43 +96,47 @@ fn rev8_be64(u64 x) {
 	return x
 }
 
-const sha256_hash_size = sha256.size 
+const sha256_hash_size = sha256.size
 
-// A mask generation function (MGF) is a cryptographic primitive similar 
-// to a cryptographic hash function except that while a hash function's 
+// A mask generation function (MGF) is a cryptographic primitive similar
+// to a cryptographic hash function except that while a hash function's
 // output has a fixed size, a MGF supports output of a variable length.
-fn mgf1_sha256(seed []u8, length int) ![]u8 {  
-    if length > (sha256_hash_size << 32) {
-        return error("Length Too Big")
-    }
-    mut result := []u8{}
-    mut counter := u32(0)
-   
-    for result.len < length {
-        mut b := []u8{len: 4}
-        big_endian_put_u32(mut b, counter)
-        data := seed << b 
-        result << sum256(data)
-        counter += 1
-    }
-    return result[..length]
+fn mgf1_sha256(seed []u8, length int) ![]u8 {
+	if length > (sha256_hash_size << 32) {
+		return error('Length Too Big')
+	}
+	mut result := []u8{}
+	mut counter := u32(0)
+
+	for result.len < length {
+		mut b := []u8{len: 4}
+		big_endian_put_u32(mut b, counter)
+
+		mut data := seed.clone()
+		data << b
+
+		result << sha256.sum256(data)
+		counter += 1
+	}
+	return result[..length]
 }
 
-const sha512_hash_length = sha512.size 
+const sha512_hash_length = sha512.size
 
-fn mgf1_sha256(seed []u8, length int) ![]u8 {  
-    if length > (sha512_hash_length << 32) {
-        return error("Length Too Big")
-    }
-    mut result := []u8{}
-    mut counter := u32(0)
-   
-    for result.len < length {
-        mut b := []u8{len: 4}
-        big_endian_put_u32(mut b, counter)
-        data := seed << b 
-        result << sum512(data)
-        counter += 1
-    }
-    return result[..length]
+fn mgf1_sha512(seed []u8, length int) ![]u8 {
+	if length > (sha512_hash_length << 32) {
+		return error('Length Too Big')
+	}
+	mut result := []u8{}
+	mut counter := u32(0)
+
+	for result.len < length {
+		mut b := []u8{len: 4}
+		big_endian_put_u32(mut b, counter)
+		mut data := seed.clone()
+		data << b
+		result << sha512.sum512(data)
+		counter += 1
+	}
+	return result[..length]
 }

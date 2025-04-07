@@ -108,3 +108,52 @@ fn wots_sign(ctx Context, m []u8, sk_seed []u8, pk_seed []u8, mut addr Address) 
 	}
 	return sig
 }
+
+// 5.3 Computing a WOTS+ Public Key From a Signature
+//
+// Algorithm 8 wots_pkFromSig(𝑠𝑖𝑔, 𝑀, PK.seed, ADRS)
+// Computes a WOTS+ public key from a message and its signature.
+// Input: WOTS+ signature 𝑠𝑖𝑔, message 𝑀, public seed
+// Output: WOTS+ public key 𝑝𝑘𝑠𝑖𝑔 derived from 𝑠𝑖𝑔.
+fn wots_pkfromsig(ctx Context, sig []u8, m []u8, pk_seed []u8, mut addr Address) ![]u8 {
+	mut csum := 0
+	// convert message to base w, ie, 𝑚𝑠𝑔 ← base_2b(𝑀, 𝑙𝑔𝑤, 𝑙𝑒𝑛1)
+	len1 := ctx.prm.len1()
+	msgs := base_2exp_b(m, ctx.prm.lgw, len1)
+
+	// compute checksum
+	for i := 0; i < len1 - 1; i++ {
+		// 𝑐𝑠𝑢𝑚 ← 𝑐𝑠𝑢𝑚 + 𝑤 − 1 − 𝑚𝑠𝑔[𝑖]
+		csum += w - 1 - msgs[i]
+	}
+	// for 𝑙𝑔𝑤 = 4, left shift by 4, its only values supported in this module
+	// 𝑐𝑠𝑢𝑚 ← 𝑐𝑠𝑢𝑚 ≪ ((8 − ((𝑙𝑒𝑛2 ⋅ 𝑙𝑔𝑤) mod 8)) mod 8)
+	csum <<= (8 - ((len2 * ctx.prm.lgw) % 8)) % 8
+
+	// convert to base w, 𝑚𝑠𝑔 ← 𝑚𝑠𝑔 ∥ base_2b (toByte (𝑐𝑠𝑢𝑚, ⌈(𝑙𝑒𝑛2*𝑙𝑔𝑤)/8⌉) , 𝑙𝑔𝑤, 𝑙𝑒𝑛2)
+	mlen := cdiv(len2 * ctx.prm.lgw, 8)
+	bytes := to_byte(u64(csum), mlen)
+	msgs << base_2exp_b(bytes, ctx.prm.lgw, len2)
+
+	mut tmp := []u8{}
+	for i := 0; i < ctx.prm.wots_len(); i++ {
+		// ADRS.setChainAddress(𝑖)
+		addr.set_chain_address(u32(i))
+		// 𝑡𝑚𝑝[𝑖] ← chain(𝑠𝑖𝑔[𝑖], 𝑚𝑠𝑔[𝑖], 𝑤 − 1 − 𝑚𝑠𝑔[𝑖], PK.seed, ADRS)
+		x := sig[i * ctx.prm.n..(i + 1) * ctx.prm.n]
+		next_chain := chain(ctx, x, msgs[i], w - 1 - msgs[i], pk_seed, mut addr)!
+		assert next_chain.len != 0
+
+		tmp << next_chain
+	}
+	// copy address to create WOTS+ public key address, wotspkADRS ← ADRS
+	mut wots_pk_addr := addr.clone()
+	// wotspkADRS.setTypeAndClear(WOTS_PK)
+	wots_pk_addr.set_type_and_clear(.wots_pk)
+	// wotspkADRS.setKeyPairAddress(ADRS.getKeyPairAddress())
+	wots_pk_addr.set_keypair_address(addr.get_keypair_address())
+	// 𝑝𝑘𝑠𝑖𝑔 ← T𝑙𝑒𝑛(PK.seed, wotspkADRS,𝑡𝑚𝑝)
+	pk_sig := ctx.tlen(pk_seed, wots_pk_addr, tmp)!
+
+	return pk_sig
+}

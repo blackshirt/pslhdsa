@@ -39,7 +39,11 @@ fn slh_sign_internal(ctx Context, m []u8, sk Sk, addrnd []u8, opt SignerOpts) ![
 	// (k*a)/8 .. (k*a)/8 + (h-h/d)/8
 	tmp_idx_tree := digest[cdiv(ctx.prm.k * ctx.prm.a, 8)..cdiv(ctx.prm.k * ctx.prm.a, 8) +
 		cdiv(ctx.prm.h - (ctx.prm.h / ctx.prm.d), 8)]
-	tmp_idx_leaf = digest[cdiv(ctx.k*ctx.a,8)+cdiv(ctx.h-ctx.h//ctx.d,8) : cdiv(ctx.k*ctx.a,8)+cdiv(ctx.h-ctx.h//ctx.d,8)+cdiv(ctx.h,8*ctx.d)]
+
+	// (k*a)/8 + (h-h/d)/8 .. (k*a)/8 + (h-h/d)/8 + h/8d
+	tmp_idx_leaf = digest[cdiv(ctx.prm.k * ctx.prm.a, 8) + cdiv(ctx.h - (ctx.prm.h / ctx.prm.d), 8)..
+		cdiv(ctx.prm.k * ctx.prm.a, 8) + cdiv(ctx.prm.h - (ctx.prm.h / ctx.prm.d), 8) +
+		cdiv(ctx.prm.h, 8 * ctx.prm.d)]
 	// idx_tree := toInt(tmp_idx_tree, cdiv(ctx.h-ctx.h//ctx.d,8)) % 2**(ctx.h-ctx.h//ctx.d)
 	// idx_leaf := toInt(tmp_idx_leaf, cdiv(ctx.h,8*ctx.d)) % 2**(ctx.h//ctx.d)
 }

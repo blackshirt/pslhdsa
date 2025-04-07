@@ -62,21 +62,6 @@ fn base_2exp_b(x []u8, b u32, out_len int) []u32 {
 	return baseb
 }
 
-// Algorithm 5 chain(𝑋, 𝑖, 𝑠, PK.seed, ADRS)
-//
-// Chaining function used in WOTS+.
-// Input: Input string 𝑋, start index 𝑖, number of steps 𝑠, public seed PK.seed, address ADRS.
-// Output: Value of F iterated 𝑠 times on 𝑋.
-// (where 𝑖 + 𝑠 < w
-fn chain(x []u8, idx int, step int, pk PublicKey, address Adrs) []u8 {
-	tmp := x.clone()
-	for j := idx; j < idx + step; j++ {
-		address.setHashAddress(j)
-		tmp = hash_fn(pk.seed, address, tmp)
-	}
-	return tmp
-}
-
 //  revert if not big endian
 @[inline]
 fn rev8_be32(x u32) u32 {

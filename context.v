@@ -64,14 +64,14 @@ fn (ctx Context) prf(pk_seed []u8, sk_seed []u8, addr Address) []u8 {
 
 // Tℓ(PK.seed, ADRS, 𝑀ℓ) (𝔹𝑛 × 𝔹32 × 𝔹ℓ𝑛 → 𝔹𝑛) is a hash function that maps an
 // ℓ𝑛-byte message to an 𝑛-byte message.
-fn (ctx Context) tl(pk_seed []u8, addr Address, ml []u8) []u8 {
+fn (ctx Context) tlen(pk_seed []u8, addr Address, ml []u8) []u8 {
 	if ctx.is_shake() {
-		return shake256_tl(pk_seed, addr, ml, ctx.prm.n)
+		return shake256_tlen(pk_seed, addr, ml, ctx.prm.n)
 	}
 	if ctx.prm.sc == 1 {
-		return sha256_tl(pk_seed, addr, ml, ctx.prm.n)
+		return sha256_tlen(pk_seed, addr, ml, ctx.prm.n)
 	}
-	return sha512_tl(pk_seed, addr, ml, ctx.prm.n)
+	return sha512_tlen(pk_seed, addr, ml, ctx.prm.n)
 }
 
 // H(PK.seed, ADRS, 𝑀2) (𝔹𝑛 × 𝔹32 × 𝔹2𝑛 → 𝔹𝑛) is a special case of Tℓ that takes a
@@ -260,7 +260,7 @@ fn shake256_prf(pk_seed []u8, sk_seed []u8, addr Address, n int) []u8 {
 // Tℓ(PK.seed, ADRS, 𝑀ℓ) (𝔹𝑛 × 𝔹32 × 𝔹ℓ𝑛 → 𝔹𝑛) is a hash function that maps an
 // ℓ𝑛-byte message to an 𝑛-byte message.
 @[inline]
-fn shake256_tl(pk_seed []u8, addr Address, ml []u8, n int) []u8 {
+fn shake256_tlen(pk_seed []u8, addr Address, ml []u8, n int) []u8 {
 	mut data := []u8{}
 	data << pk_seed
 	data << addr.full_to_bytes()
@@ -343,7 +343,7 @@ fn sha256_prf(pk_seed []u8, sk_seed []u8, addr Address, n int) []u8 {
 // Tℓ(PK.seed, ADRS, 𝑀ℓ) (𝔹𝑛 × 𝔹32 × 𝔹ℓ𝑛 → 𝔹𝑛) is a hash function that maps an
 // ℓ𝑛-byte message to an 𝑛-byte message.
 @[inline]
-fn sha256_tl(pk_seed []u8, addr Address, ml []u8, n int) []u8 {
+fn sha256_tlen(pk_seed []u8, addr Address, ml []u8, n int) []u8 {
 	compressed := addr.compress()
 	mut data := []u8{}
 	data << pk_seed
@@ -443,7 +443,7 @@ fn sha512_prf(pk_seed []u8, sk_seed []u8, addr Address, n int) []u8 {
 // Tℓ(PK.seed, ADRS, 𝑀ℓ) (𝔹𝑛 × 𝔹32 × 𝔹ℓ𝑛 → 𝔹𝑛) is a hash function that maps an
 // ℓ𝑛-byte message to an 𝑛-byte message.
 @[inline]
-fn sha512_tl(pk_seed []u8, addr Address, ml []u8, n int) []u8 {
+fn sha512_tlen(pk_seed []u8, addr Address, ml []u8, n int) []u8 {
 	compressed := addr.compress()
 	mut data := []u8{}
 	data << pk_seed

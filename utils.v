@@ -24,6 +24,7 @@ fn to_int(x []u8, n int) u64 {
 // Converts an integer to a byte string.
 // Input: Integer 𝑥, string length 𝑛.
 // Output: Byte string of length 𝑛 containing binary representation of 𝑥 in big-endian byte-order.
+@[inline]
 fn to_byte(x u64, n int) []u8 {
 	if n == 0 {
 		return []u8{}
@@ -35,6 +36,12 @@ fn to_byte(x u64, n int) []u8 {
 		t >>= 8
 	}
 	return s
+}
+
+// Compute ceil(n/k)
+@[inline]
+fn cdiv(n int, k int) int {
+	return (n + k - 1) / k
 }
 
 // Algorithm 4 base_2exp_b(𝑋, 𝑏, 𝑜𝑢𝑡_𝑙𝑒𝑛)

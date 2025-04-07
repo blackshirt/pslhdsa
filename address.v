@@ -72,6 +72,14 @@ fn (mut addr Address) reset() {
 // Member functions for addresses
 
 // ADRS.setTypeAndClear(𝑌) ADRS ← ADRS[0 ∶ 16] ∥ toByte(𝑌 , 4) ∥ toByte(0, 12)
+fn (mut addr Address) set_type_and_clear(new_type AddressType) {
+	addr.tipe = new_type
+	// Whenever the type in an address changes, the final 12 bytes of the address are
+	// initialized to zero.
+	addr.final[0] = 0
+	addr.final[1] = 0
+	addr.final[2] = 0
+}
 
 // ADRS.setLayerAddress(𝑙) ADRS ← toByte(𝑙, 4) ∥ ADRS[4 ∶ 32]
 fn (mut addr Address) set_layer_address(x u32) {

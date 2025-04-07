@@ -18,6 +18,20 @@ mut:
 	// 12 bytes
 }
 
+// The Address type word will have a value of 0, 1, 2, 3, 4, 5, or 6.
+// In order to improve readability, these values will be
+// referred to in this standard by the constants WOTS_HASH, WOTS_PK, TREE,
+// FORS_TREE, FORS_ROOTS, WOTS_PRF, and FORS_PRF, respectively
+enum AddressType as u32 {
+	wots_hash  = 0
+	wots_pk    = 1
+	tree       = 2
+	fors_tree  = 3
+	fors_roots = 4
+	wots_prf   = 5
+	fors_prf   = 6
+}
+
 fn (addr Address) full_to_bytes() []u8 {
 	mut out := []u8{len: 32}
 
@@ -137,20 +151,6 @@ fn (addr Address) get_tree_index() u32 {
 fn (mut addr Address) set_hash_address(x u32) {
 	// 𝑡𝑦𝑝𝑒 = 0 (WOTS_HASH), 𝑡𝑦𝑝𝑒 = 5 (WOTS_PRF)
 	addr.final[2] = rev8_be32(x)
-}
-
-// The Address type word will have a value of 0, 1, 2, 3, 4, 5, or 6.
-// In order to improve readability, these values will be
-// referred to in this standard by the constants WOTS_HASH, WOTS_PK, TREE,
-// FORS_TREE, FORS_ROOTS, WOTS_PRF, and FORS_PRF, respectively
-enum AddressType as u32 {
-	wots_hash  = 0
-	wots_pk    = 1
-	tree       = 2
-	fors_tree  = 3
-	fors_roots = 4
-	wots_prf   = 5
-	fors_prf   = 6
 }
 
 // serializes AddressType to bytes in big endian order

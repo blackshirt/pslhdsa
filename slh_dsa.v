@@ -60,14 +60,14 @@ fn slh_sign_internal(c Context, m []u8, sk Sk, addrnd []u8, opt SignerOpts) ![]u
 	// ADRS.setKeyPairAddress(𝑖𝑑𝑥𝑙𝑒𝑎𝑓)
 	addr.set_keypair_address(idx_leaf)
 	// SIG𝐹𝑂𝑅𝑆 ← fors_sign(𝑚𝑑, SK.seed, PK.seed, ADRS)
-	sig_fors := fors_sign(ctx, md, sk.seed, sk.pk.seed, addr)!
+	sig_fors := fors_sign(c, md, sk.seed, sk.pk.seed, addr)!
 	// SIG ← SIG ∥ SIG𝐹𝑂𝑅s
 	sig << sig_fors
 
 	// get FORS key, PK𝐹𝑂𝑅𝑆 ← fors_pkFromSig(SIG𝐹𝑂𝑅𝑆, 𝑚𝑑, PK.seed, ADRS)
-	pk_fors := fors_pkfromsig(ctx, sig_fors, md, sk.pk.seed, addr)!
+	pk_fors := fors_pkfromsig(c, sig_fors, md, sk.pk.seed, addr)!
 	// 17: SIG𝐻𝑇 ← ht_sign(PK𝐹𝑂𝑅𝑆, SK.seed, PK.seed,𝑖𝑑𝑥𝑡𝑟𝑒𝑒,𝑖𝑑𝑥𝑙𝑒𝑎𝑓)
-	sig_ht := ht_sign(ctx, pk_fors, sk.seed, sk.pk.seed, idx_tree, idx_leaf)!
+	sig_ht := ht_sign(c, pk_fors, sk.seed, sk.pk.seed, idx_tree, idx_leaf)!
 
 	// : SIG ← SIG ∥ SIG𝐻�
 	sig << sig_ht
@@ -103,7 +103,7 @@ fn slh_keygen(c Context) ! {
 	sk_prf := rand.read(c.prm.n)!
 	pk_seed := rand.read(c.prm.n)!
 
-	return slh_keygen_internal(ctx, sk_seed, sk_prf, pk_seed)!
+	return slh_keygen_internal(c, sk_seed, sk_prf, pk_seed)!
 }
 
 // Algorithm 18 slh_keygen_internal(SK.seed, SK.prf, PK.seed)
@@ -118,7 +118,7 @@ fn slh_keygen_internal(c Context, sk_seed []u8, sk_prf []u8, pk_seed []u8) !(Sk,
 	// 2: ADRS.setLayerAddress(𝑑 − 1)
 	addr.set_layer_address(c.prm.d - 1)
 	// 3: PK.root ← xmss_node(SK.seed, 0, ℎ′ , PK.seed, ADRS)
-	pk_root := xmms_node(ctx, sk_seed, 0, c.prm.hp, pk_seed, mut addr)!
+	pk_root := xmms_node(c, sk_seed, 0, c.prm.hp, pk_seed, mut addr)!
 	// 4: return ( (SK.seed, SK.prf, PK.seed, PK.root), (PK.seed, PK.root) )
 	pk := Pk{
 		seed: pk_seed
@@ -179,10 +179,10 @@ fn slh_verify_internal(c Context, m []u8, sig []u8, pk Pk) !bool {
 	addr.set_key_pair_address(idx_leaf)
 
 	// PK𝐹𝑂𝑅𝑆 ← fors_pkFromSig(SIG𝐹𝑂𝑅𝑆, 𝑚𝑑, PK.seed, ADRS)
-	pk_fors := fors_pkfromsig(ctx, sig_fors, md, pk.seed, addr)!
+	pk_fors := fors_pkfromsig(c, sig_fors, md, pk.seed, addr)!
 
 	// return ht_verify(PK𝐹𝑂𝑅𝑆, SIG𝐻𝑇, PK.seed,𝑖𝑑𝑥𝑡𝑟𝑒𝑒,𝑖𝑑𝑥𝑙𝑒𝑎𝑓, PK.root)
-	return ht_verify(ctx, pk_fors, sig_ht, pk.seed, idx_tree, idx_leaf, pk.root)!
+	return ht_verify(c, pk_fors, sig_ht, pk.seed, idx_tree, idx_leaf, pk.root)!
 }
 
 const max_allowed_context_string = 255

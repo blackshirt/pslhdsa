@@ -8,7 +8,7 @@ module pslhdsa
 // Generates a FORS private-key value.
 // Input: Secret seed SK.seed, public seed PK.seed, address ADRS, secret key index 𝑖𝑑𝑥.
 // Output: 𝑛-byte FORS private-key value.
-fn fors_skgen(ctx Context, sk_seed []u8, pk_seed []u8, addr Address, idx int) ![]u8 {
+fn fors_skgen(c Context, sk_seed []u8, pk_seed []u8, addr Address, idx int) ![]u8 {
 	// idx >=0
 	// copy address to create key generation address
 	sk_addr := addr.clone()
@@ -20,7 +20,7 @@ fn fors_skgen(ctx Context, sk_seed []u8, pk_seed []u8, addr Address, idx int) ![
 	sk_add.set_tree_index(u32(idx))
 
 	// return PRF(PK.seed, SK.seed,skADRS)
-	return ctx.prf(pk_seed, sk_seed, sk_addr)!
+	return c.prf(pk_seed, sk_seed, sk_addr)!
 }
 
 // 8.2 Generating a Merkle Hash Tree
@@ -29,27 +29,27 @@ fn fors_skgen(ctx Context, sk_seed []u8, pk_seed []u8, addr Address, idx int) ![
 // Computes the root of a Merkle subtree of FORS public values.
 // Input: Secret seed SK.seed, target node index 𝑖, target node height 𝑧, public seed PK.seed, address ADRS.
 // Output: 𝑛-byte root 𝑛𝑜𝑑𝑒.
-fn fors_node(ctx Context, sk_seed []u8, i int, z int, pk_seed []u8, mut addr Address) ![]u8 {
-	if z > ctx.prm.a || i >= ctx.k * (1 << (ctx.prm.a - z)) {
+fn fors_node(c Context, sk_seed []u8, i int, z int, pk_seed []u8, mut addr Address) ![]u8 {
+	if z > c.prm.a || i >= c.k * (1 << (c.prm.a - z)) {
 		return error('Bad fors_node params')
 		// return empty bytes instead ?
 	}
 	if z == 0 {
 		// 𝑠𝑘 ← fors_skGen(SK.seed, PK.seed, ADRS,𝑖)
-		sk := fors_skgen(ctx, sk_seed, pk_seed, addr, i)!
+		sk := fors_skgen(c, sk_seed, pk_seed, addr, i)!
 		// 3: ADRS.setTreeHeight(0)
 		addr.set_tree_height(u32(0))
 		// 4: ADRS.setTreeIndex(𝑖)
 		addr.set_tree_index(u32(i))
 		// 5: 𝑛𝑜𝑑𝑒 ← F(PK.seed, ADRS, 𝑠𝑘)
-		node := ctx.f(pk_seed, addr, sk)!
+		node := c.f(pk_seed, addr, sk)!
 		return node
 	}
 	// else
 	// 𝑙𝑛𝑜𝑑𝑒 ← fors_node(SK.seed, 2𝑖, 𝑧 − 1, PK.seed, ADRS)
-	lnode := fors_node(ctx, sk_seed, 2 * i, z - 1, pk_seed, mut addr)!
+	lnode := fors_node(c, sk_seed, 2 * i, z - 1, pk_seed, mut addr)!
 	// 8: 𝑟𝑛𝑜𝑑𝑒 ← fors_node(SK.seed, 2𝑖 + 1, 𝑧 − 1, PK.seed, ADRS)
-	rnode := fors_node(ctx, sk_seed, 2 * i + 1, z - 1, pk_seed, mut addr)!
+	rnode := fors_node(c, sk_seed, 2 * i + 1, z - 1, pk_seed, mut addr)!
 	// 9: ADRS.setTreeHeight(𝑧)
 	addr.set_tree_height(u32(z))
 	// 10: ADRS.setTreeIndex(𝑖)
@@ -58,7 +58,7 @@ fn fors_node(ctx Context, sk_seed []u8, i int, z int, pk_seed []u8, mut addr Add
 	mut m2 := []u8{}
 	m2 << lnode
 	m2 << rnode
-	node := ctx.h(pk_seed, addr, m2)
+	node := c.h(pk_seed, addr, m2)
 
 	return node
 }
@@ -69,27 +69,27 @@ fn fors_node(ctx Context, sk_seed []u8, i int, z int, pk_seed []u8, mut addr Add
 // Generates a FORS signature.
 // Input: Message digest 𝑚𝑑, secret seed SK.seed, address ADRS, public seed PK.seed.
 // Output: FORS signature SIG𝐹𝑂𝑅𝑆.
-fn fors_sign(ctx Context, md []u8, sk_seed []u8, pk_seed []u8, addr Address) ![]u8 {
-	assert md.len == cdiv(ctx.prm.k * ctx.prm.a, 8)
+fn fors_sign(c Context, md []u8, sk_seed []u8, pk_seed []u8, addr Address) ![]u8 {
+	assert md.len == cdiv(c.prm.k * c.prm.a, 8)
 
 	// initialize SIG𝐹𝑂𝑅𝑆 as a zero-length byte string
 	mut sig_fors := []u8{}
 	//  𝑖𝑛𝑑𝑖𝑐𝑒𝑠 ← base_2b(𝑚𝑑, 𝑎, 𝑘)
-	indices := base_2exp_b(md, ctx.prm.a, ctx.prm.k)
+	indices := base_2exp_b(md, c.prm.a, c.prm.k)
 
 	// compute signature elements
-	for i := 0; i <= ctx.prm.k - 1; i++ {
-		fors_item := fors_skgen(ctx, sk_seed, pk_seed, addr, i * (1 << ctx.prm.a) + indices[i])
+	for i := 0; i <= c.prm.k - 1; i++ {
+		fors_item := fors_skgen(c, sk_seed, pk_seed, addr, i * (1 << c.prm.a) + indices[i])
 		sig_fors << fors_item
 
 		// compute auth path
 		mut auth := []u8{}
-		for j := 0; j <= ctx.prm.a - 1; j++ {
+		for j := 0; j <= c.prm.a - 1; j++ {
 			// s ← ⌊𝑖𝑛𝑑𝑖𝑐𝑒𝑠[𝑖]/2^𝑗⌋ ⊕ 1
 			s := (indices[i] >> j) ^ 0x01
 			// AUTH[𝑗] ← fors_node(SK.seed,𝑖 * 2^(𝑎−𝑗) + 𝑠, 𝑗, PK.seed, ADRS)
-			idx := i * (1 << (ctx.prm.a - j)) + s
-			auth_j := fors_node(ctx, sk_seed, idx, j, pk_seed, addr)!
+			idx := i * (1 << (c.prm.a - j)) + s
+			auth_j := fors_node(c, sk_seed, idx, j, pk_seed, addr)!
 			auth << auth_j
 		}
 		// SIG𝐹𝑂𝑅𝑆 ← SIG𝐹𝑂𝑅𝑆 ∥ AUTH
@@ -104,33 +104,33 @@ fn fors_sign(ctx Context, md []u8, sk_seed []u8, pk_seed []u8, addr Address) ![]
 // Computes a FORS public key from a FORS signature.
 // Input: FORS signature SIG𝐹𝑂𝑅𝑆, message digest 𝑚𝑑, public seed PK.seed, address ADRS.
 // Output: FORS public key
-fn fors_pkfromsig(ctx Context, sig_fors []u8, md []u8, pk_seed []u8, mut addr Address) ![]u8 {
-	assert sig_fors.len == ctx.prm.k * (ctx.prm.a + 1) * ctx.prm.n
-	assert md.len == cdiv(ctx.prm.k * ctx.prm.a, 8)
+fn fors_pkfromsig(c Context, sig_fors []u8, md []u8, pk_seed []u8, mut addr Address) ![]u8 {
+	assert sig_fors.len == c.prm.k * (c.prm.a + 1) * c.prm.n
+	assert md.len == cdiv(c.prm.k * c.prm.a, 8)
 
 	// 𝑖𝑛𝑑𝑖𝑐𝑒𝑠 ← base_2b(𝑚𝑑, 𝑎, 𝑘)
-	indices := base_2exp_b(md, ctx.prm.a, ctx.prm.k)
+	indices := base_2exp_b(md, c.prm.a, c.prm.k)
 	mut node := [][]u8{len: 2}
 	mut root := []u8{}
-	for i := 0; i <= ctx.prm.k - 1; i++ {
+	for i := 0; i <= c.prm.k - 1; i++ {
 		// SIG𝐹𝑂𝑅𝑆[𝑖 ⋅ (𝑎 + 1) ⋅ 𝑛 ∶ (𝑖 ⋅ (𝑎 + 1) + 1) ⋅ 𝑛]
 		// 𝑠𝑘 ← SIG𝐹𝑂𝑅𝑆.getSK(𝑖)
-		start := i * (ctx.prm.a + 1) * ctx.prm.n
-		end := (i * (ctx + prm.a + 1) + 1) * ctx.prm.n
+		start := i * (c.prm.a + 1) * c.prm.n
+		end := (i * (ctx + prm.a + 1) + 1) * c.prm.n
 		sk := sig_fors[start..end]
 		// compute leaf
 		// ADRS.setTreeHeight(0)
 		addr.set_tree_height(0)
 		// ADRS.setTreeIndex(𝑖 ⋅ 2^𝑎 + 𝑖𝑛𝑑𝑖𝑐𝑒𝑠[𝑖])
-		addr.set_tree_index(i * (1 << ctx.prm.a) + indices[i])
+		addr.set_tree_index(i * (1 << c.prm.a) + indices[i])
 		// 𝑛𝑜𝑑𝑒[0] ← F(PK.seed, ADRS, 𝑠𝑘)
-		node[0] = ctx.f(pk_seed, addr, sk)
+		node[0] = c.f(pk_seed, addr, sk)
 
 		// compute root from leaf and AUTH
 		// 𝑎𝑢𝑡ℎ ← SIG𝐹𝑂𝑅𝑆.getAUTH(𝑖) ▷ SIG𝐹𝑂𝑅𝑆[(𝑖 ⋅ (𝑎 + 1) + 1) ⋅ 𝑛 ∶ (𝑖 + 1) ⋅ (𝑎 + 1) ⋅ 𝑛]
 
-		auth := sig_fors[(i * (ctx.prm.a + 1) + 1) * ctx.prm.n..(i + 1) * (ctx.prm.a + ctx.prm.n) * ctx.prm.n]
-		for j := 0; j <= ctx.prm.a - 1; j++ {
+		auth := sig_fors[(i * (c.prm.a + 1) + 1) * c.prm.n..(i + 1) * (c.prm.a + c.prm.n) * c.prm.n]
+		for j := 0; j <= c.prm.a - 1; j++ {
 			// ADRS.setTreeHeight(𝑗 + 1)
 			addr.set_tree_height(u32(j + 1))
 			// if ⌊𝑖𝑛𝑑𝑖𝑐𝑒𝑠[𝑖]/2^𝑗⌋ is even
@@ -140,16 +140,16 @@ fn fors_pkfromsig(ctx Context, sig_fors []u8, md []u8, pk_seed []u8, mut addr Ad
 				// 𝑛𝑜𝑑𝑒[1] ← H(PK.seed, ADRS, 𝑛𝑜𝑑𝑒[0] ∥ 𝑎𝑢𝑡ℎ[𝑗])
 				mut msi := []u8{}
 				msi << node[0]
-				msi << auth[j * ctx.prm.n..(j + 1) * ctx.prm.n]
-				node[1] = ctx.h(pk_seed, addr, msi)!
+				msi << auth[j * c.prm.n..(j + 1) * c.prm.n]
+				node[1] = c.h(pk_seed, addr, msi)!
 			} else {
 				// ADRS.setTreeIndex((ADRS.getTreeIndex() − 1)/2)
 				addr.set_tree_index((addr.get_tree_index() - 1) >> 1)
 				// 15: 𝑛𝑜𝑑𝑒[1] ← H(PK.seed, ADRS, 𝑎𝑢𝑡ℎ[𝑗] ∥ 𝑛𝑜𝑑𝑒[0])
 				mut msi := []u8{}
-				msi << auth[j * ctx.prm.n..(j + 1) * ctx.prm.n]
+				msi << auth[j * c.prm.n..(j + 1) * c.prm.n]
 				msi << node[0]
-				node[1] = ctx.h(pk_seed, addr, msi)!
+				node[1] = c.h(pk_seed, addr, msi)!
 			}
 			// 𝑛𝑜𝑑𝑒[0] ← 𝑛𝑜𝑑𝑒[1]
 			node[0] = node[1]
@@ -166,7 +166,7 @@ fn fors_pkfromsig(ctx Context, sig_fors []u8, md []u8, pk_seed []u8, mut addr Ad
 
 	// compute the FORS public key
 	// 24: 𝑝𝑘 ← T𝑘(PK.seed, forspkADRS, 𝑟𝑜𝑜𝑡) ▷
-	pk := ctx.tlen(pk_seed, fors_pkaddr, root)!
+	pk := c.tlen(pk_seed, fors_pkaddr, root)!
 
 	return pk
 }

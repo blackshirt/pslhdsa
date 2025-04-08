@@ -2,6 +2,7 @@ module pslhdsa
 
 import crypto.sha256
 import crypto.sha512
+import encoding.binary
 
 // Algorithm 2 toInt(𝑋, 𝑛)
 //
@@ -54,7 +55,7 @@ fn cdiv(n int, k int) int {
 fn base_2exp_b(x []u8, b u32, out_len int) []u32 {
 	assert b > 0
 	assert out_len >= 0
-	assert x.len >= cdiv(out_len * b, 8)
+	assert x.len >= cdiv(out_len * int(b), 8)
 
 	mut bits := u32(0)
 	mut total := u32(0)
@@ -85,7 +86,7 @@ fn rev8_be32(x u32) u32 {
 }
 
 @[inline]
-fn rev8_be64(u64 x) {
+fn rev8_be64(x u64) u64 {
 	$if !big_endian {
 		return (x << 56) | ((x & 0x0000_0000_0000_FF00) << 40) | ((x & 0x0000_0000_00FF_0000) << 24) | ((x & 0x0000_0000_FF00_0000) << 8) | ((x & 0x0000_00FF_0000_0000) >> 8) | ((x & 0x0000_FF00_0000_0000) >> 24) | ((x & 0x00FF_0000_0000_0000) >> 40) | (x >> 56)
 	}
@@ -106,7 +107,7 @@ fn mgf1_sha256(seed []u8, length int) ![]u8 {
 
 	for result.len < length {
 		mut b := []u8{len: 4}
-		big_endian_put_u32(mut b, counter)
+		binary.big_endian_put_u32(mut b, counter)
 
 		mut data := seed.clone()
 		data << b
@@ -128,7 +129,7 @@ fn mgf1_sha512(seed []u8, length int) ![]u8 {
 
 	for result.len < length {
 		mut b := []u8{len: 4}
-		big_endian_put_u32(mut b, counter)
+		binary.big_endian_put_u32(mut b, counter)
 		mut data := seed.clone()
 		data << b
 		result << sha512.sum512(data)

@@ -18,6 +18,15 @@ mut:
 	// 12 bytes
 }
 
+fn (addr Address) clone() Address {
+	return Address{
+		layer: addr.layer
+		tree:  addr.tree
+		tipe:  addr.tipe
+		final: addr.final
+	}
+}
+
 // The Address type word will have a value of 0, 1, 2, 3, 4, 5, or 6.
 // In order to improve readability, these values will be
 // referred to in this standard by the constants WOTS_HASH, WOTS_PK, TREE,
@@ -156,27 +165,4 @@ fn (mut addr Address) set_hash_address(x u32) {
 // serializes AddressType to bytes in big endian order
 fn (adt AddressType) to_bytes() []u8 {
 	return binary.big_endian_get_u32(u32(adt))
-}
-
-// Parameters Set
-struct ParamSet {
-	// Algorithm name
-	alg_id string
-
-	n u32
-	//  Security level / hash size { 16,24,32 }.
-	h u32
-	//  Bits h used to select FORS key.
-	d u32
-	//  Number of hypertree layers d.
-	hp u32
-	//  Merkle tree height h' (XMSS).
-	a u32
-	//  String length t = 2**a (FORS).
-	k u32
-	//  Number of strings (FORS).
-	lgw u32
-	//  Number of bits in chain index (WOTS+)
-	m u32
-	//  Length in bytes of message digest.
 }

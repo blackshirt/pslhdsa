@@ -2,7 +2,6 @@ module pslhdsa
 
 import crypto
 import crypto.rand
-import crypto.hash
 import crypto.sha3
 import crypto.sha256
 import crypto.sha512
@@ -22,22 +21,22 @@ struct SignerOpts {
 // Output: SLH-DSA signature SIG.
 fn slh_sign_internal(c Context, m []u8, sk Sk, addrnd []u8, opt SignerOpts) ![]u8 {
 	// ADRS ← toByte(0, 32)
-	mut addr := to_byte(0, 32)
+	mut addr := Address{}
 	// substitute 𝑜𝑝𝑡_𝑟𝑎𝑛𝑑 ← PK.seed for the deterministic variant, 𝑜𝑝𝑡_𝑟𝑎𝑛𝑑 ← 𝑎𝑑𝑑𝑟𝑛
 	mut opt_rand := addrnd.clone()
 	if opt.deterministic {
-		opt_rand = sk.pk.seed
+		opt_rand = unsafe { sk.pk.seed }
 	}
 	if opt.randomize {
-		opt_rand = rand.read(c.prm.n)!
+		opt_rand = unsafe { rand.read(c.prm.n)! }
 	}
 	// generate randomizer, 𝑅 ← PRF𝑚𝑠𝑔(SK.prf, 𝑜𝑝𝑡_𝑟𝑎𝑛𝑑, 𝑀 )
-	r := c.prf_msg(sk.prf, opt_rand, m)!
+	r := c.prf_msg(sk.prf, opt_rand, m)
 	// SIG ← r
 	mut sig := r.clone()
 
 	// compute message digest, 	𝑑𝑖𝑔𝑒𝑠𝑡 ← H𝑚𝑠𝑔(𝑅, PK.seed, PK.root, 𝑀 )
-	digest := c.h_msg(r, pk.seed, pk.root, m)!
+	digest := c.h_msg(r, sk.pk.seed, sk.pk.root, m)
 	// 𝑚𝑑 ← 𝑑𝑖𝑔𝑒𝑠𝑡 [0 ∶ (𝑘⋅𝑎 ⌉ 8 )]
 	md := digest[0..cdiv(c.prm.k * c.prm.a, 8)]
 
@@ -46,30 +45,30 @@ fn slh_sign_internal(c Context, m []u8, sk Sk, addrnd []u8, opt SignerOpts) ![]u
 		cdiv(c.prm.h - (c.prm.h / c.prm.d), 8)]
 
 	// (k*a)/8 + (h-h/d)/8 .. (k*a)/8 + (h-h/d)/8 + h/8d
-	tmp_idx_leaf = digest[cdiv(c.prm.k * c.prm.a, 8) + cdiv(c.prm.h - (c.prm.h / c.prm.d), 8)..
+	tmp_idx_leaf := digest[cdiv(c.prm.k * c.prm.a, 8) + cdiv(c.prm.h - (c.prm.h / c.prm.d), 8)..
 		cdiv(c.prm.k * c.prm.a, 8) + cdiv(c.prm.h - (c.prm.h / c.prm.d), 8) +
 		cdiv(c.prm.h, 8 * c.prm.d)]
 	idx_tree := to_int(tmp_idx_tree, cdiv(c.prm.h - c.prm.h / c.prm.d, 8)) % (1 << (c.prm.h - c.prm.h / c.prm.d)) // mod 2^(ℎ−ℎ/d)
 	idx_leaf := to_int(tmp_idx_leaf, cdiv(c.prm.h, 8 * c.prm.d)) % (1 << (c.prm.h / c.prm.d))
 
 	// ADRS.setTreeAddress(𝑖𝑑𝑥𝑡𝑟𝑒𝑒)
-	addr.set_tree_address(idx_tree)
+	addr.set_tree_address(u32(idx_tree))
 
 	// ADRS.setTypeAndClear(FORS_TREE)
 	addr.set_type_and_clear(.fors_tree)
 	// ADRS.setKeyPairAddress(𝑖𝑑𝑥𝑙𝑒𝑎𝑓)
-	addr.set_keypair_address(idx_leaf)
+	addr.set_keypair_address(u32(idx_leaf))
 	// SIG𝐹𝑂𝑅𝑆 ← fors_sign(𝑚𝑑, SK.seed, PK.seed, ADRS)
 	sig_fors := fors_sign(c, md, sk.seed, sk.pk.seed, addr)!
 	// SIG ← SIG ∥ SIG𝐹𝑂𝑅s
 	sig << sig_fors
 
 	// get FORS key, PK𝐹𝑂𝑅𝑆 ← fors_pkFromSig(SIG𝐹𝑂𝑅𝑆, 𝑚𝑑, PK.seed, ADRS)
-	pk_fors := fors_pkfromsig(c, sig_fors, md, sk.pk.seed, addr)!
+	pk_fors := fors_pkfromsig(c, sig_fors, md, sk.pk.seed, mut addr)!
 	// 17: SIG𝐻𝑇 ← ht_sign(PK𝐹𝑂𝑅𝑆, SK.seed, PK.seed,𝑖𝑑𝑥𝑡𝑟𝑒𝑒,𝑖𝑑𝑥𝑙𝑒𝑎𝑓)
-	sig_ht := ht_sign(c, pk_fors, sk.seed, sk.pk.seed, idx_tree, idx_leaf)!
+	sig_ht := ht_sign(c, pk_fors, sk.seed, sk.pk.seed, int(idx_tree), int(idx_leaf))!
 
-	// : SIG ← SIG ∥ SIG𝐻�
+	// : SIG ← SIG ∥ SIG𝐻t
 	sig << sig_ht
 	// : return SIG
 	return sig
@@ -97,7 +96,7 @@ mut:
 // Generates an SLH-DSA key pair.
 // Input: (none)
 // Output: SLH-DSA key pair (SK, PK)
-fn slh_keygen(c Context) ! {
+fn slh_keygen(c Context) !(Sk, Pk) {
 	// set SK.seed, SK.prf, and PK.seed to random 𝑛-byte
 	sk_seed := rand.read(c.prm.n)!
 	sk_prf := rand.read(c.prm.n)!
@@ -114,11 +113,11 @@ fn slh_keygen(c Context) ! {
 fn slh_keygen_internal(c Context, sk_seed []u8, sk_prf []u8, pk_seed []u8) !(Sk, Pk) {
 	// generate the public key for the top-level XMSS tree
 	// 1: ADRS ← toByte(0, 32) ▷
-	mut addr := to_byte(0, 32)
+	mut addr := Address{}
 	// 2: ADRS.setLayerAddress(𝑑 − 1)
-	addr.set_layer_address(c.prm.d - 1)
+	addr.set_layer_address(u32(c.prm.d - 1))
 	// 3: PK.root ← xmss_node(SK.seed, 0, ℎ′ , PK.seed, ADRS)
-	pk_root := xmms_node(c, sk_seed, 0, c.prm.hp, pk_seed, mut addr)!
+	pk_root := xmss_node(c, sk_seed, 0, c.prm.hp, pk_seed, mut addr)!
 	// 4: return ( (SK.seed, SK.prf, PK.seed, PK.root), (PK.seed, PK.root) )
 	pk := Pk{
 		seed: pk_seed
@@ -146,7 +145,7 @@ fn slh_verify_internal(c Context, m []u8, sig []u8, pk Pk) !bool {
 	}
 
 	// ADRS ← toByte(0, 32)
-	mut addr := to_byte(0, 32)
+	mut addr := Address{}
 	// 𝑅 ← SIG.getR(), ▷ SIG[0 ∶ n]
 	r := sig[0..c.prm.n].clone()
 	// SIG𝐹𝑂𝑅𝑆 ← SIG.getSIG_FORS(), SIG[𝑛 ∶ (1 + 𝑘(1 + 𝑎)) ⋅ 𝑛]
@@ -156,17 +155,17 @@ fn slh_verify_internal(c Context, m []u8, sig []u8, pk Pk) !bool {
 		c.prm.d * c.prm.wots_len()) * c.prm.n]
 
 	// compute message digest, 𝑑𝑖𝑔𝑒𝑠𝑡 ← H𝑚𝑠𝑔(𝑅, PK.seed, PK.root, 𝑀 )
-	digest := c.h_msg(r, pk.seed, pk.root, m)!
+	digest := c.h_msg(r, pk.seed, pk.root, m)
 
 	// first (k.a)/8 bytes, 𝑚𝑑 ← 𝑑𝑖𝑔𝑒𝑠𝑡 [0 ∶ ⌈𝑘⋅𝑎]/8]
 	md := digest[0..cdiv(c.prm.k * c.prm.a, 8)]
 
 	// next ⌈ℎ−ℎ/𝑑]/8 ⌉ bytes
-	tmp_idx_tree := digest[cdiv(c.k * c.prm.a, 8)..cdiv(c.prm.k * c.prm.a, 8) +
+	tmp_idx_tree := digest[cdiv(c.prm.k * c.prm.a, 8)..cdiv(c.prm.k * c.prm.a, 8) +
 		cdiv(c.prm.h - c.prm.h / c.prm.d, 8)]
 
 	// next [h/8𝑑] bytes
-	tmp_idx_leaf = digest[cdiv(c.prm.k * c.a, 8) + cdiv(c.prm.h - c.prm.h / c.prm.d, 8)..
+	tmp_idx_leaf := digest[cdiv(c.prm.k * c.prm.a, 8) + cdiv(c.prm.h - c.prm.h / c.prm.d, 8)..
 		cdiv(c.prm.k * c.prm.a, 8) + cdiv(c.prm.h - c.prm.h / c.prm.d, 8) +
 		cdiv(c.prm.h, 8 * c.prm.d)]
 
@@ -174,15 +173,15 @@ fn slh_verify_internal(c Context, m []u8, sig []u8, pk Pk) !bool {
 	idx_leaf := to_int(tmp_idx_leaf, cdiv(c.prm.h, 8 * c.prm.d)) % (1 << (c.prm.h / c.prm.d)) // mod 2^(ℎ/d)
 
 	// compute FORS public key
-	addr.set_tree_address(idx_tree)
+	addr.set_tree_address(u32(idx_tree))
 	addr.set_type_and_clear(.fors_tree)
-	addr.set_key_pair_address(idx_leaf)
+	addr.set_keypair_address(u32(idx_leaf))
 
 	// PK𝐹𝑂𝑅𝑆 ← fors_pkFromSig(SIG𝐹𝑂𝑅𝑆, 𝑚𝑑, PK.seed, ADRS)
-	pk_fors := fors_pkfromsig(c, sig_fors, md, pk.seed, addr)!
+	pk_fors := fors_pkfromsig(c, sig_fors, md, pk.seed, mut addr)!
 
 	// return ht_verify(PK𝐹𝑂𝑅𝑆, SIG𝐻𝑇, PK.seed,𝑖𝑑𝑥𝑡𝑟𝑒𝑒,𝑖𝑑𝑥𝑙𝑒𝑎𝑓, PK.root)
-	return ht_verify(c, pk_fors, sig_ht, pk.seed, idx_tree, idx_leaf, pk.root)!
+	return ht_verify(c, pk_fors, sig_ht, pk.seed, int(idx_tree), int(idx_leaf), pk.root)!
 }
 
 const max_allowed_context_string = 255
@@ -204,7 +203,7 @@ fn slh_sign(c Context, m []u8, cx []u8, sk Sk, opt SignerOpts) ![]u8 {
 	// 𝑀′ ← toByte(0, 1) ∥ toByte(|𝑐𝑡𝑥|, 1) ∥ 𝑐𝑡𝑥 ∥ m
 	mut msg := []u8{}
 	msg << to_byte(0, 1)
-	msg << to_byte(cx.len, 1)
+	msg << to_byte(u64(cx.len), 1)
 	msg << cx
 	msg << m
 
@@ -214,6 +213,7 @@ fn slh_sign(c Context, m []u8, cx []u8, sk Sk, opt SignerOpts) ![]u8 {
 	return sig
 }
 
+/*
 // 10.2.2 HashSLH-DSA Signature Generation
 //
 // Algorithm 23 hash_slh_sign(𝑀, 𝑐𝑡𝑥, PH, SK)
@@ -231,7 +231,7 @@ fn hash_slh_sign(c Context, m []u8, cx []u8, ph crypto.Hash, sk Sk, opt SignerOp
 
 	// default to sha256
 	// OID ← toByte(0x0609608648016503040201, 11)
-	mut oid := to_byte(0x0609608648016503040201, 11)
+	mut oid := to_byte(u64(0x0609608648016503040201), 11)
 	// PH𝑀 ← SHA-256(𝑀 )
 	mut phm := sha256.sum256(m)
 
@@ -241,21 +241,21 @@ fn hash_slh_sign(c Context, m []u8, cx []u8, ph crypto.Hash, sk Sk, opt SignerOp
 		}
 		.sha512 {
 			// OID ← toByte(0x0609608648016503040203, 11) ▷ 2.16.840.1.101.3.4.2.3
-			oid = to_byte(0x0609608648016503040203, 11)
+			oid = to_byte(u64(0x0609608648016503040203), 11)
 			// PH𝑀 ← SHA-512(𝑀 )
 			phm = sha512.sum512(m)
 		}
 		// need to be patched into .shake128
 		.sha3_224 {
 			// OID ← toByte(0x060960864801650304020B, 11) ▷ 2.16.840.1.101.3.4.2.11
-			oid = to_byte(0x060960864801650304020B, 11)
+			oid = to_byte(u64(0x060960864801650304020B), 11)
 			// 17: PH𝑀 ← SHAKE128(𝑀, 256)
 			phm = sha3.shake128(m, 256)
 		}
 		// // need to be patched into .shake256
 		.sha3_256 {
 			// OID ← toByte(0x060960864801650304020C, 11) ▷ 2.16.840.1.101.3.4.2.12
-			oid = to_byte(0x060960864801650304020C, 11)
+			oid = to_byte(u64(0x060960864801650304020C), 11)
 			// PH𝑀 ← SHAKE256(𝑀, 512)
 			phm = sha3.shake256(m, 512)
 		}
@@ -273,10 +273,11 @@ fn hash_slh_sign(c Context, m []u8, cx []u8, ph crypto.Hash, sk Sk, opt SignerOp
 	msg << phm
 
 	// SIG ← slh_sign_internal(𝑀′, SK, 𝑎𝑑𝑑𝑟𝑛𝑑) ▷ omit 𝑎𝑑𝑑𝑟𝑛𝑑 for the deterministic variant
-	sig := slh_sign_internal(msg, sk, addrnd, opt)
+	sig := slh_sign_internal(msg, sk, addrnd, opt)!
 
 	return sig
 }
+*/
 
 // 10.3 SLH-DSA Signature Verification
 //
@@ -291,7 +292,7 @@ fn slh_verify(c Context, m []u8, sig []u8, cx []u8, pk Pk) !bool {
 	// 𝑀′ ← toByte(0, 1) ∥ toByte(|𝑐𝑡𝑥|, 1) ∥ 𝑐𝑡𝑥 ∥ m
 	mut msg := []u8{}
 	msg << to_byte(0, 1)
-	msg << to_byte(cx.len, 1)
+	msg << to_byte(u64(cx.len), 1)
 	msg << cx
 	msg << m
 
@@ -299,6 +300,7 @@ fn slh_verify(c Context, m []u8, sig []u8, cx []u8, pk Pk) !bool {
 	return slh_verify_internal(c, msg, sig, pk)!
 }
 
+/*
 // Algorithm 25 hash_slh_verify(𝑀, SIG, 𝑐𝑡𝑥, PH, PK)
 // Verifies a pre-hash SLH-DSA signature.
 // Input: Message 𝑀, signature SIG, context string 𝑐𝑡𝑥, pre-hash function PH, public key PK.
@@ -309,7 +311,7 @@ fn hash_slh_verify(c Context, m []u8, sig []u8, cx []u8, ph crypto.Hash, pk Pk) 
 	}
 	// default to sha256
 	// OID ← toByte(0x0609608648016503040201, 11)
-	mut oid := to_byte(0x0609608648016503040201, 11)
+	mut oid := to_byte(u64(0x0609608648016503040201), 11)
 	// PH𝑀 ← SHA-256(𝑀 )
 	mut phm := sha256.sum256(m)
 
@@ -319,21 +321,21 @@ fn hash_slh_verify(c Context, m []u8, sig []u8, cx []u8, ph crypto.Hash, pk Pk) 
 		}
 		.sha512 {
 			// OID ← toByte(0x0609608648016503040203, 11) ▷ 2.16.840.1.101.3.4.2.3
-			oid = to_byte(0x0609608648016503040203, 11)
+			oid = to_byte(u64(0x0609608648016503040203), 11)
 			// PH𝑀 ← SHA-512(𝑀 )
 			phm = sha512.sum512(m)
 		}
 		// need to be patched into .shake128
 		.sha3_224 {
 			// OID ← toByte(0x060960864801650304020B, 11) ▷ 2.16.840.1.101.3.4.2.11
-			oid = to_byte(0x060960864801650304020B, 11)
+			oid = to_byte(u64(0x060960864801650304020B), 11)
 			// 17: PH𝑀 ← SHAKE128(𝑀, 256)
 			phm = sha3.shake128(m, 256)
 		}
 		// // need to be patched into .shake256
 		.sha3_256 {
 			// OID ← toByte(0x060960864801650304020C, 11) ▷ 2.16.840.1.101.3.4.2.12
-			oid = to_byte(0x060960864801650304020C, 11)
+			oid = to_byte(u64(0x060960864801650304020C), 11)
 			// PH𝑀 ← SHAKE256(𝑀, 512)
 			phm = sha3.shake256(m, 512)
 		}
@@ -344,7 +346,7 @@ fn hash_slh_verify(c Context, m []u8, sig []u8, cx []u8, ph crypto.Hash, pk Pk) 
 	// 𝑀′ ← toByte(1, 1) ∥ toByte(|𝑐𝑡𝑥|, 1) ∥ 𝑐𝑡𝑥 ∥ OID ∥ PHm
 	mut msg := []u8{}
 	msg << to_byte(1, 1)
-	msg << to_byte(cx.len, 1)
+	msg << to_byte(u64(cx.len), 1)
 	msg << cx
 	msg << oid
 	msg << phm
@@ -352,3 +354,4 @@ fn hash_slh_verify(c Context, m []u8, sig []u8, cx []u8, ph crypto.Hash, pk Pk) 
 	// return slh_verify_internal(𝑀′, SIG, PK)
 	return slh_verify_internal(c, msg, sig, pk)!
 }
+*/

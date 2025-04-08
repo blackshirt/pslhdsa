@@ -15,7 +15,7 @@ fn ht_sign(c Context, m []u8, sk_seed []u8, pk_seed []u8, idxtree_ int, idxleaf_
 	mut idxleaf := idxleaf_
 
 	// ADRS ← toByte(0, 32)
-	mut addr := to_byte(0, 32)
+	mut addr := Address{}
 	// ADRS.setTreeAddress(𝑖𝑑𝑥𝑡𝑟𝑒𝑒)
 	addr.set_tree_address(u64(idxtree))
 	// SIG𝑡𝑚𝑝 ← xmss_sign(𝑀, SK.seed,𝑖𝑑𝑥𝑙𝑒𝑎𝑓, PK.seed, ADRS)
@@ -57,7 +57,7 @@ fn ht_verify(c Context, m []u8, sig_ht []u8, pk_seed []u8, idxtree_ int, idx_lea
 	mut idxleaf := idxleaf_
 
 	// ADRS ← toByte(0, 32)
-	mut addr := to_byte(0, 32)
+	mut addr := Address{}
 	// ADRS.setTreeAddress(𝑖𝑑𝑥𝑡𝑟𝑒𝑒)
 	addr.set_tree_address(u32(idxtree))
 	// SIG𝑡𝑚𝑝 ← SIG𝐻𝑇.getXMSSSignature(0) ▷ SIG𝐻𝑇[0 ∶ (ℎ′ + 𝑙𝑒𝑛) ⋅ 𝑛]

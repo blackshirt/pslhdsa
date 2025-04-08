@@ -39,7 +39,7 @@ fn (ctx Context) prf_msg(sk_prf []u8, opt_rand []u8, msg []u8) []u8 {
 
 // H𝑚𝑠𝑔(𝑅, PK.seed, PK.root, 𝑀 ) (𝔹𝑛 × 𝔹𝑛 × 𝔹𝑛 × 𝔹∗ → 𝔹𝑚) is used to generate the
 // digest of the message to be signed.
-fn (ctx Context) h_msg(r []u8, pk_seed []u8, pk_root []u8, msg []u8, m int) []u8 {
+fn (ctx Context) h_msg(r []u8, pk_seed []u8, pk_root []u8, msg []u8) []u8 {
 	if ctx.is_shake() {
 		return shake256_h_msg(r, pk_seed, pk_root, msg, ctx.prm.m)
 	}

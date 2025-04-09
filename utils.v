@@ -54,7 +54,7 @@ fn base_2exp_b(x []u8, b int, out_len int) []int {
 	assert x.len >= cdiv(out_len * int(b), 8)
 
 	mut bits := 0
-	mut total := 0
+	mut total := u32(0)
 	mut pos := 0
 	mut baseb := []int{len: out_len}
 
@@ -65,7 +65,7 @@ fn base_2exp_b(x []u8, b int, out_len int) []int {
 			bits += 8
 		}
 		bits -= b
-		baseb[out] = (total >> bits) & max_int
+		baseb[out] = int(total >> bits) & max_int
 	}
 	return baseb
 }

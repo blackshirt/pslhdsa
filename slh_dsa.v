@@ -1,6 +1,5 @@
 module pslhdsa
 
-import crypto
 import crypto.rand
 // import crypto.sha3
 // import crypto.sha256

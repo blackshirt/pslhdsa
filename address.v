@@ -177,10 +177,7 @@ const sha256_hash_size = sha256.size
 // to a cryptographic hash function except that while a hash function's
 // output has a fixed size, a MGF supports output of a variable length.
 @[inline]
-fn mgf1_sha256(seed []u8, mlen int) ![]u8 {
-	if mlen > (sha256_hash_size << 32) {
-		return error('Length Too Big')
-	}
+fn mgf1_sha256(seed []u8, mlen int) []u8 {
 	mut out := []u8{}
 	for c := 0; c < cdiv(mlen, sha256_hash_size); c++ {
 		mut data := seed.clone()
@@ -194,10 +191,7 @@ fn mgf1_sha256(seed []u8, mlen int) ![]u8 {
 const sha512_hash_size = sha512.size
 
 @[inline]
-fn mgf1_sha512(seed []u8, mlen int) ![]u8 {
-	if mlen > (sha512_hash_size << 32) {
-		return error('Length Too Big')
-	}
+fn mgf1_sha512(seed []u8, mlen int) []u8 {
 	mut out := []u8{}
 	for c := 0; c < cdiv(mlen, sha512_hash_size); c++ {
 		mut data := seed.clone()
@@ -248,6 +242,9 @@ fn (c Context) prf_msg(sk_prf []u8, opt_rand []u8, msg []u8) ![]u8 {
 		data << opt_rand
 		data << msg
 
+		// if c.prm.id in [.shake_128f, .shake_128s] {
+		//	return sha3.shake128(data, c.prm.n)
+		// }
 		return sha3.shake256(data, c.prm.n)
 	}
 	// sha2 family
@@ -271,7 +268,9 @@ fn (c Context) h_msg(r []u8, pk_seed []u8, pk_root []u8, msg []u8) ![]u8 {
 		data << pk_seed
 		data << pk_root
 		data << msg
-
+		if c.prm.id in [.shake_128f, .shake_128s] {
+			return sha3.shake128(data, c.prm.m)
+		}
 		return sha3.shake256(data, c.prm.m)
 	}
 	// mgf1_sha256(R + pk_seed + sha256(R + pk_seed + pk_root + M)
@@ -294,55 +293,133 @@ fn (c Context) h_msg(r []u8, pk_seed []u8, pk_root []u8, msg []u8) ![]u8 {
 	seed << hashed_2nd_seed
 
 	if c.prm.sc != 1 {
-		return mgf1_sha512(seed, c.prm.m)!
+		return mgf1_sha512(seed, c.prm.m)
 	}
-	return mgf1_sha256(seed, c.prm.m)!
+	return mgf1_sha256(seed, c.prm.m)
 }
 
 // PRF(PK.seed, SK.seed, ADRS) (𝔹𝑛 × 𝔹𝑛 × 𝔹32 → 𝔹𝑛) is a PRF that is used to
 // generate the secret values in WOTS+ and FORS private keys.
 fn (c Context) prf(pk_seed []u8, sk_seed []u8, addr Address) ![]u8 {
 	if c.is_shake() {
-		return shake256_prf(pk_seed, sk_seed, addr, c.prm.n)
+		mut data := []u8{}
+		data << pk_seed
+		data << addr.full_to_bytes()
+		data << sk_seed
+		if c.prm.id in [.shake_128f, .shake_128s] {
+			return sha3.shake128(data, c.prm.n)
+		}
+		return sha3.shake256(data, c.prm.n)
 	}
-	if c.prm.sc == 1 {
-		return sha256_prf(pk_seed, sk_seed, addr, c.prm.n)
-	}
-	return sha512_prf(pk_seed, sk_seed, addr, c.prm.n)
+	// sha2 family,
+	// SLH-DSA Using SHA2 for Security Category 1
+	// PRF(PK.seed, SK.seed, ADRS) = Trunc𝑛(SHA-256(PK.seed ∥ toByte(0, 64 − 𝑛) ∥ ADRS𝑐 ∥ SK.seed))
+	addrs_c := addr.compress()
+	mut data := []u8{}
+	data << pk_seed
+	data << to_byte(0, 64 - c.prm.n)
+	data << addrs_c
+	data << sk_seed
+	mut out := sha256.sum256(data)
+	// SLH-DSA Using SHA2 for Security Categories 3 and 5
+	// PRF(PK.seed, SK.seed, ADRS) = Trunc𝑛(SHA-256(PK.seed ∥ toByte(0, 64 − 𝑛) ∥ ADRS𝑐 ∥ SK.seed))
+	// Really the same with category 1
+	// if c.prm.sc != 1 {
+	//	out = sha512.sum512(data)
+	// }
+	return out[..c.prm.n]
 }
 
 // Tℓ(PK.seed, ADRS, 𝑀ℓ) (𝔹𝑛 × 𝔹32 × 𝔹ℓ𝑛 → 𝔹𝑛) is a hash function that maps an
 // ℓ𝑛-byte message to an 𝑛-byte message.
 fn (c Context) tlen(pk_seed []u8, addr Address, ml []u8) ![]u8 {
 	if c.is_shake() {
-		return shake256_tlen(pk_seed, addr, ml, c.prm.n)
+		// Tℓ(PK.seed, ADRS, 𝑀ℓ) = SHAKE256(PK.seed ∥ ADRS ∥ 𝑀ℓ, 8𝑛)
+		mut data := []u8{}
+		data << pk_seed
+		data << addr.full_to_bytes()
+		data << ml
+
+		return sha3.shake256(data, c.prm.n)
 	}
+	// sha2 family,
+	//
+	// SLH-DSA Using SHA2 for Security Category 1
+	// Tℓ(PK.seed, ADRS, 𝑀ℓ) = Trunc𝑛(SHA-256(PK.seed ∥ toByte(0, 64 − 𝑛) ∥ ADRS𝑐 ∥ 𝑀ℓ))
+	addrs_c := addr.compress()
+	mut data := []u8{}
+	data << pk_seed
 	if c.prm.sc == 1 {
-		return sha256_tlen(pk_seed, addr, ml, c.prm.n)
+		data << to_byte(0, 64 - c.prm.n)
+	} else {
+		data << to_byte(0, 128 - c.prm.n)
 	}
-	return sha512_tlen(pk_seed, addr, ml, c.prm.n)
+	data << addrs_c
+	data << ml
+	mut out := sha256.sum256(data)
+	// SLH-DSA Using SHA2 for Security Categories 3 and 5
+	// Tℓ(PK.seed, ADRS, 𝑀ℓ) = Trunc𝑛(SHA-512(PK.seed ∥ toByte(0, 128 − 𝑛) ∥ ADRS𝑐 ∥ 𝑀ℓ))
+	if c.prm.sc != 1 {
+		out = sha512.sum512(data)
+	}
+	return out[..c.prm.n]
 }
 
 // H(PK.seed, ADRS, 𝑀2) (𝔹𝑛 × 𝔹32 × 𝔹2𝑛 → 𝔹𝑛) is a special case of Tℓ that takes a
 // 2𝑛-byte message as input.
 fn (c Context) h(pk_seed []u8, addr Address, m2 []u8) ![]u8 {
 	if c.is_shake() {
-		return shake256_h(pk_seed, addr, m2, c.prm.n)
+		// H(PK.seed, ADRS, 𝑀2) = SHAKE256(PK.seed ∥ ADRS ∥ 𝑀2, 8𝑛)
+		mut data := []u8{}
+		data << pk_seed
+		data << addr.full_to_bytes()
+		data << m2
+
+		return sha3.shake256(data, c.prm.n)
 	}
+	// H(PK.seed, ADRS, 𝑀2) = Trunc𝑛(SHA-256(PK.seed ∥ toByte(0, 64 − 𝑛) ∥ ADRS𝑐 ∥ 𝑀2))
+	// H(PK.seed, ADRS, 𝑀2) = Trunc𝑛(SHA-512(PK.seed ∥ toByte(0, 128 − 𝑛) ∥ ADRS𝑐 ∥ 𝑀2))
+	addrs_c := addr.compress()
+	mut data := []u8{}
+	data << pk_seed
+
 	if c.prm.sc == 1 {
-		return sha256_h(pk_seed, addr, m2, c.prm.n)
+		data << to_byte(0, 64 - c.prm.n)
+	} else {
+		data << to_byte(0, 128 - c.prm.n)
 	}
-	return sha512_h(pk_seed, addr, m2, c.prm.n)
+	data << addrs_c
+	data << m2
+
+	mut out := sha256.sum256(data)
+	if c.prm.sc != 1 {
+		out = sha512.sum512(data)
+	}
+	return out[..c.prm.n]
 }
 
 // F(PK.seed, ADRS, 𝑀1) (𝔹𝑛 × 𝔹32 × 𝔹𝑛 → 𝔹𝑛) is a hash function that takes an 𝑛-byte
 // message as input and produces an 𝑛-byte output.
 fn (c Context) f(pk_seed []u8, addr Address, m1 []u8) ![]u8 {
 	if c.is_shake() {
-		return shake256_f(pk_seed, addr, m1, c.prm.m)
+		mut data := []u8{}
+		data << pk_seed
+		data << addr.full_to_bytes()
+		data << m1
+
+		return sha3.shake256(data, c.prm.n)
 	}
-	if c.prm.sc == 1 {
-		return sha256_f(pk_seed, addr, m1, c.prm.m)
-	}
-	return sha512_f(pk_seed, addr, m1, c.prm.m)
+	// 11.2.1 SLH-DSA Using SHA2 for Security Category 1
+	// F(PK.seed, ADRS, 𝑀1) = Trunc𝑛(SHA-256(PK.seed ∥ toByte(0, 64 − 𝑛) ∥ ADRS𝑐 ∥ 𝑀1))
+	// SLH-DSA Using SHA2 for Security Categories 3 and 5
+	// F(PK.seed, ADRS, 𝑀1) = Trunc𝑛(SHA-256(PK.seed ∥ toByte(0, 64 − 𝑛) ∥ ADRS𝑐 ∥ 𝑀1))
+	addrs_c := addr.compress()
+	mut data := []u8{}
+	data << pk_seed
+	data << to_byte(0, 64 - c.prm.n)
+	data << addrs_c
+	data << m1
+
+	out := sha256.sum256(data)
+	return out[..c.prm.n]
 }

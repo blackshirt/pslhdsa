@@ -30,9 +30,11 @@ fn fors_skgen(c Context, sk_seed []u8, pk_seed []u8, addr Address, idx int) ![]u
 // Input: Secret seed SK.seed, target node index 𝑖, target node height 𝑧, public seed PK.seed, address ADRS.
 // Output: 𝑛-byte root 𝑛𝑜𝑑𝑒.
 fn fors_node(c Context, sk_seed []u8, i int, z int, pk_seed []u8, mut addr Address) ![]u8 {
+	// if z > ctx.a or i >= ctx.k * 2**(ctx.a - z):
 	if z > c.prm.a || i >= c.prm.k * (1 << (c.prm.a - z)) {
-		return error('Bad fors_node params')
+		// return error('Bad fors_node params')
 		// return empty bytes instead ?
+		return []u8{}
 	}
 	if z == 0 {
 		// 𝑠𝑘 ← fors_skGen(SK.seed, PK.seed, ADRS,𝑖)

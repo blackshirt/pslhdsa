@@ -6,65 +6,44 @@ import crypto.sha256
 import crypto.sha512
 import encoding.binary
 
+// vfmt off
+const addr_layer_start 	= 0
+const addr_layer_end	= 4
+const addr_tree_start	= 4
+const addr_tree_end		= 16
+const addr_type_start 	= 16
+const addr_type_end		= 20
+const addr_final_start	= 20
+const addr_final_end	= 32
+// vfmt on
+
 // Address fundamentally 32 bytes long composed from:
-// -- layer address  4 bytes
-// -- tree address  12 bytes
-// -- 𝑡𝑦𝑝𝑒           4 bytes
-// -- final         12 bytes
+// -- layer address  4 bytes 0-4
+// -- tree address  12 bytes 4-16
+// -- 𝑡𝑦𝑝𝑒           4 bytes 16-20
+// -- final         12 bytes 20-32
 struct Address {
 mut:
-	layer u32
-	// 4 bytes
-	tree [3]u32
-	// 12 bytes
-	tipe  AddressType
-	final [3]u32
-	// 12 bytes
+	data []u8 = []u8{len: 32}
 }
 
+@[direct_array_access; inline]
+fn (addr Address) bytes() []u8 {
+	return addr.data
+}
+
+@[direct_array_access; inline]
 fn (addr Address) clone() Address {
 	return Address{
-		layer: addr.layer
-		tree:  addr.tree
-		tipe:  addr.tipe
-		final: addr.final
+		data: addr.data.clone()
 	}
 }
 
-// The Address type word will have a value of 0, 1, 2, 3, 4, 5, or 6.
-// In order to improve readability, these values will be
-// referred to in this standard by the constants WOTS_HASH, WOTS_PK, TREE,
-// FORS_TREE, FORS_ROOTS, WOTS_PRF, and FORS_PRF, respectively
-enum AddressType as u32 {
-	wots_hash  = 0
-	wots_pk    = 1
-	tree       = 2
-	fors_tree  = 3
-	fors_roots = 4
-	wots_prf   = 5
-	fors_prf   = 6
-}
-
-fn (addr Address) full_to_bytes() []u8 {
-	mut out := []u8{len: 32}
-
-	// layer
-	binary.big_endian_put_u32(mut out[0..4], addr.layer)
-
-	// tree
-	binary.big_endian_put_u32(mut out[4..8], addr.tree[0])
-	binary.big_endian_put_u32(mut out[8..12], addr.tree[1])
-	binary.big_endian_put_u32(mut out[12..16], addr.tree[1])
-
-	// type
-	binary.big_endian_put_u32(mut out[16..20], u32(addr.tipe))
-
-	// final address
-	binary.big_endian_put_u32(mut out[20..24], addr.final[0])
-	binary.big_endian_put_u32(mut out[24..28], addr.final[1])
-	binary.big_endian_put_u32(mut out[28..32], addr.final[2])
-
-	return out
+@[direct_array_access; inline]
+fn (mut addr Address) reset() {
+	unsafe {
+		addr.data.reset()
+	}
 }
 
 // 18. Compressed address (ADRS ) 22 bytes
@@ -73,102 +52,126 @@ fn (addr Address) full_to_bytes() []u8 {
 // tree address 8 bytes
 // 𝑡𝑦𝑝𝑒 1 byte
 // final 12 bytes
+@[direct_array_access; inline]
 fn (addr Address) compress() []u8 {
-	data := addr.full_to_bytes()
-
 	mut out := []u8{}
-	out << data[3..4]
-	out << data[8..16]
-	out << data[19..32]
+	out << addr.data[3..4]
+	out << addr.data[8..16]
+	out << addr.data[19..32]
 
+	assert out.len == 22
 	return out
 }
 
-fn (mut addr Address) reset() {
-	addr.layer = 0
-	addr.tree[0] = 0
-	addr.tree[1] = 0
-	addr.tree[2] = 0
-
-	// reset tipe
-	addr.final[0] = 0
-	addr.final[1] = 0
-	addr.final[2] = 0
-}
-
 // Member functions for addresses
+//
 
-// ADRS.setTypeAndClear(𝑌) ADRS ← ADRS[0 ∶ 16] ∥ toByte(𝑌 , 4) ∥ toByte(0, 12)
-fn (mut addr Address) set_type_and_clear(new_type AddressType) {
-	addr.tipe = new_type
-	// Whenever the type in an address changes, the final 12 bytes of the address are
-	// initialized to zero.
-	addr.final[0] = 0
-	addr.final[1] = 0
-	addr.final[2] = 0
+// Layer parts
+@[direct_array_access; inline]
+fn (addr Address) get_layer_address() u64 {
+	return to_int(addr.data[addr_layer_start..addr_layer_end], 4)
 }
 
 // ADRS.setLayerAddress(𝑙) ADRS ← toByte(𝑙, 4) ∥ ADRS[4 ∶ 32]
-fn (mut addr Address) set_layer_address(x u32) {
-	v := rev8_be32(x)
-	addr.layer = v
+@[direct_array_access; inline]
+fn (mut addr Address) set_layer_address(x int) {
+	bytes := to_byte(x, 4)
+	addr.data[addr_layer_start..addr_layer_end] = bytes
 }
 
+// Tree parts
 // ADRS.setTreeAddress(𝑡) ADRS ← ADRS[0 ∶ 4] ∥ toByte(𝑡, 12) ∥ ADRS[16 ∶ 32]
-fn (mut addr Address) set_tree_address(x u64) {
-	// tree[0] of tree address are always zero
-	addr.tree[1] = rev8_be32(u32(x >> 32))
-	addr.tree[2] = rev8_be32(u32(x & 0xFFFF_FFFF))
+@[direct_array_access; inline]
+fn (mut addr Address) set_tree_address(bytes []u8) {
+	assert bytes.len == 12
+	addr.data[addr_tree_start..addr_tree_end] = bytes
 }
 
+// KEYPAIR
 // ADRS.setKeyPairAddress(𝑖) ADRS ← ADRS[0 ∶ 20] ∥ toByte(𝑖, 4) ∥ ADRS[24 ∶ 32]
-fn (mut addr Address) set_keypair_address(x u32) {
-	addr.final[0] = rev8_be32(x)
+@[direct_array_access; inline]
+fn (mut addr Address) set_keypair_address(x int) {
+	// final 20-24
+	bytes := to_byte(x, 4)
+	addr.data[addr_final_start..addr_final_start + 4] = bytes
 }
 
 // 𝑖 ← ADRS.getKeyPairAddress() 𝑖 ← toInt(ADRS[20 ∶ 24], 4)
-fn (addr Address) get_keypair_address() u32 {
-	return rev8_be32(addr.final[0])
+@[direct_array_access; inline]
+fn (addr Address) get_keypair_address() u64 {
+	return to_int(addr.data[addr_final_start..addr_final_start + 4], 4)
+}
+
+// Set WOTS+ chain address.
+// ADRS.setChainAddress(𝑖) ADRS ← ADRS[0 ∶ 24] ∥ toByte(𝑖, 4) ∥ ADRS[28 ∶ 32]
+@[direct_array_access; inline]
+fn (mut addr Address) set_chain_address(x int) {
+	// TODO: assert correct type, 𝑡𝑦𝑝𝑒 = 0 (WOTS_HASH), 𝑡𝑦𝑝𝑒 = 5 (WOTS_PRF)
+	bytes := to_byte(x, 4)
+	// at 24..28
+	addr.data[24..28] = bytes
 }
 
 // ADRS.setTreeHeight(𝑖) ADRS ← ADRS[0 ∶ 24] ∥ toByte(𝑖, 4) ∥ ADRS[28 ∶ 32]
 // sets FORS tree height
-fn (mut addr Address) set_tree_height(x u32) {
+@[direct_array_access; inline]
+fn (mut addr Address) set_tree_height(x int) {
 	// TODO: assert correct type, 𝑡𝑦𝑝𝑒 = 3 (FORS_TREE), 𝑡𝑦𝑝𝑒 = 6 (FORS_PRF), 𝑡𝑦𝑝𝑒 = 2 (TREE)
 	// tree height was on second index of final field, ie, final[1]
-	addr.final[1] = rev8_be32(x)
-}
-
-// Set WOTS+ chain address.
-// ADRS.setChainAddress(𝑖)
-fn (mut addr Address) set_chain_address(x u32) {
-	// TODO: assert correct type, 𝑡𝑦𝑝𝑒 = 0 (WOTS_HASH), 𝑡𝑦𝑝𝑒 = 5 (WOTS_PRF)
-	addr.final[1] = rev8_be32(x)
+	bytes := to_byte(x, 4)
+	// at 24..28
+	addr.data[24..28] = bytes
 }
 
 // ADRS.setTreeIndex(𝑖) ADRS ← ADRS[0 ∶ 28] ∥ toByte(𝑖, 4)
 // Set FORS tree index.
-fn (mut addr Address) set_tree_index(x u32) {
+@[direct_array_access; inline]
+fn (mut addr Address) set_tree_index(x int) {
 	// TODO: assert correct type, 𝑡𝑦𝑝𝑒 = 2 (TREE), 𝑡𝑦𝑝𝑒 = 6 (FORS_PRF)
-	addr.final[2] = rev8_be32(x)
+	// at 28..32
+	bytes := to_byte(x, 4)
+	addr.data[28..32] = bytes
 }
 
 // 𝑖 ← ADRS.getTreeIndex() 𝑖 ← toInt(ADRS[28 ∶ 32], 4)
 // Get FORS tree index.
-fn (addr Address) get_tree_index() u32 {
+@[direct_array_access; inline]
+fn (addr Address) get_tree_index() u64 {
 	// TODO: assert correct type, 𝑡𝑦𝑝𝑒 = 2 (TREE), 𝑡𝑦𝑝𝑒 = 6 (FORS_PRF)
-	return rev8_be32(addr.final[2])
+	return to_int(addr.data[28..32], 4)
 }
 
-// ADRS.setHashAddress(𝑖)
-fn (mut addr Address) set_hash_address(x u32) {
+// ADRS.setHashAddress(𝑖), ADRS ← ADRS[0 ∶ 28] ∥ toByte(𝑖, 4)
+@[direct_array_access; inline]
+fn (mut addr Address) set_hash_address(x int) {
 	// 𝑡𝑦𝑝𝑒 = 0 (WOTS_HASH), 𝑡𝑦𝑝𝑒 = 5 (WOTS_PRF)
-	addr.final[2] = rev8_be32(x)
+	bytes := to_byte(x, 4)
+	addr.data[28..32] = bytes
 }
 
-// serializes AddressType to bytes in big endian order
-fn (adt AddressType) to_bytes() []u8 {
-	return binary.big_endian_get_u32(u32(adt))
+// ADRS.setTypeAndClear(𝑌) ADRS ← ADRS[0 ∶ 16] ∥ toByte(𝑌 , 4) ∥ toByte(0, 12)
+@[direct_array_access; inline]
+fn (mut addr Address) set_type_and_clear(new_type AddressType) {
+	// set type
+	bytes_type := to_byte(int(new_type), 4)
+	addr.data[addr_type_start..addr_type_end] = bytes_type
+
+	// clear final
+	addr.data[addr_final_start..addr_final_end] = []u8{len: 12, init: 0}
+}
+
+// The Address type word will have a value of 0, 1, 2, 3, 4, 5, or 6.
+// In order to improve readability, these values will be
+// referred to in this standard by the constants WOTS_HASH, WOTS_PK, TREE,
+// FORS_TREE, FORS_ROOTS, WOTS_PRF, and FORS_PRF, respectively
+enum AddressType {
+	wots_hash  = 0
+	wots_pk    = 1
+	tree       = 2
+	fors_tree  = 3
+	fors_roots = 4
+	wots_prf   = 5
+	fors_prf   = 6
 }
 
 const sha256_hash_size = sha256.size
@@ -304,7 +307,7 @@ fn (c Context) prf(pk_seed []u8, sk_seed []u8, addr Address) ![]u8 {
 	if c.is_shake() {
 		mut data := []u8{}
 		data << pk_seed
-		data << addr.full_to_bytes()
+		data << addr.bytes()
 		data << sk_seed
 		if c.prm.id in [.shake_128f, .shake_128s] {
 			return sha3.shake128(data, c.prm.n)
@@ -337,7 +340,7 @@ fn (c Context) tlen(pk_seed []u8, addr Address, ml []u8) ![]u8 {
 		// Tℓ(PK.seed, ADRS, 𝑀ℓ) = SHAKE256(PK.seed ∥ ADRS ∥ 𝑀ℓ, 8𝑛)
 		mut data := []u8{}
 		data << pk_seed
-		data << addr.full_to_bytes()
+		data << addr.bytes()
 		data << ml
 
 		return sha3.shake256(data, c.prm.n)
@@ -372,7 +375,7 @@ fn (c Context) h(pk_seed []u8, addr Address, m2 []u8) ![]u8 {
 		// H(PK.seed, ADRS, 𝑀2) = SHAKE256(PK.seed ∥ ADRS ∥ 𝑀2, 8𝑛)
 		mut data := []u8{}
 		data << pk_seed
-		data << addr.full_to_bytes()
+		data << addr.bytes()
 		data << m2
 
 		return sha3.shake256(data, c.prm.n)
@@ -404,7 +407,7 @@ fn (c Context) f(pk_seed []u8, addr Address, m1 []u8) ![]u8 {
 	if c.is_shake() {
 		mut data := []u8{}
 		data << pk_seed
-		data << addr.full_to_bytes()
+		data << addr.bytes()
 		data << m1
 
 		return sha3.shake256(data, c.prm.n)

@@ -5,6 +5,7 @@ module pslhdsa
 // Converts a byte string to an integer
 // Input: 𝑛-byte string 𝑋.
 fn to_int(x []u8, n int) u64 {
+	assert n <= 8
 	if n == 0 {
 		return 0
 	}

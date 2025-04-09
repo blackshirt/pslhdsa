@@ -40,11 +40,11 @@ fn wots_pkgen(c Context, sk_seed []u8, pk_seed []u8, mut addr Address) ![]u8 {
 	mut tmp := []u8{}
 	for i := 0; i < wots_len - 1; i++ {
 		// skADRS.setChainAddress(𝑖)
-		sk_addr.set_chain_address(u32(i))
+		sk_addr.set_chain_address(i)
 		// compute secret value for chain i, 𝑠𝑘 ← PRF(PK.seed, SK.seed, skADRS)
 		sk := c.prf(pk_seed, sk_seed, sk_addr)!
 		// ADRS.setChainAddress(𝑖)
-		addr.set_chain_address(u32(i))
+		addr.set_chain_address(i)
 		// compute public value for chain 𝑖, 𝑡𝑚𝑝[𝑖] ← chain(𝑠𝑘, 0, 𝑤 − 1, PK.seed, ADRS)
 		tmp_i := chain(c, sk, 0, w - 1, pk_seed, mut addr)!
 		tmp << tmp_i
@@ -54,7 +54,8 @@ fn wots_pkgen(c Context, sk_seed []u8, pk_seed []u8, mut addr Address) ![]u8 {
 	// wotspkADRS.setTypeAndClear(WOTS_PK)
 	wots_pk_addr.set_type_and_clear(.wots_pk)
 	// wotspkADRS.setKeyPairAddress(ADRS.getKeyPairAddress())
-	wots_pk_addr.set_keypair_address(addr.get_keypair_address())
+	// TODO: remove int cast
+	wots_pk_addr.set_keypair_address(int(addr.get_keypair_address()))
 	// compress public key, 𝑝𝑘 ← T𝑙𝑒𝑛(PK.seed, wotspkADRS,𝑡𝑚𝑝)
 	pk := c.tlen(pk_seed, wots_pk_addr, tmp)!
 
@@ -93,15 +94,16 @@ fn wots_sign(c Context, m []u8, sk_seed []u8, pk_seed []u8, mut addr Address) ![
 	// skADRS.setTypeAndClear(WOTS_PRF)
 	sk_addr.set_type_and_clear(.wots_prf)
 	// skADRS.setKeyPairAddress(ADRS.getKeyPairAddress())
-	sk_addr.set_keypair_address(addr.get_keypair_address())
+	// TODO: handle int > larger than max_int
+	sk_addr.set_keypair_address(int(addr.get_keypair_address()))
 
 	mut sig := []u8{}
 	for i := 0; i < c.prm.wots_len(); i++ {
 		// skADRS.setChainAddress(𝑖)
-		sk_addr.set_chain_address(u32(i))
+		sk_addr.set_chain_address(i)
 		// compute chain 𝑖 secret value, 𝑠𝑘 ← PRF(PK.seed, SK.seed, skADRS)
 		sk := c.prf(pk_seed, sk_seed, sk_addr)!
-		addr.set_chain_address(u32(i))
+		addr.set_chain_address(i)
 		// compute chain 𝑖 signature value, 𝑠𝑖𝑔[𝑖] ← chain(𝑠𝑘, 0, 𝑚𝑠𝑔[𝑖], PK.seed, ADRS)
 		sig_i := chain(c, sk, 0, int(msgs[i]), pk_seed, mut addr)!
 		sig << sig_i
@@ -138,7 +140,7 @@ fn wots_pkfromsig(c Context, sig []u8, m []u8, pk_seed []u8, mut addr Address) !
 	mut tmp := []u8{}
 	for i := 0; i < c.prm.wots_len(); i++ {
 		// ADRS.setChainAddress(𝑖)
-		addr.set_chain_address(u32(i))
+		addr.set_chain_address(i)
 		// 𝑡𝑚𝑝[𝑖] ← chain(𝑠𝑖𝑔[𝑖], 𝑚𝑠𝑔[𝑖], 𝑤 − 1 − 𝑚𝑠𝑔[𝑖], PK.seed, ADRS)
 		x := sig[i * c.prm.n..(i + 1) * c.prm.n]
 		next_chain := chain(c, x, int(msgs[i]), int(w - 1 - msgs[i]), pk_seed, mut addr)!
@@ -151,7 +153,8 @@ fn wots_pkfromsig(c Context, sig []u8, m []u8, pk_seed []u8, mut addr Address) !
 	// wotspkADRS.setTypeAndClear(WOTS_PK)
 	wots_pk_addr.set_type_and_clear(.wots_pk)
 	// wotspkADRS.setKeyPairAddress(ADRS.getKeyPairAddress())
-	wots_pk_addr.set_keypair_address(addr.get_keypair_address())
+	// TODO: remove int casts ??
+	wots_pk_addr.set_keypair_address(int(addr.get_keypair_address()))
 	// 𝑝𝑘𝑠𝑖𝑔 ← T𝑙𝑒𝑛(PK.seed, wotspkADRS,𝑡𝑚𝑝)
 	pk_sig := c.tlen(pk_seed, wots_pk_addr, tmp)!
 

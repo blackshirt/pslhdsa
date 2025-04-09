@@ -2,9 +2,9 @@ module pslhdsa
 
 import crypto
 import crypto.rand
-import crypto.sha3
-import crypto.sha256
-import crypto.sha512
+// import crypto.sha3
+// import crypto.sha256
+// import crypto.sha512
 
 @[params]
 struct SignerOpts {
@@ -203,7 +203,7 @@ fn slh_sign(c Context, m []u8, cx []u8, sk Sk, opt SignerOpts) ![]u8 {
 	// 𝑀′ ← toByte(0, 1) ∥ toByte(|𝑐𝑡𝑥|, 1) ∥ 𝑐𝑡𝑥 ∥ m
 	mut msg := []u8{}
 	msg << to_byte(0, 1)
-	msg << to_byte(u64(cx.len), 1)
+	msg << to_byte(cx.len, 1)
 	msg << cx
 	msg << m
 
@@ -292,7 +292,7 @@ fn slh_verify(c Context, m []u8, sig []u8, cx []u8, pk Pk) !bool {
 	// 𝑀′ ← toByte(0, 1) ∥ toByte(|𝑐𝑡𝑥|, 1) ∥ 𝑐𝑡𝑥 ∥ m
 	mut msg := []u8{}
 	msg << to_byte(0, 1)
-	msg << to_byte(u64(cx.len), 1)
+	msg << to_byte(cx.len, 1)
 	msg << cx
 	msg << m
 

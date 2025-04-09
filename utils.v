@@ -1,9 +1,5 @@
 module pslhdsa
 
-import crypto.sha256
-import crypto.sha512
-import encoding.binary
-
 // Algorithm 2 toInt(𝑋, 𝑛)
 //
 // Converts a byte string to an integer
@@ -26,7 +22,7 @@ fn to_int(x []u8, n int) u64 {
 // Input: Integer 𝑥, string length 𝑛.
 // Output: Byte string of length 𝑛 containing binary representation of 𝑥 in big-endian byte-order.
 @[inline]
-fn to_byte(x u64, n int) []u8 {
+fn to_byte(x int, n int) []u8 {
 	if n == 0 {
 		return []u8{}
 	}
@@ -91,49 +87,4 @@ fn rev8_be64(x u64) u64 {
 		return (x << 56) | ((x & 0x0000_0000_0000_FF00) << 40) | ((x & 0x0000_0000_00FF_0000) << 24) | ((x & 0x0000_0000_FF00_0000) << 8) | ((x & 0x0000_00FF_0000_0000) >> 8) | ((x & 0x0000_FF00_0000_0000) >> 24) | ((x & 0x00FF_0000_0000_0000) >> 40) | (x >> 56)
 	}
 	return x
-}
-
-const sha256_hash_size = sha256.size
-
-// A mask generation function (MGF) is a cryptographic primitive similar
-// to a cryptographic hash function except that while a hash function's
-// output has a fixed size, a MGF supports output of a variable length.
-fn mgf1_sha256(seed []u8, length int) ![]u8 {
-	if length > (sha256_hash_size << 32) {
-		return error('Length Too Big')
-	}
-	mut result := []u8{}
-	mut counter := u32(0)
-
-	for result.len < length {
-		mut b := []u8{len: 4}
-		binary.big_endian_put_u32(mut b, counter)
-
-		mut data := seed.clone()
-		data << b
-
-		result << sha256.sum256(data)
-		counter += 1
-	}
-	return result[..length]
-}
-
-const sha512_hash_length = sha512.size
-
-fn mgf1_sha512(seed []u8, length int) ![]u8 {
-	if length > (sha512_hash_length << 32) {
-		return error('Length Too Big')
-	}
-	mut result := []u8{}
-	mut counter := u32(0)
-
-	for result.len < length {
-		mut b := []u8{len: 4}
-		binary.big_endian_put_u32(mut b, counter)
-		mut data := seed.clone()
-		data << b
-		result << sha512.sum512(data)
-		counter += 1
-	}
-	return result[..length]
 }

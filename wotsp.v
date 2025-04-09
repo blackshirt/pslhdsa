@@ -85,7 +85,7 @@ fn wots_sign(c Context, m []u8, sk_seed []u8, pk_seed []u8, mut addr Address) ![
 
 	// convert to base w, 𝑚𝑠𝑔 ← 𝑚𝑠𝑔 ∥ base_2b (toByte (𝑐𝑠𝑢𝑚, ⌈(𝑙𝑒𝑛2*𝑙𝑔𝑤)/8⌉) , 𝑙𝑔𝑤, 𝑙𝑒𝑛2)
 	mlen := cdiv(len2 * c.prm.lgw, 8)
-	bytes := to_byte(u64(csum), mlen)
+	bytes := to_byte(csum, mlen)
 	msgs << base_2exp_b(bytes, c.prm.lgw, len2)
 
 	// copy address to create key generation key address
@@ -132,7 +132,7 @@ fn wots_pkfromsig(c Context, sig []u8, m []u8, pk_seed []u8, mut addr Address) !
 
 	// convert to base w, 𝑚𝑠𝑔 ← 𝑚𝑠𝑔 ∥ base_2b (toByte (𝑐𝑠𝑢𝑚, ⌈(𝑙𝑒𝑛2*𝑙𝑔𝑤)/8⌉) , 𝑙𝑔𝑤, 𝑙𝑒𝑛2)
 	mlen := cdiv(len2 * c.prm.lgw, 8)
-	bytes := to_byte(u64(csum), mlen)
+	bytes := to_byte(csum, mlen)
 	msgs << base_2exp_b(bytes, c.prm.lgw, len2)
 
 	mut tmp := []u8{}

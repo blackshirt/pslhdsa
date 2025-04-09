@@ -41,7 +41,7 @@ fn xmss_node(c Context, sk_seed []u8, i int, z int, pk_seed []u8, mut addr Addre
 	mut gab := []u8{}
 	gab << lnode
 	gab << rnode
-	node := c.h(pk_seed, addr, gab)
+	node := c.h(pk_seed, addr, gab)!
 
 	return node
 }
@@ -121,7 +121,7 @@ fn xmms_pkfromsig(c Context, idx int, sig_xmss []u8, m []u8, pk_seed []u8, mut a
 			mut m2 := []u8{}
 			m2 << node_0
 			m2 << m_auth_k
-			node_1 := c.h(pk_seed, addr, m2)
+			node_1 := c.h(pk_seed, addr, m2)!
 			node_0 = unsafe { node_1 }
 		} else {
 			// ADRS.setTreeIndex((ADRS.getTreeIndex() − 1)/2)
@@ -132,7 +132,7 @@ fn xmms_pkfromsig(c Context, idx int, sig_xmss []u8, m []u8, pk_seed []u8, mut a
 			mut m2 := []u8{}
 			m2 << m_auth_k
 			m2 << node_0
-			node_1 := c.h(pk_seed, addr, m2)
+			node_1 := c.h(pk_seed, addr, m2)!
 			node_0 = unsafe { node_1 }
 		}
 	}

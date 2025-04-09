@@ -11,16 +11,16 @@ module pslhdsa
 fn fors_skgen(c Context, sk_seed []u8, pk_seed []u8, addr Address, idx int) ![]u8 {
 	// idx >=0
 	// copy address to create key generation address
-	sk_addr := addr.clone()
+	mut sk_addr := addr.clone()
 	// skADRS.setTypeAndClear(FORS_PRF)
 	sk_addr.set_type_and_clear(.fors_prf)
 	// 3: skADRS.setKeyPairAddress(ADRS.getKeyPairAddress())
 	sk_addr.set_keypair_address(addr.get_keypair_address())
 	// skADRS.setTreeIndex(𝑖𝑑𝑥)
-	sk_add.set_tree_index(u32(idx))
+	sk_addr.set_tree_index(u32(idx))
 
 	// return PRF(PK.seed, SK.seed,skADRS)
-	return c.prf(pk_seed, sk_seed, sk_addr)!
+	return c.prf(pk_seed, sk_seed, sk_addr)
 }
 
 // 8.2 Generating a Merkle Hash Tree
@@ -30,7 +30,7 @@ fn fors_skgen(c Context, sk_seed []u8, pk_seed []u8, addr Address, idx int) ![]u
 // Input: Secret seed SK.seed, target node index 𝑖, target node height 𝑧, public seed PK.seed, address ADRS.
 // Output: 𝑛-byte root 𝑛𝑜𝑑𝑒.
 fn fors_node(c Context, sk_seed []u8, i int, z int, pk_seed []u8, mut addr Address) ![]u8 {
-	if z > c.prm.a || i >= c.k * (1 << (c.prm.a - z)) {
+	if z > c.prm.a || i >= c.prm.k * (1 << (c.prm.a - z)) {
 		return error('Bad fors_node params')
 		// return empty bytes instead ?
 	}
@@ -58,7 +58,7 @@ fn fors_node(c Context, sk_seed []u8, i int, z int, pk_seed []u8, mut addr Addre
 	mut m2 := []u8{}
 	m2 << lnode
 	m2 << rnode
-	node := c.h(pk_seed, addr, m2)
+	node := c.h(pk_seed, addr, m2)!
 
 	return node
 }
@@ -69,7 +69,7 @@ fn fors_node(c Context, sk_seed []u8, i int, z int, pk_seed []u8, mut addr Addre
 // Generates a FORS signature.
 // Input: Message digest 𝑚𝑑, secret seed SK.seed, address ADRS, public seed PK.seed.
 // Output: FORS signature SIG𝐹𝑂𝑅𝑆.
-fn fors_sign(c Context, md []u8, sk_seed []u8, pk_seed []u8, addr Address) ![]u8 {
+fn fors_sign(c Context, md []u8, sk_seed []u8, pk_seed []u8, mut addr Address) ![]u8 {
 	assert md.len == cdiv(c.prm.k * c.prm.a, 8)
 
 	// initialize SIG𝐹𝑂𝑅𝑆 as a zero-length byte string
@@ -79,7 +79,7 @@ fn fors_sign(c Context, md []u8, sk_seed []u8, pk_seed []u8, addr Address) ![]u8
 
 	// compute signature elements
 	for i := 0; i <= c.prm.k - 1; i++ {
-		fors_item := fors_skgen(c, sk_seed, pk_seed, addr, i * (1 << c.prm.a) + indices[i])
+		fors_item := fors_skgen(c, sk_seed, pk_seed, addr, i * (1 << c.prm.a) + indices[i])!
 		sig_fors << fors_item
 
 		// compute auth path
@@ -89,7 +89,7 @@ fn fors_sign(c Context, md []u8, sk_seed []u8, pk_seed []u8, addr Address) ![]u8
 			s := (indices[i] >> j) ^ 0x01
 			// AUTH[𝑗] ← fors_node(SK.seed,𝑖 * 2^(𝑎−𝑗) + 𝑠, 𝑗, PK.seed, ADRS)
 			idx := i * (1 << (c.prm.a - j)) + s
-			auth_j := fors_node(c, sk_seed, idx, j, pk_seed, addr)!
+			auth_j := fors_node(c, sk_seed, idx, j, pk_seed, mut addr)!
 			auth << auth_j
 		}
 		// SIG𝐹𝑂𝑅𝑆 ← SIG𝐹𝑂𝑅𝑆 ∥ AUTH
@@ -116,15 +116,15 @@ fn fors_pkfromsig(c Context, sig_fors []u8, md []u8, pk_seed []u8, mut addr Addr
 		// SIG𝐹𝑂𝑅𝑆[𝑖 ⋅ (𝑎 + 1) ⋅ 𝑛 ∶ (𝑖 ⋅ (𝑎 + 1) + 1) ⋅ 𝑛]
 		// 𝑠𝑘 ← SIG𝐹𝑂𝑅𝑆.getSK(𝑖)
 		start := i * (c.prm.a + 1) * c.prm.n
-		end := (i * (ctx + prm.a + 1) + 1) * c.prm.n
+		end := (i * (c.prm.a + 1) + 1) * c.prm.n
 		sk := sig_fors[start..end]
 		// compute leaf
 		// ADRS.setTreeHeight(0)
 		addr.set_tree_height(0)
 		// ADRS.setTreeIndex(𝑖 ⋅ 2^𝑎 + 𝑖𝑛𝑑𝑖𝑐𝑒𝑠[𝑖])
-		addr.set_tree_index(i * (1 << c.prm.a) + indices[i])
+		addr.set_tree_index(u32(i * (1 << c.prm.a) + indices[i]))
 		// 𝑛𝑜𝑑𝑒[0] ← F(PK.seed, ADRS, 𝑠𝑘)
-		node[0] = c.f(pk_seed, addr, sk)
+		node[0] = c.f(pk_seed, addr, sk)!
 
 		// compute root from leaf and AUTH
 		// 𝑎𝑢𝑡ℎ ← SIG𝐹𝑂𝑅𝑆.getAUTH(𝑖) ▷ SIG𝐹𝑂𝑅𝑆[(𝑖 ⋅ (𝑎 + 1) + 1) ⋅ 𝑛 ∶ (𝑖 + 1) ⋅ (𝑎 + 1) ⋅ 𝑛]
@@ -160,7 +160,7 @@ fn fors_pkfromsig(c Context, sig_fors []u8, md []u8, pk_seed []u8, mut addr Addr
 	// copy address to create a FORS public-key address, 	forspkADRS ← ADRS ▷
 	mut fors_pkaddr := addr.clone()
 	// 22: forspkADRS.setTypeAndClear(FORS_ROOTS)
-	fors_pkaddr.set_type_and_clear(.fors_root)
+	fors_pkaddr.set_type_and_clear(.fors_roots)
 	// 23: forspkADRS.setKeyPairAddress(ADRS.getKeyPairAddress())
 	fors_pkaddr.set_keypair_address(addr.get_keypair_address())
 

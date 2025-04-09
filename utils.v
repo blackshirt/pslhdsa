@@ -52,15 +52,15 @@ fn cdiv(n int, k int) int {
 // Output: Array of 𝑜𝑢𝑡_𝑙𝑒𝑛 integers in the range [0, … , 2𝑏 − 1].
 // The base_2exp_b function is used to break the message to be signed and the checksum value
 // into arrays of base-𝑤 integers.
-fn base_2exp_b(x []u8, b u32, out_len int) []u32 {
+fn base_2exp_b(x []u8, b int, out_len int) []int {
 	assert b > 0
 	assert out_len >= 0
 	assert x.len >= cdiv(out_len * int(b), 8)
 
-	mut bits := u32(0)
-	mut total := u32(0)
+	mut bits := 0
+	mut total := 0
 	mut pos := 0
-	mut baseb := []u32{len: out_len}
+	mut baseb := []int{len: out_len}
 
 	for out := 0; out < out_len; out++ {
 		for bits < b {
@@ -69,7 +69,7 @@ fn base_2exp_b(x []u8, b u32, out_len int) []u32 {
 			bits += 8
 		}
 		bits -= b
-		baseb[out] = (total >> bits) & max_u32
+		baseb[out] = (total >> bits) & max_int
 	}
 	return baseb
 }

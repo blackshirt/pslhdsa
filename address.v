@@ -53,7 +53,7 @@ fn (addr Address) full_to_bytes() []u8 {
 	binary.big_endian_put_u32(mut out[12..16], addr.tree[1])
 
 	// type
-	binary.big_endian_put_u32(mut out[16..20], addr.tipe)
+	binary.big_endian_put_u32(mut out[16..20], u32(addr.tipe))
 
 	// final address
 	binary.big_endian_put_u32(mut out[20..24], addr.final[0])
@@ -113,8 +113,8 @@ fn (mut addr Address) set_layer_address(x u32) {
 // ADRS.setTreeAddress(𝑡) ADRS ← ADRS[0 ∶ 4] ∥ toByte(𝑡, 12) ∥ ADRS[16 ∶ 32]
 fn (mut addr Address) set_tree_address(x u64) {
 	// tree[0] of tree address are always zero
-	addr.tree[1] = rev8_be32(x >> 32)
-	addr.tree[2] = rev8_be32(x & 0xFFFF_FFFF)
+	addr.tree[1] = rev8_be32(u32(x >> 32))
+	addr.tree[2] = rev8_be32(u32(x & 0xFFFF_FFFF))
 }
 
 // ADRS.setKeyPairAddress(𝑖) ADRS ← ADRS[0 ∶ 20] ∥ toByte(𝑖, 4) ∥ ADRS[24 ∶ 32]

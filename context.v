@@ -25,7 +25,7 @@ fn (ctx Context) is_shake() bool {
 // PRF𝑚𝑠𝑔(SK.prf, 𝑜𝑝𝑡_𝑟𝑎𝑛𝑑, 𝑀 ) (𝔹𝑛 × 𝔹𝑛 × 𝔹∗ → 𝔹𝑛) is a pseudorandom function
 // (PRF) that generates the randomizer (𝑅) for the randomized hashing of the message to be
 // signed.
-fn (ctx Context) prf_msg(sk_prf []u8, opt_rand []u8, msg []u8) []u8 {
+fn (ctx Context) prf_msg(sk_prf []u8, opt_rand []u8, msg []u8) ![]u8 {
 	if ctx.is_shake() {
 		return shake256_prf_msg(sk_prf, opt_rand, msg, ctx.prm.n)
 	}
@@ -39,7 +39,7 @@ fn (ctx Context) prf_msg(sk_prf []u8, opt_rand []u8, msg []u8) []u8 {
 
 // H𝑚𝑠𝑔(𝑅, PK.seed, PK.root, 𝑀 ) (𝔹𝑛 × 𝔹𝑛 × 𝔹𝑛 × 𝔹∗ → 𝔹𝑚) is used to generate the
 // digest of the message to be signed.
-fn (ctx Context) h_msg(r []u8, pk_seed []u8, pk_root []u8, msg []u8) []u8 {
+fn (ctx Context) h_msg(r []u8, pk_seed []u8, pk_root []u8, msg []u8) ![]u8 {
 	if ctx.is_shake() {
 		return shake256_h_msg(r, pk_seed, pk_root, msg, ctx.prm.m)
 	}
@@ -52,7 +52,7 @@ fn (ctx Context) h_msg(r []u8, pk_seed []u8, pk_root []u8, msg []u8) []u8 {
 
 // PRF(PK.seed, SK.seed, ADRS) (𝔹𝑛 × 𝔹𝑛 × 𝔹32 → 𝔹𝑛) is a PRF that is used to
 // generate the secret values in WOTS+ and FORS private keys.
-fn (ctx Context) prf(pk_seed []u8, sk_seed []u8, addr Address) []u8 {
+fn (ctx Context) prf(pk_seed []u8, sk_seed []u8, addr Address) ![]u8 {
 	if ctx.is_shake() {
 		return shake256_prf(pk_seed, sk_seed, addr, ctx.prm.n)
 	}
@@ -64,7 +64,7 @@ fn (ctx Context) prf(pk_seed []u8, sk_seed []u8, addr Address) []u8 {
 
 // Tℓ(PK.seed, ADRS, 𝑀ℓ) (𝔹𝑛 × 𝔹32 × 𝔹ℓ𝑛 → 𝔹𝑛) is a hash function that maps an
 // ℓ𝑛-byte message to an 𝑛-byte message.
-fn (ctx Context) tlen(pk_seed []u8, addr Address, ml []u8) []u8 {
+fn (ctx Context) tlen(pk_seed []u8, addr Address, ml []u8) ![]u8 {
 	if ctx.is_shake() {
 		return shake256_tlen(pk_seed, addr, ml, ctx.prm.n)
 	}
@@ -76,7 +76,7 @@ fn (ctx Context) tlen(pk_seed []u8, addr Address, ml []u8) []u8 {
 
 // H(PK.seed, ADRS, 𝑀2) (𝔹𝑛 × 𝔹32 × 𝔹2𝑛 → 𝔹𝑛) is a special case of Tℓ that takes a
 // 2𝑛-byte message as input.
-fn (ctx Context) h(pk_seed []u8, addr Address, m2 []u8) []u8 {
+fn (ctx Context) h(pk_seed []u8, addr Address, m2 []u8) ![]u8 {
 	if ctx.is_shake() {
 		return shake256_h(pk_seed, addr, m2, ctx.prm.n)
 	}
@@ -88,7 +88,7 @@ fn (ctx Context) h(pk_seed []u8, addr Address, m2 []u8) []u8 {
 
 // F(PK.seed, ADRS, 𝑀1) (𝔹𝑛 × 𝔹32 × 𝔹𝑛 → 𝔹𝑛) is a hash function that takes an 𝑛-byte
 // message as input and produces an 𝑛-byte output.
-fn (ctx Context) f(pk_seed []u8, addr Address, m1 []u8) []u8 {
+fn (ctx Context) f(pk_seed []u8, addr Address, m1 []u8) ![]u8 {
 	if ctx.is_shake() {
 		return shake256_f(pk_seed, addr, m1, ctx.prm.m)
 	}
@@ -226,7 +226,7 @@ fn shake256_prf_msg(sk_prf []u8, opt_rand []u8, msg []u8, n int) []u8 {
 	mut data := []u8{}
 	data << sk_prf
 	data << opt_rand
-	data << m
+	data << msg
 
 	out := sha3.shake256(data, n)
 	return out
@@ -311,7 +311,7 @@ fn sha256_prf_msg(sk_prf []u8, opt_rand []u8, msg []u8, n int) []u8 {
 // H𝑚𝑠𝑔(𝑅, PK.seed, PK.root, 𝑀 ) (𝔹𝑛 × 𝔹𝑛 × 𝔹𝑛 × 𝔹∗ → 𝔹𝑚) is used to generate the
 // digest of the message to be signed.
 @[inline]
-fn sha256_h_msg(r []u8, pk_seed []u8, pk_root []u8, msg []u8, m int) []u8 {
+fn sha256_h_msg(r []u8, pk_seed []u8, pk_root []u8, msg []u8, m int) ![]u8 {
 	mut data := r.clone()
 	data << pk_seed
 
@@ -320,7 +320,7 @@ fn sha256_h_msg(r []u8, pk_seed []u8, pk_root []u8, msg []u8, m int) []u8 {
 	extended << msg
 
 	digest := sha256.sum256(extended)
-	return mgf1_sha256(data, digest, m)
+	return mgf1_sha256(digest, m)!
 }
 
 // PRF(PK.seed, SK.seed, ADRS) (𝔹𝑛 × 𝔹𝑛 × 𝔹32 → 𝔹𝑛) is a PRF that is used to
@@ -411,7 +411,7 @@ fn sha512_prf_msg(sk_prf []u8, opt_rand []u8, msg []u8, n int) []u8 {
 // H𝑚𝑠𝑔(𝑅, PK.seed, PK.root, 𝑀 ) (𝔹𝑛 × 𝔹𝑛 × 𝔹𝑛 × 𝔹∗ → 𝔹𝑚) is used to generate the
 // digest of the message to be signed.
 @[inline]
-fn sha512_h_msg(r []u8, pk_seed []u8, pk_root []u8, msg []u8, m int) []u8 {
+fn sha512_h_msg(r []u8, pk_seed []u8, pk_root []u8, msg []u8, m int) ![]u8 {
 	mut data := r.clone()
 	data << pk_seed
 
@@ -420,7 +420,7 @@ fn sha512_h_msg(r []u8, pk_seed []u8, pk_root []u8, msg []u8, m int) []u8 {
 	extended << msg
 
 	digest := sha512.sum512(extended)
-	return mgf1_sha512(data, digest, m)
+	return mgf1_sha512(digest, m)!
 }
 
 // PRF(PK.seed, SK.seed, ADRS) (𝔹𝑛 × 𝔹𝑛 × 𝔹32 → 𝔹𝑛) is a PRF that is used to

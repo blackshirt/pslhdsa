@@ -31,12 +31,12 @@ fn slh_sign_internal(c Context, m []u8, sk Sk, addrnd []u8, opt SignerOpts) ![]u
 		opt_rand = unsafe { rand.read(c.prm.n)! }
 	}
 	// generate randomizer, 𝑅 ← PRF𝑚𝑠𝑔(SK.prf, 𝑜𝑝𝑡_𝑟𝑎𝑛𝑑, 𝑀 )
-	r := c.prf_msg(sk.prf, opt_rand, m)
+	r := c.prf_msg(sk.prf, opt_rand, m)!
 	// SIG ← r
 	mut sig := r.clone()
 
 	// compute message digest, 	𝑑𝑖𝑔𝑒𝑠𝑡 ← H𝑚𝑠𝑔(𝑅, PK.seed, PK.root, 𝑀 )
-	digest := c.h_msg(r, sk.pk.seed, sk.pk.root, m)
+	digest := c.h_msg(r, sk.pk.seed, sk.pk.root, m)!
 	// 𝑚𝑑 ← 𝑑𝑖𝑔𝑒𝑠𝑡 [0 ∶ (𝑘⋅𝑎 ⌉ 8 )]
 	md := digest[0..cdiv(c.prm.k * c.prm.a, 8)]
 
@@ -59,7 +59,7 @@ fn slh_sign_internal(c Context, m []u8, sk Sk, addrnd []u8, opt SignerOpts) ![]u
 	// ADRS.setKeyPairAddress(𝑖𝑑𝑥𝑙𝑒𝑎𝑓)
 	addr.set_keypair_address(u32(idx_leaf))
 	// SIG𝐹𝑂𝑅𝑆 ← fors_sign(𝑚𝑑, SK.seed, PK.seed, ADRS)
-	sig_fors := fors_sign(c, md, sk.seed, sk.pk.seed, addr)!
+	sig_fors := fors_sign(c, md, sk.seed, sk.pk.seed, mut addr)!
 	// SIG ← SIG ∥ SIG𝐹𝑂𝑅s
 	sig << sig_fors
 
@@ -155,7 +155,7 @@ fn slh_verify_internal(c Context, m []u8, sig []u8, pk Pk) !bool {
 		c.prm.d * c.prm.wots_len()) * c.prm.n]
 
 	// compute message digest, 𝑑𝑖𝑔𝑒𝑠𝑡 ← H𝑚𝑠𝑔(𝑅, PK.seed, PK.root, 𝑀 )
-	digest := c.h_msg(r, pk.seed, pk.root, m)
+	digest := c.h_msg(r, pk.seed, pk.root, m)!
 
 	// first (k.a)/8 bytes, 𝑚𝑑 ← 𝑑𝑖𝑔𝑒𝑠𝑡 [0 ∶ ⌈𝑘⋅𝑎]/8]
 	md := digest[0..cdiv(c.prm.k * c.prm.a, 8)]

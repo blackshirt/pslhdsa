@@ -21,14 +21,14 @@ fn ht_sign(c Context, m []u8, sk_seed []u8, pk_seed []u8, idxtree_ int, idxleaf_
 	// SIG𝑡𝑚𝑝 ← xmss_sign(𝑀, SK.seed,𝑖𝑑𝑥𝑙𝑒𝑎𝑓, PK.seed, ADRS)
 	mut sig_tmp := xmms_sign(c, m, sk_seed, idxleaf, pk_seed, mut addr)!
 	// SIG𝐻𝑇 ← SIG𝑡𝑚p
-	mut sig_ht := sig_tmp.clone()
+	mut sig_ht := unsafe { sig_tmp }
 	// 𝑟𝑜𝑜𝑡 ← xmss_pkFromSig(𝑖𝑑𝑥𝑙𝑒𝑎𝑓, SIG𝑡𝑚𝑝, 𝑀, PK.seed, ADRS)
 	mut root := xmms_pkfromsig(c, idxleaf, sig_tmp, m, pk_seed, mut addr)!
 
 	// for 𝑗 from 1 to 𝑑 − 1
-	for j := 1; j <= c.d - 1; j++ {
+	for j := 1; j < c.d; j++ {
 		// 𝑖𝑑𝑥𝑙𝑒𝑎𝑓 ← 𝑖𝑑𝑥𝑡𝑟𝑒𝑒 mod 2ℎ′, ℎ′ least significant bits of 𝑖𝑑𝑥𝑡𝑟𝑒e
-		idxleaf = idxtree % (1 << c.hp)
+		idxleaf = idxtree & (1 << c.hp)
 		// remove least significant ℎ′ bits from 𝑖𝑑𝑥𝑡𝑟𝑒e, 𝑖𝑑𝑥𝑡𝑟𝑒𝑒 ← 𝑖𝑑𝑥𝑡𝑟𝑒𝑒 ≫ ℎ′
 		idxtree = idxtree >> c.hp
 		// ADRS.setLayerAddress(𝑗)
@@ -61,12 +61,12 @@ fn ht_verify(c Context, m []u8, sig_ht []u8, pk_seed []u8, idxtree_ int, idxleaf
 	// ADRS.setTreeAddress(𝑖𝑑𝑥𝑡𝑟𝑒𝑒)
 	addr.set_tree_address(u32(idxtree))
 	// SIG𝑡𝑚𝑝 ← SIG𝐻𝑇.getXMSSSignature(0) ▷ SIG𝐻𝑇[0 ∶ (ℎ′ + 𝑙𝑒𝑛) ⋅ 𝑛]
-	mut sig_tmp := sig_ht[0..(c.hp + c.wots_len()) * c.n]
+	mut sig_tmp := unsafe { sig_ht[0..(c.hp + c.wots_len()) * c.n] }
 	// 𝑛𝑜𝑑𝑒 ← xmss_pkFromSig(𝑖𝑑𝑥𝑙𝑒𝑎𝑓, SIG𝑡𝑚𝑝, 𝑀, PK.seed, ADRS)
 	mut node := xmms_pkfromsig(c, idxleaf, sig_tmp, m, pk_seed, mut addr)!
 
 	// for 𝑗 from 1 to 𝑑 − 1 do
-	for j := 1; j <= c.d - 1; j++ {
+	for j := 1; j < c.d; j++ {
 		// 𝑖𝑑𝑥𝑙𝑒𝑎𝑓 ← 𝑖𝑑𝑥𝑡𝑟𝑒𝑒 mod 2^ℎ′, ℎ′ least significant bits of 𝑖𝑑𝑥𝑡𝑟𝑒e
 		idxleaf = idxtree & (1 << c.hp)
 		// remove least significant ℎ′ bits from 𝑖𝑑𝑥𝑡𝑟𝑒e, 𝑖𝑑𝑥𝑡𝑟𝑒𝑒 ← 𝑖𝑑𝑥𝑡𝑟𝑒𝑒 ≫ ℎ′

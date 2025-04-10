@@ -80,7 +80,7 @@ fn fors_sign(c Context, md []u8, sk_seed []u8, pk_seed []u8, mut addr Address) !
 	indices := base_2exp_b(md, c.a, c.k)
 
 	// compute signature elements
-	for i := 0; i <= c.k - 1; i++ {
+	for i := 0; i < c.k; i++ {
 		// fors_skGen(SK.seed, PK.seed, ADRS,𝑖 ⋅ 2^𝑎 + 𝑖𝑛𝑑𝑖𝑐𝑒𝑠[𝑖])
 		fors_item := fors_skgen(c, sk_seed, pk_seed, addr, i * (1 << c.a) + int(indices[i]))!
 		sig_fors << fors_item
@@ -88,7 +88,7 @@ fn fors_sign(c Context, md []u8, sk_seed []u8, pk_seed []u8, mut addr Address) !
 		// compute auth path
 		mut auth := []u8{}
 		// for 𝑗 from 0 to 𝑎 − 1 do
-		for j := 0; j <= c.a - 1; j++ {
+		for j := 0; j < c.a; j++ {
 			// s ← ⌊𝑖𝑛𝑑𝑖𝑐𝑒𝑠[𝑖]/2^𝑗⌋ ⊕ 1
 			s := int((indices[i] >> j) ^ 0x01)
 			// AUTH[𝑗] ← fors_node(SK.seed,𝑖 * 2^(𝑎−𝑗) + 𝑠, 𝑗, PK.seed, ADRS)
@@ -116,7 +116,7 @@ fn fors_pkfromsig(c Context, sig_fors []u8, md []u8, pk_seed []u8, mut addr Addr
 	indices := base_2exp_b(md, c.a, c.k)
 	mut node := [][]u8{len: 2}
 	mut root := []u8{}
-	for i := 0; i <= c.k - 1; i++ {
+	for i := 0; i < c.k; i++ {
 		// 𝑠𝑘 ← SIG𝐹𝑂𝑅𝑆.getSK(𝑖), SIG𝐹𝑂𝑅𝑆[𝑖 ⋅ (𝑎 + 1) ⋅ 𝑛 ∶ (𝑖 ⋅ (𝑎 + 1) + 1) ⋅ 𝑛]
 		start := i * (c.a + 1) * c.n
 		end := (i * (c.a + 1) + 1) * c.n
@@ -135,7 +135,7 @@ fn fors_pkfromsig(c Context, sig_fors []u8, md []u8, pk_seed []u8, mut addr Addr
 		auth_start := (i * (c.a + 1) + 1) * c.n
 		auth_end := (i + 1) * (c.a + 1) * c.n
 		auth := sig_fors[auth_start..auth_end]
-		for j := 0; j <= c.a - 1; j++ {
+		for j := 0; j < c.a; j++ {
 			// ADRS.setTreeHeight(𝑗 + 1)
 			addr.set_tree_height(u32(j + 1))
 			// if ⌊𝑖𝑛𝑑𝑖𝑐𝑒𝑠[𝑖]/2^𝑗⌋ is even

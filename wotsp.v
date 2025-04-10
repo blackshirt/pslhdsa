@@ -14,7 +14,7 @@ fn chain(c Context, x []u8, i int, s int, pk_seed []u8, mut addr Address) ![]u8 
 		return error('Invalid wots+ params')
 	}
 	mut tmp := x.clone()
-	for j := i; j <= i + s - 1; j++ {
+	for j := i; j < i + s; j++ {
 		// ADRS.setHashAddress(𝑗)
 		addr.set_hash_address(u32(j))
 		// 𝑡𝑚𝑝 ← F(PK.seed, ADRS,𝑡𝑚𝑝)
@@ -40,7 +40,7 @@ fn wots_pkgen(c Context, sk_seed []u8, pk_seed []u8, mut addr Address) ![]u8 {
 	wots_len := c.wots_len()
 	// temporary buffer to store output
 	mut tmp := []u8{}
-	for i := 0; i <= wots_len - 1; i++ {
+	for i := 0; i < wots_len; i++ {
 		// skADRS.setChainAddress(𝑖)
 		sk_addr.set_chain_address(u32(i))
 		// compute secret value for chain i, 𝑠𝑘 ← PRF(PK.seed, SK.seed, skADRS)
@@ -78,7 +78,7 @@ fn wots_sign(c Context, m []u8, sk_seed []u8, pk_seed []u8, mut addr Address) ![
 	mut msgs := base_2exp_b(m, c.lgw, len1)
 
 	// compute checksum
-	for i := 0; i < len1 - 1; i++ {
+	for i := 0; i < len1; i++ {
 		// 𝑐𝑠𝑢𝑚 ← 𝑐𝑠𝑢𝑚 + 𝑤 − 1 − 𝑚𝑠𝑔[𝑖]
 		csum += w - 1 - msgs[i]
 	}
@@ -126,7 +126,8 @@ fn wots_pkfromsig(c Context, sig []u8, m []u8, pk_seed []u8, mut addr Address) !
 	mut msgs := base_2exp_b(m, c.lgw, len1)
 
 	// compute checksum
-	for i := 0; i < len1 - 1; i++ {
+	// for 𝑖 from 0 to 𝑙𝑒𝑛1 − 1 do
+	for i := 0; i < len1; i++ {
 		// 𝑐𝑠𝑢𝑚 ← 𝑐𝑠𝑢𝑚 + 𝑤 − 1 − 𝑚𝑠𝑔[𝑖]
 		csum += w - 1 - msgs[i]
 	}
@@ -161,4 +162,22 @@ fn wots_pkfromsig(c Context, sig []u8, m []u8, pk_seed []u8, mut addr Address) !
 	pk_sig := c.tlen(pk_seed, wots_pk_addr, tmp)!
 
 	return pk_sig
+}
+
+fn wots_csum(c Context, m []u8) u64 {
+	mut csum := u64(0)
+	t := u32((1 << c.lgw) - 1)
+
+	len1 := c.len1()
+	mut msg := base_2exp_b(m, c.lgw, len1)
+
+	// for 𝑖 from 0 to 𝑙𝑒𝑛1 − 1 do
+	for i := 0; i < len1; i++ {
+		// 𝑐𝑠𝑢𝑚 ← 𝑐𝑠𝑢𝑚 + 𝑤 − 1 − 𝑚𝑠𝑔[𝑖]
+		csum += t - msg[i]
+	}
+
+	csum <<= u64((8 - ((len2 * c.lgw) & 7)) & 7)
+
+	return csum
 }

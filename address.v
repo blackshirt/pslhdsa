@@ -68,13 +68,13 @@ fn (addr Address) compress() []u8 {
 
 // Layer parts
 @[direct_array_access; inline]
-fn (addr Address) get_layer_address() u64 {
-	return to_int(addr.data[addr_layer_start..addr_layer_end], 4)
+fn (addr Address) get_layer_address() u32 {
+	return u32(to_int(addr.data[addr_layer_start..addr_layer_end], 4))
 }
 
 // ADRS.setLayerAddress(𝑙) ADRS ← toByte(𝑙, 4) ∥ ADRS[4 ∶ 32]
 @[direct_array_access; inline]
-fn (mut addr Address) set_layer_address(x int) {
+fn (mut addr Address) set_layer_address(x u32) {
 	bytes := to_byte(x, 4)
 	addr.data[addr_layer_start..addr_layer_end] = bytes
 }
@@ -82,15 +82,15 @@ fn (mut addr Address) set_layer_address(x int) {
 // Tree parts
 // ADRS.setTreeAddress(𝑡) ADRS ← ADRS[0 ∶ 4] ∥ toByte(𝑡, 12) ∥ ADRS[16 ∶ 32]
 @[direct_array_access; inline]
-fn (mut addr Address) set_tree_address(bytes []u8) {
-	assert bytes.len == 12
-	addr.data[addr_tree_start..addr_tree_end] = bytes
+fn (mut addr Address) set_tree_address(v u64) {
+	//  bytes a[4:8] of tree address are always zero
+	binary.big_endian_put_u64(mut addr.data[addr_tree_start + 4..addr_tree_end], v)
 }
 
 // KEYPAIR
 // ADRS.setKeyPairAddress(𝑖) ADRS ← ADRS[0 ∶ 20] ∥ toByte(𝑖, 4) ∥ ADRS[24 ∶ 32]
 @[direct_array_access; inline]
-fn (mut addr Address) set_keypair_address(x int) {
+fn (mut addr Address) set_keypair_address(x u32) {
 	// final 20-24
 	bytes := to_byte(x, 4)
 	addr.data[addr_final_start..addr_final_start + 4] = bytes
@@ -98,14 +98,14 @@ fn (mut addr Address) set_keypair_address(x int) {
 
 // 𝑖 ← ADRS.getKeyPairAddress() 𝑖 ← toInt(ADRS[20 ∶ 24], 4)
 @[direct_array_access; inline]
-fn (addr Address) get_keypair_address() u64 {
-	return to_int(addr.data[addr_final_start..addr_final_start + 4], 4)
+fn (addr Address) get_keypair_address() u32 {
+	return u32(to_int(addr.data[addr_final_start..addr_final_start + 4], 4))
 }
 
 // Set WOTS+ chain address.
 // ADRS.setChainAddress(𝑖) ADRS ← ADRS[0 ∶ 24] ∥ toByte(𝑖, 4) ∥ ADRS[28 ∶ 32]
 @[direct_array_access; inline]
-fn (mut addr Address) set_chain_address(x int) {
+fn (mut addr Address) set_chain_address(x u32) {
 	// TODO: assert correct type, 𝑡𝑦𝑝𝑒 = 0 (WOTS_HASH), 𝑡𝑦𝑝𝑒 = 5 (WOTS_PRF)
 	bytes := to_byte(x, 4)
 	// at 24..28
@@ -115,7 +115,7 @@ fn (mut addr Address) set_chain_address(x int) {
 // ADRS.setTreeHeight(𝑖) ADRS ← ADRS[0 ∶ 24] ∥ toByte(𝑖, 4) ∥ ADRS[28 ∶ 32]
 // sets FORS tree height
 @[direct_array_access; inline]
-fn (mut addr Address) set_tree_height(x int) {
+fn (mut addr Address) set_tree_height(x u32) {
 	// TODO: assert correct type, 𝑡𝑦𝑝𝑒 = 3 (FORS_TREE), 𝑡𝑦𝑝𝑒 = 6 (FORS_PRF), 𝑡𝑦𝑝𝑒 = 2 (TREE)
 	// tree height was on second index of final field, ie, final[1]
 	bytes := to_byte(x, 4)
@@ -126,7 +126,7 @@ fn (mut addr Address) set_tree_height(x int) {
 // ADRS.setTreeIndex(𝑖) ADRS ← ADRS[0 ∶ 28] ∥ toByte(𝑖, 4)
 // Set FORS tree index.
 @[direct_array_access; inline]
-fn (mut addr Address) set_tree_index(x int) {
+fn (mut addr Address) set_tree_index(x u32) {
 	// TODO: assert correct type, 𝑡𝑦𝑝𝑒 = 2 (TREE), 𝑡𝑦𝑝𝑒 = 6 (FORS_PRF)
 	// at 28..32
 	bytes := to_byte(x, 4)
@@ -136,14 +136,14 @@ fn (mut addr Address) set_tree_index(x int) {
 // 𝑖 ← ADRS.getTreeIndex() 𝑖 ← toInt(ADRS[28 ∶ 32], 4)
 // Get FORS tree index.
 @[direct_array_access; inline]
-fn (addr Address) get_tree_index() u64 {
+fn (addr Address) get_tree_index() u32 {
 	// TODO: assert correct type, 𝑡𝑦𝑝𝑒 = 2 (TREE), 𝑡𝑦𝑝𝑒 = 6 (FORS_PRF)
-	return to_int(addr.data[28..32], 4)
+	return u32(to_int(addr.data[28..32], 4))
 }
 
 // ADRS.setHashAddress(𝑖), ADRS ← ADRS[0 ∶ 28] ∥ toByte(𝑖, 4)
 @[direct_array_access; inline]
-fn (mut addr Address) set_hash_address(x int) {
+fn (mut addr Address) set_hash_address(x u32) {
 	// 𝑡𝑦𝑝𝑒 = 0 (WOTS_HASH), 𝑡𝑦𝑝𝑒 = 5 (WOTS_PRF)
 	bytes := to_byte(x, 4)
 	addr.data[28..32] = bytes
@@ -153,7 +153,7 @@ fn (mut addr Address) set_hash_address(x int) {
 @[direct_array_access; inline]
 fn (mut addr Address) set_type_and_clear(new_type AddressType) {
 	// set type
-	bytes_type := to_byte(int(new_type), 4)
+	bytes_type := to_byte(u32(new_type), 4)
 	addr.data[addr_type_start..addr_type_end] = bytes_type
 
 	// clear final
@@ -164,7 +164,7 @@ fn (mut addr Address) set_type_and_clear(new_type AddressType) {
 // In order to improve readability, these values will be
 // referred to in this standard by the constants WOTS_HASH, WOTS_PK, TREE,
 // FORS_TREE, FORS_ROOTS, WOTS_PRF, and FORS_PRF, respectively
-enum AddressType {
+enum AddressType as u32 {
 	wots_hash  = 0
 	wots_pk    = 1
 	tree       = 2

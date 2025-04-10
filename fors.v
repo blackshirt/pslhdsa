@@ -164,7 +164,7 @@ fn fors_pkfromsig(c Context, sig_fors []u8, md []u8, pk_seed []u8, mut addr Addr
 	// 22: forspkADRS.setTypeAndClear(FORS_ROOTS)
 	fors_pkaddr.set_type_and_clear(.fors_roots)
 	// 23: forspkADRS.setKeyPairAddress(ADRS.getKeyPairAddress())
-	fors_pkaddr.set_keypair_address(addr.get_keypair_address())
+	fors_pkaddr.set_keypair_address(u32(addr.get_keypair_address()))
 
 	// compute the FORS public key
 	// 24: 𝑝𝑘 ← T𝑘(PK.seed, forspkADRS, 𝑟𝑜𝑜𝑡) ▷

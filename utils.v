@@ -23,7 +23,7 @@ fn to_int(x []u8, n int) u64 {
 // Input: Integer 𝑥, string length 𝑛.
 // Output: Byte string of length 𝑛 containing binary representation of 𝑥 in big-endian byte-order.
 @[inline]
-fn to_byte(x int, n int) []u8 {
+fn to_byte(x u64, n int) []u8 {
 	if n == 0 {
 		return []u8{}
 	}
@@ -49,15 +49,15 @@ fn cdiv(n int, k int) int {
 // Output: Array of 𝑜𝑢𝑡_𝑙𝑒𝑛 integers in the range [0, … , 2𝑏 − 1].
 // The base_2exp_b function is used to break the message to be signed and the checksum value
 // into arrays of base-𝑤 integers.
-fn base_2exp_b(x []u8, b int, out_len int) []int {
+fn base_2exp_b(x []u8, b int, out_len int) []u32 {
 	assert b > 0
 	assert out_len >= 0
-	assert x.len >= cdiv(out_len * int(b), 8)
+	assert x.len >= cdiv(out_len * b, 8)
 
 	mut bits := 0
 	mut total := u32(0)
 	mut pos := 0
-	mut baseb := []int{len: out_len}
+	mut baseb := []u32{len: out_len}
 
 	for out := 0; out < out_len; out++ {
 		for bits < b {
@@ -66,7 +66,7 @@ fn base_2exp_b(x []u8, b int, out_len int) []int {
 			bits += 8
 		}
 		bits -= b
-		baseb[out] = int(total >> bits) & max_int
+		baseb[out] = (total >> bits) & max_u32
 	}
 	return baseb
 }

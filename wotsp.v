@@ -34,7 +34,7 @@ fn wots_pkgen(c Context, sk_seed []u8, pk_seed []u8, mut addr Address) ![]u8 {
 	// skADRS.setTypeAndClear(WOTS_PRF)
 	sk_addr.set_type_and_clear(.wots_prf)
 	// skADRS.setKeyPairAddress(ADRS.getKeyPairAddress())
-	sk_addr.set_keypair_address(u32(addr.get_keypair_address()))
+	sk_addr.set_keypair_address(addr.get_keypair_address())
 
 	// gets wotsp length from the current context
 	wots_len := c.wots_len()
@@ -57,7 +57,7 @@ fn wots_pkgen(c Context, sk_seed []u8, pk_seed []u8, mut addr Address) ![]u8 {
 	wots_pk_addr.set_type_and_clear(.wots_pk)
 	// wotspkADRS.setKeyPairAddress(ADRS.getKeyPairAddress())
 	// TODO: remove int cast
-	wots_pk_addr.set_keypair_address(u32(addr.get_keypair_address()))
+	wots_pk_addr.set_keypair_address(addr.get_keypair_address())
 	// compress public key, 𝑝𝑘 ← T𝑙𝑒𝑛(PK.seed, wotspkADRS,𝑡𝑚𝑝)
 	pk := c.tlen(pk_seed, wots_pk_addr, tmp)!
 

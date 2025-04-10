@@ -165,9 +165,6 @@ fn (c Context) prf(pk_seed []u8, sk_seed []u8, addr Address) ![]u8 {
 		data << pk_seed
 		data << addr.bytes()
 		data << sk_seed
-		if c.id in [.shake_128f, .shake_128s] {
-			return sha3.shake128(data, c.n)
-		}
 		return sha3.shake256(data, c.n)
 	}
 	// sha2 family,

@@ -80,11 +80,29 @@ mut:
 	pk   Pk
 }
 
+fn (sk Sk) bytes() []u8 {
+	mut out := []u8{}
+	out << sk.seed
+	out << sk.prf
+	out << sk.pk.seed
+	out << sk.pk.root
+
+	return out
+}
+
 // The public key has a size of 2 * n bytes. i.e. It consists of the concatenation of PK.seed and PK.root
 struct Pk {
 mut:
 	seed []u8
 	root []u8
+}
+
+fn (pk Pk) bytes() []u8 {
+	mut out := []u8{}
+	out << pk.seed
+	out << pk.root
+
+	return out
 }
 
 // 10.1 SLH-DSA Key Generation

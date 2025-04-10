@@ -2,43 +2,40 @@ module pslhdsa
 
 import encoding.binary
 
-// vfmt off
-const addr_layer_start 	= 0
-const addr_layer_end	= 4
-const addr_tree_start	= 4
-const addr_tree_end		= 16
-const addr_type_start 	= 16
-const addr_type_end		= 20
-const addr_final_start	= 20
-const addr_final_end	= 32
-// inside final address, when type was a WOTS_HASH, 
-// It can contains key pair address, chain address and hash address
-// 𝑡𝑦𝑝𝑒 = 0 (WOTS_HASH)
-// key pair address	4 bytes
-// chain address	4 bytes
-// hash address		4 bytes
-const addr_keypair_start 	= 20
-const addr_keypair_end		= 24
-const addr_chain_start		= 24 
-const addr_chain_end		= 28 
-const addr_hash_start		= 28
-const addr_hash_end			= 32
-
-// vfmt on
-
 // Address fundamentally 32 bytes long composed from:
-// -- layer address  4 bytes 0-4
-// -- tree address  12 bytes 4-16
-// -- 𝑡𝑦𝑝𝑒           4 bytes 16-20
-// -- final         12 bytes 20-32
+// -- layer address  4 bytes 	0	0..4
+// -- tree address  12 bytes 	1	4..8
+// -- tree address  			2	8..12
+// -- tree address   			3	12..16
+// -- 𝑡𝑦𝑝𝑒           4 bytes 	4	16..20
+// -- final          12 bytes	5	20..24
+// -- final          			6 	24..28
+// -- final          			7 	28..32
 struct Address {
 mut:
-	data []u8 = []u8{len: 32}
+	data []u32 = []u32{len: 8}
 }
 
 @[direct_array_access; inline]
 fn (addr Address) bytes() []u8 {
-	return addr.data
+	mut x := []u8{len: 32}
+	// addr.0 was layer address, written into x0..x3
+	binary.big_endian_put_u32(mut x[0..4], addr.data[0])
+
+	// addr.1..addr.3 was tree address, written into x4..x15
+	binary.big_endian_put_u32(mut x[4..8], addr.data[1])
+	binary.big_endian_put_u32(mut x[8..12], addr.data[2])
+	binary.big_endian_put_u32(mut x[12..16], addr.data[3])
+
+	// addr.4 was address type
+	binary.big_endian_put_u32(mut x[16..20], addr.data[4])
+
+	// last 3 u32 was final address
+	binary.big_endian_put_u32(mut x[20..24], addr.data[5])
+	binary.big_endian_put_u32(mut x[24..28], addr.data[6])
+	binary.big_endian_put_u32(mut x[28..32], addr.data[7])
+
+	return x
 }
 
 @[direct_array_access; inline]
@@ -63,13 +60,19 @@ fn (mut addr Address) reset() {
 // final 12 bytes
 @[direct_array_access; inline]
 fn (addr Address) compress() []u8 {
-	mut out := []u8{}
-	out << addr.data[3..4]
-	out << addr.data[8..16]
-	out << addr.data[19..32]
-
-	assert out.len == 22
-	return out
+	mut x := []u8{len: 22}
+	// layer, byte at 3-4
+	x[0] = u8(addr.data[0] & 0xff)
+	// tree
+	binary.big_endian_put_u32(mut x[1..5], addr.data[2])
+	binary.big_endian_put_u32(mut x[5..9], addr.data[3])
+	// type
+	x[9] = u8(addr.data[4] & 0xff)
+	// final
+	binary.big_endian_put_u32(mut x[10..14], addr.data[5])
+	binary.big_endian_put_u32(mut x[14..18], addr.data[6])
+	binary.big_endian_put_u32(mut x[18..22], addr.data[7])
+	return x
 }
 
 // Member functions for addresses
@@ -78,41 +81,39 @@ fn (addr Address) compress() []u8 {
 // Layer parts
 @[direct_array_access; inline]
 fn (addr Address) get_layer_address() u32 {
-	return binary.big_endian_u32(addr.data[addr_layer_start..addr_layer_end])
+	return rev8_be32(addr.data[0])
 }
 
 // ADRS.setLayerAddress(𝑙) ADRS ← toByte(𝑙, 4) ∥ ADRS[4 ∶ 32]
 @[direct_array_access; inline]
 fn (mut addr Address) set_layer_address(v u32) {
-	// bytes := to_byte(x, 4)
-	// addr.data[addr_layer_start..addr_layer_end] = bytes
-	binary.big_endian_put_u32(mut addr.data[addr_layer_start..addr_layer_end], v)
+	addr.data[0] = rev8_be32(v)
 }
 
 // Tree parts
+fn (addr Address) get_tree_address() u64 {
+	return rev8_be64(u64(addr.data[2]) << 32) | rev8_be64(u64(addr.data[3]))
+}
+
 // ADRS.setTreeAddress(𝑡) ADRS ← ADRS[0 ∶ 4] ∥ toByte(𝑡, 12) ∥ ADRS[16 ∶ 32]
 @[direct_array_access; inline]
 fn (mut addr Address) set_tree_address(v u64) {
-	// TODO: tree address should fit in 12 bytes instead, [4..16]
-	//  bytes a[4:8] of tree address are always zero
-	binary.big_endian_put_u64(mut addr.data[addr_tree_start + 4..addr_tree_end], v)
+	addr.data[1] = 0
+	addr.data[2] = rev8_be32(u32(v >> 32))
+	addr.data[3] = rev8_be32(u32(v & 0xFFFF_FFFF))
 }
 
 // KEYPAIR
 // ADRS.setKeyPairAddress(𝑖) ADRS ← ADRS[0 ∶ 20] ∥ toByte(𝑖, 4) ∥ ADRS[24 ∶ 32]
 @[direct_array_access; inline]
 fn (mut addr Address) set_keypair_address(v u32) {
-	// final 20-24
-	// bytes := to_byte(x, 4)
-	// addr.data[addr_final_start..addr_final_start + 4] = bytes
-	binary.big_endian_put_u32(mut addr.data[addr_keypair_start..addr_keypair_end], v)
+	addr.data[5] = rev8_be32(v)
 }
 
 // 𝑖 ← ADRS.getKeyPairAddress() 𝑖 ← toInt(ADRS[20 ∶ 24], 4)
 @[direct_array_access; inline]
 fn (addr Address) get_keypair_address() u32 {
-	// return u32(to_int(addr.data[addr_final_start..addr_final_start + 4], 4))
-	return binary.big_endian_u32(addr.data[addr_keypair_start..addr_keypair_end])
+	return rev8_be32(addr.data[5])
 }
 
 // Set WOTS+ chain address.
@@ -123,7 +124,7 @@ fn (mut addr Address) set_chain_address(v u32) {
 	// bytes := to_byte(x, 4)
 	// at 24..28
 	// addr.data[24..28] = bytes
-	binary.big_endian_put_u32(mut addr.data[addr_chain_start..addr_chain_end], v)
+	addr.data[6] = rev8_be32(v)
 }
 
 // ADRS.setTreeHeight(𝑖) ADRS ← ADRS[0 ∶ 24] ∥ toByte(𝑖, 4) ∥ ADRS[28 ∶ 32]
@@ -131,11 +132,7 @@ fn (mut addr Address) set_chain_address(v u32) {
 @[direct_array_access; inline]
 fn (mut addr Address) set_tree_height(v u32) {
 	// TODO: assert correct type, 𝑡𝑦𝑝𝑒 = 3 (FORS_TREE), 𝑡𝑦𝑝𝑒 = 6 (FORS_PRF), 𝑡𝑦𝑝𝑒 = 2 (TREE)
-	// tree height was on second index of final field, ie, final[1]
-	// bytes := to_byte(x, 4)
-	// at 24..28
-	// addr.data[24..28] = bytes
-	binary.big_endian_put_u32(mut addr.data[24..28], v)
+	addr.data[6] = rev8_be32(v)
 }
 
 // ADRS.setTreeIndex(𝑖) ADRS ← ADRS[0 ∶ 28] ∥ toByte(𝑖, 4)
@@ -146,7 +143,7 @@ fn (mut addr Address) set_tree_index(v u32) {
 	// at 28..32
 	// bytes := to_byte(x, 4)
 	// addr.data[28..32] = bytes
-	binary.big_endian_put_u32(mut addr.data[28..32], v)
+	addr.data[7] = rev8_be32(v)
 }
 
 // 𝑖 ← ADRS.getTreeIndex() 𝑖 ← toInt(ADRS[28 ∶ 32], 4)
@@ -155,7 +152,7 @@ fn (mut addr Address) set_tree_index(v u32) {
 fn (addr Address) get_tree_index() u32 {
 	// TODO: assert correct type, 𝑡𝑦𝑝𝑒 = 2 (TREE), 𝑡𝑦𝑝𝑒 = 6 (FORS_PRF)
 	// return u32(to_int(addr.data[28..32], 4))
-	return binary.big_endian_u32(addr.data[28..32])
+	return rev8_be32(addr.data[7])
 }
 
 // ADRS.setHashAddress(𝑖), ADRS ← ADRS[0 ∶ 28] ∥ toByte(𝑖, 4)
@@ -164,20 +161,28 @@ fn (mut addr Address) set_hash_address(v u32) {
 	// 𝑡𝑦𝑝𝑒 = 0 (WOTS_HASH), 𝑡𝑦𝑝𝑒 = 5 (WOTS_PRF)
 	// bytes := to_byte(x, 4)
 	// addr.data[28..32] = bytes
-	binary.big_endian_put_u32(mut addr.data[28..32], v)
+	addr.data[7] = rev8_be32(v)
+}
+
+fn (addr Address) get_type() !AddressType {
+	val := rev8_be32(addr.data[4])
+	return address_type_from_u32(val)!
 }
 
 // ADRS.setTypeAndClear(𝑌) ADRS ← ADRS[0 ∶ 16] ∥ toByte(𝑌 , 4) ∥ toByte(0, 12)
 @[direct_array_access; inline]
 fn (mut addr Address) set_type_and_clear(new_type AddressType) {
-	// set type
-	// bytes_type := to_byte(u32(new_type), 4)
-	// addr.data[addr_type_start..addr_type_end] = bytes_type
-	binary.big_endian_put_u32(mut addr.data[addr_type_start..addr_type_end], u32(new_type))
-	// clear final
-	unsafe {
-		addr.data[addr_final_start..addr_final_end].reset()
-	}
+	addr.data[4] = rev8_be32(u32(new_type))
+	addr.data[5] = 0
+	addr.data[6] = 0
+	addr.data[7] = 0
+}
+
+@[direct_array_access; inline]
+fn (mut addr Address) set_type_and_clear_not_kp(new_type AddressType) {
+	addr.data[4] = rev8_be32(u32(new_type))
+	addr.data[6] = 0
+	addr.data[7] = 0
 }
 
 // The Address type word will have a value of 0, 1, 2, 3, 4, 5, or 6.
@@ -192,4 +197,17 @@ enum AddressType as u32 {
 	fors_roots = 4
 	wots_prf   = 5
 	fors_prf   = 6
+}
+
+fn address_type_from_u32(v u32) !AddressType {
+	match v {
+		0 { return .wots_hash }
+		1 { return .wots_pk }
+		2 { return .tree }
+		3 { return .fors_tree }
+		4 { return .fors_roots }
+		5 { return .wots_prf }
+		6 { return .fors_prf }
+		else { return error('Bad address type value') }
+	}
 }

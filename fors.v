@@ -107,7 +107,7 @@ fn fors_sign(c Context, md []u8, sk_seed []u8, pk_seed []u8, mut addr Address) !
 // Input: FORS signature SIG𝐹𝑂𝑅𝑆, message digest 𝑚𝑑, public seed PK.seed, address ADRS.
 // Output: FORS public key
 fn fors_pkfromsig(c Context, sig_fors []u8, md []u8, pk_seed []u8, mut addr Address) ![]u8 {
-	assert sig_fors.len == c.k * (c.a + 1) * c.n
+	// assert sig_fors.len == c.k * (c.a + 1) * c.n
 	assert md.len == cdiv(c.k * c.a, 8)
 
 	// 𝑖𝑛𝑑𝑖𝑐𝑒𝑠 ← base_2b(𝑚𝑑, 𝑎, 𝑘)

@@ -57,6 +57,7 @@ fn base_2exp_b(x []u8, b int, out_len int) []u32 {
 	mut bits := 0
 	mut total := u32(0)
 	mut pos := 0
+	mod := (u32(1) << b) - 1
 	mut baseb := []u32{len: out_len}
 
 	for out := 0; out < out_len; out++ {
@@ -66,7 +67,7 @@ fn base_2exp_b(x []u8, b int, out_len int) []u32 {
 			bits += 8
 		}
 		bits -= b
-		baseb[out] = (total >> bits) & max_u32
+		baseb[out] = (total >> bits) & mod
 	}
 	return baseb
 }

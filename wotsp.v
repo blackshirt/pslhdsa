@@ -9,7 +9,7 @@ module pslhdsa
 // Output: Value of F iterated 𝑠 times on 𝑋.
 // (where 𝑖 + 𝑠 < w
 fn chain(c Context, x []u8, i int, s int, pk_seed []u8, mut addr Address) ![]u8 {
-	assert x.len == c.prm.n
+	assert x.len == c.n
 	if i + s >= w {
 		return error('Invalid wots+ params')
 	}
@@ -35,7 +35,7 @@ fn wots_pkgen(c Context, sk_seed []u8, pk_seed []u8, mut addr Address) ![]u8 {
 	sk_addr.set_keypair_address(u32(addr.get_keypair_address()))
 
 	// gets wotsp length from the current context
-	wots_len := c.prm.wots_len()
+	wots_len := c.wots_len()
 	// temporary buffer to store output
 	mut tmp := []u8{}
 	for i := 0; i < wots_len - 1; i++ {
@@ -72,8 +72,8 @@ fn wots_pkgen(c Context, sk_seed []u8, pk_seed []u8, mut addr Address) ![]u8 {
 fn wots_sign(c Context, m []u8, sk_seed []u8, pk_seed []u8, mut addr Address) ![]u8 {
 	mut csum := u64(0)
 	// convert message to base w, ie, 𝑚𝑠𝑔 ← base_2b(𝑀, 𝑙𝑔𝑤, 𝑙𝑒𝑛1)
-	len1 := c.prm.len1()
-	mut msgs := base_2exp_b(m, c.prm.lgw, len1)
+	len1 := c.len1()
+	mut msgs := base_2exp_b(m, c.lgw, len1)
 
 	// compute checksum
 	for i := 0; i < len1 - 1; i++ {
@@ -82,12 +82,12 @@ fn wots_sign(c Context, m []u8, sk_seed []u8, pk_seed []u8, mut addr Address) ![
 	}
 	// for 𝑙𝑔𝑤 = 4, left shift by 4, its only values supported in this module
 	// 𝑐𝑠𝑢𝑚 ← 𝑐𝑠𝑢𝑚 ≪ ((8 − ((𝑙𝑒𝑛2 ⋅ 𝑙𝑔𝑤) mod 8)) mod 8)
-	csum <<= u64((8 - ((len2 * c.prm.lgw) % 8)) % 8)
+	csum <<= u64((8 - ((len2 * c.lgw) % 8)) % 8)
 
 	// convert to base w, 𝑚𝑠𝑔 ← 𝑚𝑠𝑔 ∥ base_2b (toByte (𝑐𝑠𝑢𝑚, ⌈(𝑙𝑒𝑛2*𝑙𝑔𝑤)/8⌉) , 𝑙𝑔𝑤, 𝑙𝑒𝑛2)
-	mlen := cdiv(len2 * c.prm.lgw, 8)
+	mlen := cdiv(len2 * c.lgw, 8)
 	bytes := to_byte(csum, mlen)
-	msgs << base_2exp_b(bytes, c.prm.lgw, len2)
+	msgs << base_2exp_b(bytes, c.lgw, len2)
 
 	// copy address to create key generation key address
 	mut sk_addr := addr.clone()
@@ -98,7 +98,7 @@ fn wots_sign(c Context, m []u8, sk_seed []u8, pk_seed []u8, mut addr Address) ![
 	sk_addr.set_keypair_address(u32(addr.get_keypair_address()))
 
 	mut sig := []u8{}
-	for i := 0; i < c.prm.wots_len(); i++ {
+	for i := 0; i < c.wots_len(); i++ {
 		// skADRS.setChainAddress(𝑖)
 		sk_addr.set_chain_address(u32(i))
 		// compute chain 𝑖 secret value, 𝑠𝑘 ← PRF(PK.seed, SK.seed, skADRS)
@@ -120,8 +120,8 @@ fn wots_sign(c Context, m []u8, sk_seed []u8, pk_seed []u8, mut addr Address) ![
 fn wots_pkfromsig(c Context, sig []u8, m []u8, pk_seed []u8, mut addr Address) ![]u8 {
 	mut csum := u64(0)
 	// convert message to base w, ie, 𝑚𝑠𝑔 ← base_2b(𝑀, 𝑙𝑔𝑤, 𝑙𝑒𝑛1)
-	len1 := c.prm.len1()
-	mut msgs := base_2exp_b(m, c.prm.lgw, len1)
+	len1 := c.len1()
+	mut msgs := base_2exp_b(m, c.lgw, len1)
 
 	// compute checksum
 	for i := 0; i < len1 - 1; i++ {
@@ -130,19 +130,19 @@ fn wots_pkfromsig(c Context, sig []u8, m []u8, pk_seed []u8, mut addr Address) !
 	}
 	// for 𝑙𝑔𝑤 = 4, left shift by 4, its only values supported in this module
 	// 𝑐𝑠𝑢𝑚 ← 𝑐𝑠𝑢𝑚 ≪ ((8 − ((𝑙𝑒𝑛2 ⋅ 𝑙𝑔𝑤) mod 8)) mod 8)
-	csum <<= u64((8 - ((len2 * c.prm.lgw) % 8)) % 8)
+	csum <<= u64((8 - ((len2 * c.lgw) % 8)) % 8)
 
 	// convert to base w, 𝑚𝑠𝑔 ← 𝑚𝑠𝑔 ∥ base_2b (toByte (𝑐𝑠𝑢𝑚, ⌈(𝑙𝑒𝑛2*𝑙𝑔𝑤)/8⌉) , 𝑙𝑔𝑤, 𝑙𝑒𝑛2)
-	mlen := cdiv(len2 * c.prm.lgw, 8)
+	mlen := cdiv(len2 * c.lgw, 8)
 	bytes := to_byte(csum, mlen)
-	msgs << base_2exp_b(bytes, c.prm.lgw, len2)
+	msgs << base_2exp_b(bytes, c.lgw, len2)
 
 	mut tmp := []u8{}
-	for i := 0; i < c.prm.wots_len(); i++ {
+	for i := 0; i < c.wots_len(); i++ {
 		// ADRS.setChainAddress(𝑖)
 		addr.set_chain_address(u32(i))
 		// 𝑡𝑚𝑝[𝑖] ← chain(𝑠𝑖𝑔[𝑖], 𝑚𝑠𝑔[𝑖], 𝑤 − 1 − 𝑚𝑠𝑔[𝑖], PK.seed, ADRS)
-		x := sig[i * c.prm.n..(i + 1) * c.prm.n]
+		x := sig[i * c.n..(i + 1) * c.n]
 		next_chain := chain(c, x, int(msgs[i]), int(w - 1 - msgs[i]), pk_seed, mut addr)!
 		assert next_chain.len != 0
 

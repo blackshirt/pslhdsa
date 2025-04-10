@@ -27,7 +27,7 @@ fn slh_sign_internal(c Context, m []u8, sk Sk, addrnd []u8, opt SignerOpts) ![]u
 		opt_rand = unsafe { sk.pk.seed }
 	}
 	if opt.randomize {
-		opt_rand = unsafe { rand.read(c.prm.n)! }
+		opt_rand = unsafe { rand.read(c.n)! }
 	}
 	// generate randomizer, 𝑅 ← PRF𝑚𝑠𝑔(SK.prf, 𝑜𝑝𝑡_𝑟𝑎𝑛𝑑, 𝑀 )
 	r := c.prf_msg(sk.prf, opt_rand, m)!
@@ -37,18 +37,16 @@ fn slh_sign_internal(c Context, m []u8, sk Sk, addrnd []u8, opt SignerOpts) ![]u
 	// compute message digest, 	𝑑𝑖𝑔𝑒𝑠𝑡 ← H𝑚𝑠𝑔(𝑅, PK.seed, PK.root, 𝑀 )
 	digest := c.h_msg(r, sk.pk.seed, sk.pk.root, m)!
 	// 𝑚𝑑 ← 𝑑𝑖𝑔𝑒𝑠𝑡 [0 ∶ (𝑘⋅𝑎 ⌉ 8 )]
-	md := digest[0..cdiv(c.prm.k * c.prm.a, 8)]
+	md := digest[0..cdiv(c.k * c.a, 8)]
 
 	// (k*a)/8 .. (k*a)/8 + (h-h/d)/8
-	tmp_idx_tree := digest[cdiv(c.prm.k * c.prm.a, 8)..cdiv(c.prm.k * c.prm.a, 8) +
-		cdiv(c.prm.h - (c.prm.h / c.prm.d), 8)]
+	tmp_idx_tree := digest[cdiv(c.k * c.a, 8)..cdiv(c.k * c.a, 8) + cdiv(c.h - (c.h / c.d), 8)]
 
 	// (k*a)/8 + (h-h/d)/8 .. (k*a)/8 + (h-h/d)/8 + h/8d
-	tmp_idx_leaf := digest[cdiv(c.prm.k * c.prm.a, 8) + cdiv(c.prm.h - (c.prm.h / c.prm.d), 8)..
-		cdiv(c.prm.k * c.prm.a, 8) + cdiv(c.prm.h - (c.prm.h / c.prm.d), 8) +
-		cdiv(c.prm.h, 8 * c.prm.d)]
-	idx_tree := to_int(tmp_idx_tree, cdiv(c.prm.h - c.prm.h / c.prm.d, 8)) % (1 << (c.prm.h - c.prm.h / c.prm.d)) // mod 2^(ℎ−ℎ/d)
-	idx_leaf := to_int(tmp_idx_leaf, cdiv(c.prm.h, 8 * c.prm.d)) % (1 << (c.prm.h / c.prm.d))
+	tmp_idx_leaf := digest[cdiv(c.k * c.a, 8) + cdiv(c.h - (c.h / c.d), 8)..cdiv(c.k * c.a, 8) +
+		cdiv(c.h - (c.h / c.d), 8) + cdiv(c.h, 8 * c.d)]
+	idx_tree := to_int(tmp_idx_tree, cdiv(c.h - c.h / c.d, 8)) % (1 << (c.h - c.h / c.d)) // mod 2^(ℎ−ℎ/d)
+	idx_leaf := to_int(tmp_idx_leaf, cdiv(c.h, 8 * c.d)) % (1 << (c.h / c.d))
 
 	// ADRS.setTreeAddress(𝑖𝑑𝑥𝑡𝑟𝑒𝑒)
 	addr.set_tree_address(u32(idx_tree))
@@ -97,9 +95,9 @@ mut:
 // Output: SLH-DSA key pair (SK, PK)
 fn slh_keygen(c Context) !(Sk, Pk) {
 	// set SK.seed, SK.prf, and PK.seed to random 𝑛-byte
-	sk_seed := rand.read(c.prm.n)!
-	sk_prf := rand.read(c.prm.n)!
-	pk_seed := rand.read(c.prm.n)!
+	sk_seed := rand.read(c.n)!
+	sk_prf := rand.read(c.n)!
+	pk_seed := rand.read(c.n)!
 
 	return slh_keygen_internal(c, sk_seed, sk_prf, pk_seed)!
 }
@@ -114,9 +112,9 @@ fn slh_keygen_internal(c Context, sk_seed []u8, sk_prf []u8, pk_seed []u8) !(Sk,
 	// 1: ADRS ← toByte(0, 32) ▷
 	mut addr := Address{}
 	// 2: ADRS.setLayerAddress(𝑑 − 1)
-	addr.set_layer_address(u32(c.prm.d - 1))
+	addr.set_layer_address(u32(c.d - 1))
 	// 3: PK.root ← xmss_node(SK.seed, 0, ℎ′ , PK.seed, ADRS)
-	pk_root := xmss_node(c, sk_seed, 0, c.prm.hp, pk_seed, mut addr)!
+	pk_root := xmss_node(c, sk_seed, 0, c.hp, pk_seed, mut addr)!
 	// 4: return ( (SK.seed, SK.prf, PK.seed, PK.root), (PK.seed, PK.root) )
 	pk := Pk{
 		seed: pk_seed
@@ -138,7 +136,7 @@ fn slh_keygen_internal(c Context, sk_seed []u8, sk_prf []u8, pk_seed []u8) !(Sk,
 // Output: Boolean.
 fn slh_verify_internal(c Context, m []u8, sig []u8, pk Pk) !bool {
 	// if |SIG| ≠ (1 + 𝑘(1 + 𝑎) + ℎ + 𝑑 ⋅ 𝑙𝑒𝑛) ⋅ 𝑛 { return false }
-	exp_length := (1 + c.prm.k * (1 + c.prm.a) + c.prm.h + c.prm.d * c.prm.wots_len()) * c.prm.n
+	exp_length := (1 + c.k * (1 + c.a) + c.h + c.d * c.wots_len()) * c.n
 	if sig.len != exp_length {
 		return false
 	}
@@ -146,30 +144,27 @@ fn slh_verify_internal(c Context, m []u8, sig []u8, pk Pk) !bool {
 	// ADRS ← toByte(0, 32)
 	mut addr := Address{}
 	// 𝑅 ← SIG.getR(), ▷ SIG[0 ∶ n]
-	r := sig[0..c.prm.n].clone()
+	r := sig[0..c.n].clone()
 	// SIG𝐹𝑂𝑅𝑆 ← SIG.getSIG_FORS(), SIG[𝑛 ∶ (1 + 𝑘(1 + 𝑎)) ⋅ 𝑛]
-	sig_fors := sig[c.prm.n..(1 + c.prm.k * (1 + c.prm.a)) * c.prm.n]
+	sig_fors := sig[c.n..(1 + c.k * (1 + c.a)) * c.n]
 	// SIG𝐻𝑇 ← SIG.getSIG_HT(), SIG[(1 + 𝑘(1 + 𝑎)) ⋅ 𝑛 ∶ (1 + 𝑘(1 + 𝑎) + ℎ + 𝑑 ⋅ 𝑙𝑒𝑛) ⋅ 𝑛]
-	sig_ht := sig[(1 + c.prm.k * (1 + c.prm.a)) * c.prm.n..(1 + c.prm.k * (1 + c.prm.a) + c.prm.h +
-		c.prm.d * c.prm.wots_len()) * c.prm.n]
+	sig_ht := sig[(1 + c.k * (1 + c.a)) * c.n..(1 + c.k * (1 + c.a) + c.h + c.d * c.wots_len()) * c.n]
 
 	// compute message digest, 𝑑𝑖𝑔𝑒𝑠𝑡 ← H𝑚𝑠𝑔(𝑅, PK.seed, PK.root, 𝑀 )
 	digest := c.h_msg(r, pk.seed, pk.root, m)!
 
 	// first (k.a)/8 bytes, 𝑚𝑑 ← 𝑑𝑖𝑔𝑒𝑠𝑡 [0 ∶ ⌈𝑘⋅𝑎]/8]
-	md := digest[0..cdiv(c.prm.k * c.prm.a, 8)]
+	md := digest[0..cdiv(c.k * c.a, 8)]
 
 	// next ⌈ℎ−ℎ/𝑑]/8 ⌉ bytes
-	tmp_idx_tree := digest[cdiv(c.prm.k * c.prm.a, 8)..cdiv(c.prm.k * c.prm.a, 8) +
-		cdiv(c.prm.h - c.prm.h / c.prm.d, 8)]
+	tmp_idx_tree := digest[cdiv(c.k * c.a, 8)..cdiv(c.k * c.a, 8) + cdiv(c.h - c.h / c.d, 8)]
 
 	// next [h/8𝑑] bytes
-	tmp_idx_leaf := digest[cdiv(c.prm.k * c.prm.a, 8) + cdiv(c.prm.h - c.prm.h / c.prm.d, 8)..
-		cdiv(c.prm.k * c.prm.a, 8) + cdiv(c.prm.h - c.prm.h / c.prm.d, 8) +
-		cdiv(c.prm.h, 8 * c.prm.d)]
+	tmp_idx_leaf := digest[cdiv(c.k * c.a, 8) + cdiv(c.h - c.h / c.d, 8)..cdiv(c.k * c.a, 8) +
+		cdiv(c.h - c.h / c.d, 8) + cdiv(c.h, 8 * c.d)]
 
-	idx_tree := to_int(tmp_idx_tree, cdiv(c.prm.h - c.prm.h / c.prm.d, 8)) % (1 << (c.prm.h - c.prm.h / c.prm.d)) // mod 2^(ℎ−ℎ/d)
-	idx_leaf := to_int(tmp_idx_leaf, cdiv(c.prm.h, 8 * c.prm.d)) % (1 << (c.prm.h / c.prm.d)) // mod 2^(ℎ/d)
+	idx_tree := to_int(tmp_idx_tree, cdiv(c.h - c.h / c.d, 8)) % (1 << (c.h - c.h / c.d)) // mod 2^(ℎ−ℎ/d)
+	idx_leaf := to_int(tmp_idx_leaf, cdiv(c.h, 8 * c.d)) % (1 << (c.h / c.d)) // mod 2^(ℎ/d)
 
 	// compute FORS public key
 	addr.set_tree_address(u32(idx_tree))
@@ -196,7 +191,7 @@ fn slh_sign(c Context, m []u8, cx []u8, sk Sk, opt SignerOpts) ![]u8 {
 	}
 	mut addrnd := []u8{}
 	if opt.randomize {
-		addrnd = rand.read(c.prm.n)!
+		addrnd = rand.read(c.n)!
 	}
 
 	// 𝑀′ ← toByte(0, 1) ∥ toByte(|𝑐𝑡𝑥|, 1) ∥ 𝑐𝑡𝑥 ∥ m
@@ -225,7 +220,7 @@ fn hash_slh_sign(c Context, m []u8, cx []u8, ph crypto.Hash, sk Sk, opt SignerOp
 	}
 	mut addrnd := []u8{}
 	if opt.randomize {
-		addrnd = rand.read(c.prm.n)!
+		addrnd = rand.read(c.n)!
 	}
 
 	// default to sha256

@@ -1,10 +1,38 @@
 module pslhdsa
 
-// 4. Functions and Addressing
 // import crypto.sha256
 // import crypto.sha512
 // import crypto.sha3 // for shake
 // import crypto.hmac
+
+// SLH-DSA Context
+struct Context {
+	// Chapter 11. Parameters Set
+	id  Kind
+	n   int
+	h   int
+	d   int
+	hp  int
+	a   int
+	k   int
+	lgw int = 4
+	m   int
+	sc  int
+	pkb int
+	sig int
+}
+
+fn new_context(k Kind) Context {
+	return paramset[k.str()]
+}
+
+// is_shake tells underlying hash was a shake-family algorithm
+@[inline]
+fn (c Context) is_shake() bool {
+	return c.id.is_shake()
+}
+
+// 4. Functions and Addressing
 
 // The enumeration type of the SLH-DSA key.
 // See Table 2. SLH-DSA parameter sets of the Chapter 11. Parameter Sets<br>
@@ -70,56 +98,35 @@ fn (n Kind) str() string {
 	}
 }
 
-// Chapter 11. Parameters Set
-struct ParamSet {
-	// Algorithm name
-	id  Kind
-	n   int
-	h   int
-	d   int
-	hp  int
-	a   int
-	k   int
-	lgw int = 4
-	m   int
-	sc  int
-	pkb int
-	sig int
-}
-
 // When 𝑙𝑔𝑤 = 4, 𝑤 = 16, 𝑙𝑒𝑛1 = 2𝑛, 𝑙𝑒𝑛2 = 3, and 𝑙𝑒𝑛 = 2𝑛 + 3.
 // See FIPS 205 p17
 const w = 16
 const len2 = 3
 
 @[inline]
-fn (p ParamSet) len1() int {
-	return 2 * p.n
+fn (c Context) len1() int {
+	return 2 * c.n
 }
 
 @[inline]
-fn (p ParamSet) wots_len() int {
-	return 2 * p.n + 3
+fn (c Context) wots_len() int {
+	return 2 * c.n + 3
 }
 
 // Table 2. SLH-DSA parameter sets
 const paramset = {
-	// 						     id 	𝑛 	ℎ 	𝑑 	ℎ′  𝑎 	𝑘 	𝑙𝑔𝑤 𝑚  sc pkb  sig
-	'sha2_128s':  ParamSet{.sha2_128s, 16, 63, 7, 9, 12, 14, 4, 30, 1, 32, 7856}
-	'sha2_128f':  ParamSet{.sha2_128f, 16, 66, 22, 3, 6, 33, 4, 34, 1, 32, 17088}
-	'sha2_192s':  ParamSet{.sha2_192s, 24, 63, 7, 9, 14, 17, 4, 39, 3, 48, 16224}
-	'sha2_192f':  ParamSet{.sha2_192f, 24, 66, 22, 3, 8, 33, 4, 42, 3, 48, 35664}
-	'sha2_256s':  ParamSet{.sha2_256s, 32, 64, 8, 8, 14, 22, 4, 47, 5, 64, 29792}
-	'sha2_256f':  ParamSet{.sha2_256f, 32, 68, 17, 4, 9, 35, 4, 49, 5, 64, 49856}
+	// 						     id   𝑛   ℎ   𝑑  ℎp  𝑎 	𝑘 	𝑙𝑔𝑤 𝑚 sc pkb  sig
+	'sha2_128s':  Context{.sha2_128s, 16, 63, 7, 9, 12, 14, 4, 30, 1, 32, 7856}
+	'sha2_128f':  Context{.sha2_128f, 16, 66, 22, 3, 6, 33, 4, 34, 1, 32, 17088}
+	'sha2_192s':  Context{.sha2_192s, 24, 63, 7, 9, 14, 17, 4, 39, 3, 48, 16224}
+	'sha2_192f':  Context{.sha2_192f, 24, 66, 22, 3, 8, 33, 4, 42, 3, 48, 35664}
+	'sha2_256s':  Context{.sha2_256s, 32, 64, 8, 8, 14, 22, 4, 47, 5, 64, 29792}
+	'sha2_256f':  Context{.sha2_256f, 32, 68, 17, 4, 9, 35, 4, 49, 5, 64, 49856}
 	// SHAKE family
-	'shake_128s': ParamSet{.shake_128s, 16, 63, 7, 9, 12, 14, 4, 30, 1, 32, 7856}
-	'shake_128f': ParamSet{.shake_128f, 16, 66, 22, 3, 6, 33, 4, 34, 1, 32, 17088}
-	'shake_192s': ParamSet{.shake_192s, 24, 63, 7, 9, 14, 17, 4, 39, 3, 48, 16224}
-	'shake_192f': ParamSet{.shake_192f, 24, 66, 22, 3, 8, 33, 4, 42, 3, 48, 35664}
-	'shake_256s': ParamSet{.shake_256s, 32, 64, 8, 8, 14, 22, 4, 47, 5, 64, 29792}
-	'shake_256f': ParamSet{.shake_256f, 32, 68, 17, 4, 9, 35, 4, 49, 5, 64, 49856}
-}
-
-fn ParamSet.from_kind(k Kind) ParamSet {
-	return paramset[k.str()]
+	'shake_128s': Context{.shake_128s, 16, 63, 7, 9, 12, 14, 4, 30, 1, 32, 7856}
+	'shake_128f': Context{.shake_128f, 16, 66, 22, 3, 6, 33, 4, 34, 1, 32, 17088}
+	'shake_192s': Context{.shake_192s, 24, 63, 7, 9, 14, 17, 4, 39, 3, 48, 16224}
+	'shake_192f': Context{.shake_192f, 24, 66, 22, 3, 8, 33, 4, 42, 3, 48, 35664}
+	'shake_256s': Context{.shake_256s, 32, 64, 8, 8, 14, 22, 4, 47, 5, 64, 29792}
+	'shake_256f': Context{.shake_256f, 32, 68, 17, 4, 9, 35, 4, 49, 5, 64, 49856}
 }

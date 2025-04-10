@@ -14,8 +14,10 @@ fn chain(c Context, x []u8, i int, s int, pk_seed []u8, mut addr Address) ![]u8 
 		return error('Invalid wots+ params')
 	}
 	mut tmp := x.clone()
-	for j := i; j < i + s; j++ {
+	for j := i; j <= i + s - 1; j++ {
+		// ADRS.setHashAddress(𝑗)
 		addr.set_hash_address(u32(j))
+		// 𝑡𝑚𝑝 ← F(PK.seed, ADRS,𝑡𝑚𝑝)
 		tmp = c.f(pk_seed, addr, tmp)!
 	}
 	return tmp
@@ -38,7 +40,7 @@ fn wots_pkgen(c Context, sk_seed []u8, pk_seed []u8, mut addr Address) ![]u8 {
 	wots_len := c.wots_len()
 	// temporary buffer to store output
 	mut tmp := []u8{}
-	for i := 0; i < wots_len - 1; i++ {
+	for i := 0; i <= wots_len - 1; i++ {
 		// skADRS.setChainAddress(𝑖)
 		sk_addr.set_chain_address(u32(i))
 		// compute secret value for chain i, 𝑠𝑘 ← PRF(PK.seed, SK.seed, skADRS)

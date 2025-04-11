@@ -8,9 +8,9 @@ import encoding.binary
 // -- tree address  			2	8..12
 // -- tree address   			3	12..16
 // -- 𝑡𝑦𝑝𝑒           4 bytes 	4	16..20
-// -- final          12 bytes	5	20..24
-// -- final          			6 	24..28
-// -- final          			7 	28..32
+// -- final          12 bytes	5	20..24, keypair
+// -- final          			6 	24..28, chain, tree height
+// -- final          			7 	28..32, hash, tree index
 struct Address {
 mut:
 	data []u32 = []u32{len: 8}
@@ -81,13 +81,13 @@ fn (addr Address) compress() []u8 {
 // Layer parts
 @[direct_array_access; inline]
 fn (addr Address) get_layer_address() u32 {
-	return rev8_be32(addr.data[0])
+	return addr.data[0]
 }
 
 // ADRS.setLayerAddress(𝑙) ADRS ← toByte(𝑙, 4) ∥ ADRS[4 ∶ 32]
 @[direct_array_access; inline]
 fn (mut addr Address) set_layer_address(v u32) {
-	addr.data[0] = rev8_be32(v)
+	addr.data[0] = v
 }
 
 // Tree parts
@@ -99,21 +99,21 @@ fn (addr Address) get_tree_address() u64 {
 @[direct_array_access; inline]
 fn (mut addr Address) set_tree_address(v u64) {
 	addr.data[1] = 0
-	addr.data[2] = rev8_be32(u32(v >> 32))
-	addr.data[3] = rev8_be32(u32(v & 0xFFFF_FFFF))
+	addr.data[2] = u32(v >> 32)
+	addr.data[3] = u32(v & 0xFFFF_FFFF)
 }
 
 // KEYPAIR
 // ADRS.setKeyPairAddress(𝑖) ADRS ← ADRS[0 ∶ 20] ∥ toByte(𝑖, 4) ∥ ADRS[24 ∶ 32]
 @[direct_array_access; inline]
 fn (mut addr Address) set_keypair_address(v u32) {
-	addr.data[5] = rev8_be32(v)
+	addr.data[5] = v
 }
 
 // 𝑖 ← ADRS.getKeyPairAddress() 𝑖 ← toInt(ADRS[20 ∶ 24], 4)
 @[direct_array_access; inline]
 fn (addr Address) get_keypair_address() u32 {
-	return rev8_be32(addr.data[5])
+	return addr.data[5]
 }
 
 // Set WOTS+ chain address.
@@ -124,7 +124,7 @@ fn (mut addr Address) set_chain_address(v u32) {
 	// bytes := to_byte(x, 4)
 	// at 24..28
 	// addr.data[24..28] = bytes
-	addr.data[6] = rev8_be32(v)
+	addr.data[6] = v
 }
 
 // ADRS.setTreeHeight(𝑖) ADRS ← ADRS[0 ∶ 24] ∥ toByte(𝑖, 4) ∥ ADRS[28 ∶ 32]
@@ -132,7 +132,7 @@ fn (mut addr Address) set_chain_address(v u32) {
 @[direct_array_access; inline]
 fn (mut addr Address) set_tree_height(v u32) {
 	// TODO: assert correct type, 𝑡𝑦𝑝𝑒 = 3 (FORS_TREE), 𝑡𝑦𝑝𝑒 = 6 (FORS_PRF), 𝑡𝑦𝑝𝑒 = 2 (TREE)
-	addr.data[6] = rev8_be32(v)
+	addr.data[6] = v
 }
 
 // ADRS.setTreeIndex(𝑖) ADRS ← ADRS[0 ∶ 28] ∥ toByte(𝑖, 4)
@@ -143,7 +143,7 @@ fn (mut addr Address) set_tree_index(v u32) {
 	// at 28..32
 	// bytes := to_byte(x, 4)
 	// addr.data[28..32] = bytes
-	addr.data[7] = rev8_be32(v)
+	addr.data[7] = v
 }
 
 // 𝑖 ← ADRS.getTreeIndex() 𝑖 ← toInt(ADRS[28 ∶ 32], 4)
@@ -152,7 +152,7 @@ fn (mut addr Address) set_tree_index(v u32) {
 fn (addr Address) get_tree_index() u32 {
 	// TODO: assert correct type, 𝑡𝑦𝑝𝑒 = 2 (TREE), 𝑡𝑦𝑝𝑒 = 6 (FORS_PRF)
 	// return u32(to_int(addr.data[28..32], 4))
-	return rev8_be32(addr.data[7])
+	return addr.data[7]
 }
 
 // ADRS.setHashAddress(𝑖), ADRS ← ADRS[0 ∶ 28] ∥ toByte(𝑖, 4)
@@ -161,18 +161,18 @@ fn (mut addr Address) set_hash_address(v u32) {
 	// 𝑡𝑦𝑝𝑒 = 0 (WOTS_HASH), 𝑡𝑦𝑝𝑒 = 5 (WOTS_PRF)
 	// bytes := to_byte(x, 4)
 	// addr.data[28..32] = bytes
-	addr.data[7] = rev8_be32(v)
+	addr.data[7] = v
 }
 
 fn (addr Address) get_type() !AddressType {
-	val := rev8_be32(addr.data[4])
+	val := addr.data[4]
 	return address_type_from_u32(val)!
 }
 
 // ADRS.setTypeAndClear(𝑌) ADRS ← ADRS[0 ∶ 16] ∥ toByte(𝑌 , 4) ∥ toByte(0, 12)
 @[direct_array_access; inline]
 fn (mut addr Address) set_type_and_clear(new_type AddressType) {
-	addr.data[4] = rev8_be32(u32(new_type))
+	addr.data[4] = u32(new_type)
 	addr.data[5] = 0
 	addr.data[6] = 0
 	addr.data[7] = 0
@@ -180,7 +180,7 @@ fn (mut addr Address) set_type_and_clear(new_type AddressType) {
 
 @[direct_array_access; inline]
 fn (mut addr Address) set_type_and_clear_not_kp(new_type AddressType) {
-	addr.data[4] = rev8_be32(u32(new_type))
+	addr.data[4] = u32(new_type)
 	addr.data[6] = 0
 	addr.data[7] = 0
 }

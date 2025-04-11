@@ -28,8 +28,10 @@ fn chain(c Context, x []u8, i int, s int, pk_seed []u8, mut addr Address) ![]u8 
 // Generates a WOTS+ public key.
 // Input: Secret seed SK.seed, public seed PK.seed, address ADRS.
 // Output: WOTS+ public key 𝑝k
-fn wots_pkgen(c Context, sk_seed []u8, pk_seed []u8, mut addr Address) ![]u8 {
+fn wots_pkgen(c Context, sk_seed []u8, pk_seed []u8, mut addr_ Address) ![]u8 {
+	assert addr_.get_type()! == .wots_hash
 	// copy address to create key generation key address
+	mut addr := addr_.clone()
 	mut sk_addr := addr.clone()
 	// skADRS.setTypeAndClear(WOTS_PRF)
 	sk_addr.set_type_and_clear(.wots_prf)

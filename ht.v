@@ -19,24 +19,25 @@ fn ht_sign(c Context, m []u8, sk_seed []u8, pk_seed []u8, idxtree_ int, idxleaf_
 	// ADRS.setTreeAddress(𝑖𝑑𝑥𝑡𝑟𝑒𝑒)
 	addr.set_tree_address(u64(idxtree))
 	// SIG𝑡𝑚𝑝 ← xmss_sign(𝑀, SK.seed,𝑖𝑑𝑥𝑙𝑒𝑎𝑓, PK.seed, ADRS)
-	mut sig_tmp := xmms_sign(c, m, sk_seed, idxleaf, pk_seed, mut addr)!
+	mut sig_tmp := xmss_sign(c, m, sk_seed, idxleaf, pk_seed, mut addr)!
 	// SIG𝐻𝑇 ← SIG𝑡𝑚p
 	mut sig_ht := unsafe { sig_tmp }
 	// 𝑟𝑜𝑜𝑡 ← xmss_pkFromSig(𝑖𝑑𝑥𝑙𝑒𝑎𝑓, SIG𝑡𝑚𝑝, 𝑀, PK.seed, ADRS)
 	mut root := xmms_pkfromsig(c, idxleaf, sig_tmp, m, pk_seed, mut addr)!
-
+	mask1 := 1 << c.hp - 1
+	mask2 := 1 << (64 - c.hp) - 1
 	// for 𝑗 from 1 to 𝑑 − 1
 	for j := 1; j < c.d; j++ {
 		// 𝑖𝑑𝑥𝑙𝑒𝑎𝑓 ← 𝑖𝑑𝑥𝑡𝑟𝑒𝑒 mod 2ℎ′, ℎ′ least significant bits of 𝑖𝑑𝑥𝑡𝑟𝑒e
-		idxleaf = idxtree & (1 << c.hp)
+		idxleaf = idxtree & mask1
 		// remove least significant ℎ′ bits from 𝑖𝑑𝑥𝑡𝑟𝑒e, 𝑖𝑑𝑥𝑡𝑟𝑒𝑒 ← 𝑖𝑑𝑥𝑡𝑟𝑒𝑒 ≫ ℎ′
-		idxtree = idxtree >> c.hp
+		idxtree = (idxtree >> c.hp) & mask2
 		// ADRS.setLayerAddress(𝑗)
 		addr.set_layer_address(u32(j))
 		// 10: ADRS.setTreeAddress(𝑖𝑑𝑥𝑡𝑟𝑒𝑒)
 		addr.set_tree_address(u32(idxtree))
 		// SIG𝑡𝑚𝑝 ← xmss_sign(𝑟𝑜𝑜𝑡, SK.seed,𝑖𝑑𝑥𝑙𝑒𝑎𝑓, PK.seed, ADRS)
-		sig_tmp = xmms_sign(c, root, sk_seed, idxleaf, pk_seed, mut addr)!
+		sig_tmp = xmss_sign(c, root, sk_seed, idxleaf, pk_seed, mut addr)!
 		// SIG𝐻𝑇 ← SIG𝐻𝑇 ∥ SIG𝑡𝑚p
 		sig_ht << sig_tmp
 		if j < c.d - 1 {

@@ -53,11 +53,12 @@ fn xmss_node(c Context, sk_seed []u8, i int, z int, pk_seed []u8, mut addr Addre
 // Input: 𝑛-byte message 𝑀, secret seed SK.seed, index 𝑖𝑑𝑥, public seed PK.seed,
 // address ADRS.
 // Output: XMSS signature SIG𝑋𝑀𝑆𝑆 = (𝑠𝑖𝑔 ∥ AUTH).
-fn xmms_sign(c Context, m []u8, sk_seed []u8, idx int, pk_seed []u8, mut addr Address) ![]u8 {
+fn xmss_sign(c Context, m []u8, sk_seed []u8, idx int, pk_seed []u8, mut addr_ Address) ![]u8 {
 	assert m.len == c.n
 	assert idx >= 0
 	assert idx <= (1 << c.hp)
 
+	mut addr := addr_.clone()
 	mut auth := []u8{}
 	// build authentication path
 	for j := 0; j < c.hp; j++ {
@@ -78,6 +79,7 @@ fn xmms_sign(c Context, m []u8, sk_seed []u8, idx int, pk_seed []u8, mut addr Ad
 	sig_xmss << sig
 	sig_xmss << auth
 
+	assert sig_xmss.len == c.n * (c.wots_len() + c.hp)
 	return sig_xmss
 }
 
@@ -87,9 +89,10 @@ fn xmms_sign(c Context, m []u8, sk_seed []u8, idx int, pk_seed []u8, mut addr Ad
 // Computes an XMSS public key from an XMSS signature.
 // Input: Index 𝑖𝑑𝑥, XMSS signature SIG𝑋𝑀𝑆𝑆 = (𝑠𝑖𝑔 ∥ AUTH), 𝑛-byte message, public seed PK.seed, address ADRS.
 // Output: 𝑛-byte root value 𝑛𝑜𝑑𝑒[0].
-fn xmms_pkfromsig(c Context, idx int, sig_xmss []u8, m []u8, pk_seed []u8, mut addr Address) ![]u8 {
+fn xmms_pkfromsig(c Context, idx int, sig_xmss []u8, m []u8, pk_seed []u8, mut addr_ Address) ![]u8 {
 	assert idx >= 0
 	assert m.len == c.n
+	mut addr := addr_.clone()
 	// assert sig_xmss.len == (c.wots_len() + c.hp) * c.n
 	mut node := [][]u8{len: 2}
 	// compute WOTS+ pk from WOTS+ 𝑠𝑖g, ADRS.setTypeAndClear(WOTS_HASH)
@@ -114,7 +117,7 @@ fn xmms_pkfromsig(c Context, idx int, sig_xmss []u8, m []u8, pk_seed []u8, mut a
 		// ADRS.setTreeHeight(𝑘 + 1)
 		addr.set_tree_height(u32(k + 1))
 		// if ⌊𝑖𝑑𝑥/2^𝑘⌋ is even then
-		if (idx >> k) % 2 == 0 {
+		if (idx >> k) & 1 == 0 {
 			// 11: ADRS.setTreeIndex(ADRS.getTreeIndex()/2)
 			addr.set_tree_index(u32(addr.get_tree_index() >> 1))
 			// 12: 𝑛𝑜𝑑𝑒[1] ← H(PK.seed, ADRS, 𝑛𝑜𝑑𝑒[0] ∥ AUTH[𝑘])

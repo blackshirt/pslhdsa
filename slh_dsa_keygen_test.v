@@ -32,6 +32,7 @@ fn test_basic_slh_keygen_internal() ! {
 		sk, pk := slh_keygen_internal(c, sk_seed, sk_prf, pk_seed)!
 
 		assert sk.pk.root == pk_root
+		assert sk.bytes() == sk_out
 		assert pk.bytes() == pk_out
 	}
 }

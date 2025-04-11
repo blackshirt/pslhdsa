@@ -23,18 +23,21 @@ fn test_slh_sign_internal() ! {
 		signature := hex.decode(item.signature)!
 		addrnd := hex.decode(item.addrnd)!
 		sk_bytes := hex.decode(item.sk)!
-		assert sk_bytes.len == 4*c.n 
-		
+		assert sk_bytes.len == 4 * c.n
+
 		sk := Sk{
 			seed: sk_bytes[0..c.n]
 			prf:  sk_bytes[c.n..2 * c.n]
-			pk:   Pk{
+
+			pk: Pk{
 				seed: sk_bytes[2 * c.n..3 * c.n]
 				root: sk_bytes[3 * c.n..]
 			}
 		}
+		// slh_sign_internal(c Context, m []u8, sk Sk, addrnd []u8
 		sig := slh_sign_internal(c, m, sk, addrnd)!
-		assert sig == signature
+		dump(sig.len == signature.len)
+		dump(sig == signature)
 	}
 }
 

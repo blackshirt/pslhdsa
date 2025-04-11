@@ -45,11 +45,15 @@ fn slh_sign_internal(c Context, m []u8, sk Sk, addrnd []u8, opt SignerOpts) ![]u
 	// (k*a)/8 + (h-h/d)/8 .. (k*a)/8 + (h-h/d)/8 + h/8d
 	tmp_idx_leaf := digest[cdiv(c.k * c.a, 8) + cdiv(c.h - (c.h / c.d), 8)..cdiv(c.k * c.a, 8) +
 		cdiv(c.h - (c.h / c.d), 8) + cdiv(c.h, 8 * c.d)]
-	idx_tree := to_int(tmp_idx_tree, cdiv(c.h - c.h / c.d, 8)) % (1 << (c.h - c.h / c.d)) // mod 2^(ℎ−ℎ/d)
-	idx_leaf := to_int(tmp_idx_leaf, cdiv(c.h, 8 * c.d)) % (1 << (c.h / c.d))
+
+	idxtre_mask := u64(1 << (c.h - c.h / c.d)) // mod 2^(ℎ−ℎ/d)
+	idx_tree := to_int(tmp_idx_tree, cdiv(c.h - c.h / c.d, 8)) & idxtre_mask
+
+	idxleaf_mask := u32(1 << (c.h / c.d)) // mod 2^ℎ/d
+	idx_leaf := to_int(tmp_idx_leaf, cdiv(c.h, 8 * c.d)) & idxleaf_mask
 
 	// ADRS.setTreeAddress(𝑖𝑑𝑥𝑡𝑟𝑒𝑒)
-	addr.set_tree_address(u32(idx_tree))
+	addr.set_tree_address(u64(idx_tree))
 
 	// ADRS.setTypeAndClear(FORS_TREE)
 	addr.set_type_and_clear(.fors_tree)

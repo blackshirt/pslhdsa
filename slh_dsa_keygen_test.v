@@ -18,7 +18,7 @@ fn test_basic_slh_keygen_internal() ! {
 	for item in keygen_samples {
 		kind := kind_from_longname(item.kind)!
 		c := new_context(kind)
-		// dump(c.is_shake())
+
 		sk_seed := hex.decode(item.sk_seed)!
 		sk_prf := hex.decode(item.sk_prf)!
 		pk_seed := hex.decode(item.pk_seed)!
@@ -26,7 +26,7 @@ fn test_basic_slh_keygen_internal() ! {
 		sk_out := hex.decode(item.sk_out)!
 		pk_out := hex.decode(item.pk_out)!
 
-		// splitted from pk_out, where its pk_seed+pk_root
+		// pk_root was splitted from pk_out, where its pk_seed+pk_root
 		pk_root := pk_out[c.n..]
 
 		sk, pk := slh_keygen_internal(c, sk_seed, sk_prf, pk_seed)!
@@ -36,6 +36,9 @@ fn test_basic_slh_keygen_internal() ! {
 	}
 }
 
+// This samples of data was copied from SwiftSHPINCS test resources
+// See https://github.com/leif-ibsen/SwiftSPHINCS/blob/main/Tests/SwiftSPHINCSTests/Resources/katTestKeyGen.rsp
+// but with reduced count numbers.
 const keygen_samples = [
 	KeygenTest{
 		tcid:    1

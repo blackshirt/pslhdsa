@@ -92,7 +92,7 @@ fn (mut addr Address) set_layer_address(v u32) {
 
 // Tree parts
 fn (addr Address) get_tree_address() u64 {
-	return rev8_be64(u64(addr.data[2]) << 32) | rev8_be64(u64(addr.data[3]))
+	return u64(addr.data[2]) << 32 | u64(addr.data[3])
 }
 
 // ADRS.setTreeAddress(𝑡) ADRS ← ADRS[0 ∶ 4] ∥ toByte(𝑡, 12) ∥ ADRS[16 ∶ 32]

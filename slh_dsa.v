@@ -37,37 +37,37 @@ fn slh_sign_internal(c Context, m []u8, sk Sk, addrnd []u8, opt SignerOpts) ![]u
 	// compute message digest, 	𝑑𝑖𝑔𝑒𝑠𝑡 ← H𝑚𝑠𝑔(𝑅, PK.seed, PK.root, 𝑀 )
 	digest := c.h_msg(r, sk.pk.seed, sk.pk.root, m)!
 	// 𝑚𝑑 ← 𝑑𝑖𝑔𝑒𝑠𝑡 [0 ∶ (𝑘⋅𝑎 ⌉ 8 )]
-	md := digest[0..cdiv(c.k * c.a, 8)]
+	md := digest[0..cdiv(c.k * c.a, 8)].clone()
 
-	// (k*a)/8 .. (k*a)/8 + (h-h/d)/8
-	tmp_idx_tree := digest[cdiv(c.k * c.a, 8)..cdiv(c.k * c.a, 8) + cdiv(c.h - (c.h / c.d), 8)]
+	// ∶ ⌈(k*a)/8⌉ .. ∶ ⌈(k*a)/8⌉ + ∶ ⌈(h-h/d)/8⌉
+	tmp_idxtree := digest[cdiv(c.k * c.a, 8)..cdiv(c.k * c.a, 8) + cdiv(c.h - (c.h / c.d), 8)].clone()
 
-	// (k*a)/8 + (h-h/d)/8 .. (k*a)/8 + (h-h/d)/8 + h/8d
-	tmp_idx_leaf := digest[cdiv(c.k * c.a, 8) + cdiv(c.h - (c.h / c.d), 8)..cdiv(c.k * c.a, 8) +
+	// ⌈(k*a)/8⌉ + ⌈(h-h/d)/8⌉ .. ⌈(k*a)/8⌉ + ⌈(h-h/d)/8⌉ + ⌈h/8d⌉
+	tmp_idxleaf := digest[cdiv(c.k * c.a, 8) + cdiv(c.h - (c.h / c.d), 8)..cdiv(c.k * c.a, 8) +
 		cdiv(c.h - (c.h / c.d), 8) + cdiv(c.h, 8 * c.d)]
 
-	idxtre_mask := u64(1 << (c.h - c.h / c.d)) // mod 2^(ℎ−ℎ/d)
-	idx_tree := to_int(tmp_idx_tree, cdiv(c.h - c.h / c.d, 8)) & idxtre_mask
+	idxtree_mask := u64(1 << (c.h - c.h / c.d)) - 1 // mod 2^(ℎ−ℎ/d)
+	idxtree := to_int(tmp_idxtree, cdiv(c.h - c.h / c.d, 8)) & idxtree_mask
 
-	idxleaf_mask := u32(1 << (c.h / c.d)) // mod 2^ℎ/d
-	idx_leaf := to_int(tmp_idx_leaf, cdiv(c.h, 8 * c.d)) & idxleaf_mask
+	idxleaf_mask := u64(1 << (c.h / c.d)) - 1 // mod 2^ℎ/d
+	idxleaf := to_int(tmp_idxleaf, cdiv(c.h, 8 * c.d)) & idxleaf_mask
 
 	// ADRS.setTreeAddress(𝑖𝑑𝑥𝑡𝑟𝑒𝑒)
-	addr.set_tree_address(u64(idx_tree))
-
+	addr.set_tree_address(idxtree)
 	// ADRS.setTypeAndClear(FORS_TREE)
 	addr.set_type_and_clear(.fors_tree)
 	// ADRS.setKeyPairAddress(𝑖𝑑𝑥𝑙𝑒𝑎𝑓)
-	addr.set_keypair_address(u32(idx_leaf))
+	addr.set_keypair_address(u32(idxleaf))
+
 	// SIG𝐹𝑂𝑅𝑆 ← fors_sign(𝑚𝑑, SK.seed, PK.seed, ADRS)
-	sig_fors := fors_sign(c, md, sk.seed, sk.pk.seed, mut addr)!
+	sig_fors := fors_sign(c, md, sk.seed, sk.pk.seed, addr)!
 	// SIG ← SIG ∥ SIG𝐹𝑂𝑅s
 	sig << sig_fors
 
 	// get FORS key, PK𝐹𝑂𝑅𝑆 ← fors_pkFromSig(SIG𝐹𝑂𝑅𝑆, 𝑚𝑑, PK.seed, ADRS)
-	pk_fors := fors_pkfromsig(c, sig_fors, md, sk.pk.seed, mut addr)!
+	pk_fors := fors_pkfromsig(c, sig_fors, md, sk.pk.seed, addr)!
 	// 17: SIG𝐻𝑇 ← ht_sign(PK𝐹𝑂𝑅𝑆, SK.seed, PK.seed,𝑖𝑑𝑥𝑡𝑟𝑒𝑒,𝑖𝑑𝑥𝑙𝑒𝑎𝑓)
-	sig_ht := ht_sign(c, pk_fors, sk.seed, sk.pk.seed, int(idx_tree), int(idx_leaf))!
+	sig_ht := ht_sign(c, pk_fors, sk.seed, sk.pk.seed, int(idxtree), int(idxleaf))!
 
 	// : SIG ← SIG ∥ SIG𝐻t
 	sig << sig_ht
@@ -136,7 +136,7 @@ fn slh_keygen_internal(c Context, sk_seed []u8, sk_prf []u8, pk_seed []u8) !(Sk,
 	// 2: ADRS.setLayerAddress(𝑑 − 1)
 	addr.set_layer_address(u32(c.d - 1))
 	// 3: PK.root ← xmss_node(SK.seed, 0, ℎ′ , PK.seed, ADRS)
-	pk_root := xmss_node(c, sk_seed, 0, c.hp, pk_seed, mut addr)!
+	pk_root := xmss_node(c, sk_seed, 0, c.hp, pk_seed, addr)!
 	// 4: return ( (SK.seed, SK.prf, PK.seed, PK.root), (PK.seed, PK.root) )
 	pk := Pk{
 		seed: pk_seed
@@ -179,25 +179,31 @@ fn slh_verify_internal(c Context, m []u8, sig []u8, pk Pk) !bool {
 	md := digest[0..cdiv(c.k * c.a, 8)]
 
 	// next ⌈ℎ−ℎ/𝑑]/8 ⌉ bytes
-	tmp_idx_tree := digest[cdiv(c.k * c.a, 8)..cdiv(c.k * c.a, 8) + cdiv(c.h - c.h / c.d, 8)]
+	tmp_idxtree := digest[cdiv(c.k * c.a, 8)..cdiv(c.k * c.a, 8) + cdiv(c.h - c.h / c.d, 8)]
 
 	// next [h/8𝑑] bytes
-	tmp_idx_leaf := digest[cdiv(c.k * c.a, 8) + cdiv(c.h - c.h / c.d, 8)..cdiv(c.k * c.a, 8) +
+	tmp_idxleaf := digest[cdiv(c.k * c.a, 8) + cdiv(c.h - c.h / c.d, 8)..cdiv(c.k * c.a, 8) +
 		cdiv(c.h - c.h / c.d, 8) + cdiv(c.h, 8 * c.d)]
 
-	idx_tree := to_int(tmp_idx_tree, cdiv(c.h - c.h / c.d, 8)) % (1 << (c.h - c.h / c.d)) // mod 2^(ℎ−ℎ/d)
-	idx_leaf := to_int(tmp_idx_leaf, cdiv(c.h, 8 * c.d)) % (1 << (c.h / c.d)) // mod 2^(ℎ/d)
+	idxtree_mask := u64(1 << (c.h - c.h / c.d)) - 1 // mod 2^(ℎ−ℎ/d)
+	idxleaf_mask := u64(1 << (c.h / c.d)) - 1 // mod 2^ℎ/d
+
+	idxtree := to_int(tmp_idxtree, cdiv(c.h - c.h / c.d, 8)) & idxtree_mask // mod 2^(ℎ−ℎ/d)
+	idxleaf := to_int(tmp_idxleaf, cdiv(c.h, 8 * c.d)) & idxleaf_mask // mod 2^(ℎ/d)
 
 	// compute FORS public key
-	addr.set_tree_address(u32(idx_tree))
+	// ADRS.setTreeAddress(𝑖𝑑𝑥𝑡𝑟𝑒𝑒)
+	// ADRS.setTypeAndClear(FORS_TREE)
+	// ADRS.setKeyPairAddress(𝑖𝑑𝑥𝑙𝑒𝑎𝑓)
+	addr.set_tree_address(u64(idxtree))
 	addr.set_type_and_clear(.fors_tree)
-	addr.set_keypair_address(u32(idx_leaf))
+	addr.set_keypair_address(u32(idxleaf))
 
 	// PK𝐹𝑂𝑅𝑆 ← fors_pkFromSig(SIG𝐹𝑂𝑅𝑆, 𝑚𝑑, PK.seed, ADRS)
-	pk_fors := fors_pkfromsig(c, sig_fors, md, pk.seed, mut addr)!
+	pk_fors := fors_pkfromsig(c, sig_fors, md, pk.seed, addr)!
 
 	// return ht_verify(PK𝐹𝑂𝑅𝑆, SIG𝐻𝑇, PK.seed,𝑖𝑑𝑥𝑡𝑟𝑒𝑒,𝑖𝑑𝑥𝑙𝑒𝑎𝑓, PK.root)
-	return ht_verify(c, pk_fors, sig_ht, pk.seed, int(idx_tree), int(idx_leaf), pk.root)!
+	return ht_verify(c, pk_fors, sig_ht, pk.seed, int(idxtree), int(idxleaf), pk.root)!
 }
 
 const max_allowed_context_string = 255

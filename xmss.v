@@ -11,25 +11,28 @@ module pslhdsa
 // Input: Secret seed SK.seed, target node index 𝑖, target node height 𝑧, public seed PK.seed,
 // address ADRS.
 // Output: 𝑛-byte root 𝑛𝑜𝑑e
-fn xmss_node(c Context, sk_seed []u8, i int, z int, pk_seed []u8, mut addr Address) ![]u8 {
-	if z > c.hp || i >= (1 << (c.hp - z)) {
-		return error('bad xmss_node params')
-	}
+fn xmss_node(c Context, sk_seed []u8, i int, z int, pk_seed []u8, addr_ Address) ![]u8 {
+	assert sk_seed.len == c.n
+	assert pk_seed.len == c.n
+	assert z <= c.hp
+	assert i < (1 << c.hp - z)
+
+	mut addr := addr_.clone()
 	if z == 0 {
 		// ADRS.setTypeAndClear(WOTS_HASH)
 		addr.set_type_and_clear(.wots_hash)
 		// ADRS.setKeyPairAddress(𝑖)
 		addr.set_keypair_address(u32(i))
 		// 𝑛𝑜𝑑𝑒 ← wots_pkGen(SK.seed, PK.seed, ADRS)
-		// wots_pkgen(c Context, sk_seed []u8, pk_seed []u8, mut addr Address)
-		node := wots_pkgen(c, sk_seed, pk_seed, mut addr)!
+		// wots_pkgen(c Context, sk_seed []u8, pk_seed []u8, addr Address)
+		node := wots_pkgen(c, sk_seed, pk_seed, addr)!
 		return node
 	}
 	// otherwise
 	// 𝑙𝑛𝑜𝑑𝑒 ← xmss_node(SK.seed, 2𝑖, 𝑧 − 1, PK.seed, ADRS)
-	lnode := xmss_node(c, sk_seed, 2 * i, z - 1, pk_seed, mut addr)!
+	lnode := xmss_node(c, sk_seed, 2 * i, z - 1, pk_seed, addr)!
 	// 𝑟𝑛𝑜𝑑𝑒 ← xmss_node(SK.seed, 2𝑖 + 1, 𝑧 − 1, PK.seed, ADRS)
-	rnode := xmss_node(c, sk_seed, 2 * i + 1, z - 1, pk_seed, mut addr)!
+	rnode := xmss_node(c, sk_seed, 2 * i + 1, z - 1, pk_seed, addr)!
 	// 8: ADRS.setTypeAndClear(TREE)
 	addr.set_type_and_clear(.tree)
 	// 9: ADRS.setTreeHeight(𝑧)
@@ -53,7 +56,7 @@ fn xmss_node(c Context, sk_seed []u8, i int, z int, pk_seed []u8, mut addr Addre
 // Input: 𝑛-byte message 𝑀, secret seed SK.seed, index 𝑖𝑑𝑥, public seed PK.seed,
 // address ADRS.
 // Output: XMSS signature SIG𝑋𝑀𝑆𝑆 = (𝑠𝑖𝑔 ∥ AUTH).
-fn xmss_sign(c Context, m []u8, sk_seed []u8, idx int, pk_seed []u8, mut addr_ Address) ![]u8 {
+fn xmss_sign(c Context, m []u8, sk_seed []u8, idx int, pk_seed []u8, addr_ Address) ![]u8 {
 	assert m.len == c.n
 	assert idx >= 0
 	assert idx <= (1 << c.hp)
@@ -65,7 +68,7 @@ fn xmss_sign(c Context, m []u8, sk_seed []u8, idx int, pk_seed []u8, mut addr_ A
 		// 𝑘 ← ⌊𝑖𝑑𝑥/2^𝑗⌋ ⊕ 1
 		k := (idx >> j) ^ 0x01
 		// 3: AUTH[𝑗] ← xmss_node(SK.seed, 𝑘, 𝑗, PK.seed, ADRS)
-		auth_j := xmss_node(c, sk_seed, k, j, pk_seed, mut addr)!
+		auth_j := xmss_node(c, sk_seed, k, j, pk_seed, addr)!
 		auth << auth_j
 	}
 	// ADRS.setTypeAndClear(WOTS_HASH)
@@ -73,7 +76,7 @@ fn xmss_sign(c Context, m []u8, sk_seed []u8, idx int, pk_seed []u8, mut addr_ A
 	// 6: ADRS.setKeyPairAddress(𝑖𝑑𝑥)
 	addr.set_keypair_address(u32(idx))
 	// 7: 𝑠𝑖𝑔 ← wots_sign(𝑀, SK.seed, PK.seed, ADRS)
-	sig := wots_sign(c, m, sk_seed, pk_seed, mut addr)!
+	sig := wots_sign(c, m, sk_seed, pk_seed, addr)!
 	// 8: SIG𝑋𝑀𝑆𝑆 ← 𝑠𝑖𝑔 ∥ AUTH
 	mut sig_xmss := []u8{}
 	sig_xmss << sig
@@ -89,12 +92,12 @@ fn xmss_sign(c Context, m []u8, sk_seed []u8, idx int, pk_seed []u8, mut addr_ A
 // Computes an XMSS public key from an XMSS signature.
 // Input: Index 𝑖𝑑𝑥, XMSS signature SIG𝑋𝑀𝑆𝑆 = (𝑠𝑖𝑔 ∥ AUTH), 𝑛-byte message, public seed PK.seed, address ADRS.
 // Output: 𝑛-byte root value 𝑛𝑜𝑑𝑒[0].
-fn xmms_pkfromsig(c Context, idx int, sig_xmss []u8, m []u8, pk_seed []u8, mut addr_ Address) ![]u8 {
+fn xmms_pkfromsig(c Context, idx int, sig_xmss []u8, m []u8, pk_seed []u8, addr_ Address) ![]u8 {
 	assert idx >= 0
 	assert m.len == c.n
 	mut addr := addr_.clone()
 	// assert sig_xmss.len == (c.wots_len() + c.hp) * c.n
-	mut node := [][]u8{len: 2}
+	// mut node := [][]u8{len: 2}
 	// compute WOTS+ pk from WOTS+ 𝑠𝑖g, ADRS.setTypeAndClear(WOTS_HASH)
 	addr.set_type_and_clear(.wots_hash)
 	// ADRS.setKeyPairAddress(𝑖𝑑𝑥)
@@ -105,7 +108,8 @@ fn xmms_pkfromsig(c Context, idx int, sig_xmss []u8, m []u8, pk_seed []u8, mut a
 	auth := sig_xmss[c.wots_len() * c.n..(c.wots_len() + c.hp) * c.n]
 
 	// 𝑛𝑜𝑑𝑒[0] ← wots_pkFromSig(𝑠𝑖𝑔, 𝑀, PK.seed, ADRS)
-	node[0] = wots_pkfromsig(c, sig, m, pk_seed, mut addr)!
+	mut node_0 := wots_pkfromsig(c, sig, m, pk_seed, addr)!
+	mut node_1 := []u8{}
 
 	// compute root from WOTS+ pk and AUTH
 	// ADRS.setTypeAndClear(TREE)
@@ -123,9 +127,9 @@ fn xmms_pkfromsig(c Context, idx int, sig_xmss []u8, m []u8, pk_seed []u8, mut a
 			// 12: 𝑛𝑜𝑑𝑒[1] ← H(PK.seed, ADRS, 𝑛𝑜𝑑𝑒[0] ∥ AUTH[𝑘])
 			m_auth_k := auth[k * c.n..(k + 1) * c.n]
 			mut m2 := []u8{}
-			m2 << node[0]
+			m2 << node_0
 			m2 << m_auth_k
-			node[1] = c.h(pk_seed, addr, m2)!
+			node_1 = c.h(pk_seed, addr, m2)!
 		} else {
 			// ADRS.setTreeIndex((ADRS.getTreeIndex() − 1)/2)
 			// TODO: correctly handles > max_int
@@ -135,10 +139,10 @@ fn xmms_pkfromsig(c Context, idx int, sig_xmss []u8, m []u8, pk_seed []u8, mut a
 			m_auth_k := auth[k * c.n..(k + 1) * c.n]
 			mut m2 := []u8{}
 			m2 << m_auth_k
-			m2 << node[0]
-			node[1] = c.h(pk_seed, addr, m2)!
+			m2 << node_0
+			node_1 = c.h(pk_seed, addr, m2)!
 		}
-		node[0] = unsafe { node[1] }
+		node_0 = unsafe { node_1 }
 	}
-	return node[0]
+	return node_0
 }

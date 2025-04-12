@@ -331,7 +331,7 @@ fn kind_from_longname(s string) !Kind {
 	}
 }
 
-fn (n Kind) long_name() !string {
+fn (n Kind) long_name() string {
 	match n {
 		// SHA2-based family
 		.sha2_128s { return 'SLH-DSA-SHA2-128s' }

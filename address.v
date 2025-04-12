@@ -19,21 +19,45 @@ mut:
 @[direct_array_access; inline]
 fn (addr Address) bytes() []u8 {
 	mut x := []u8{len: 32}
-	// addr.0 was layer address, written into x0..x3
-	binary.big_endian_put_u32(mut x[0..4], addr.data[0])
+	x[0] = u8((addr.data[0] >> 24) & 0xff)
+	x[1] = u8((addr.data[0] >> 16) & 0xff)
+	x[2] = u8((addr.data[0] >> 8) & 0xff)
+	x[3] = u8((addr.data[0] >> 0) & 0xff)
 
-	// addr.1..addr.3 was tree address, written into x4..x15
-	binary.big_endian_put_u32(mut x[4..8], addr.data[1])
-	binary.big_endian_put_u32(mut x[8..12], addr.data[2])
-	binary.big_endian_put_u32(mut x[12..16], addr.data[3])
+	x[4] = u8((addr.data[1] >> 24) & 0xff)
+	x[5] = u8((addr.data[1] >> 16) & 0xff)
+	x[6] = u8((addr.data[1] >> 8) & 0xff)
+	x[7] = u8((addr.data[1] >> 0) & 0xff)
 
-	// addr.4 was address type
-	binary.big_endian_put_u32(mut x[16..20], addr.data[4])
+	x[8] = u8((addr.data[2] >> 24) & 0xff)
+	x[9] = u8((addr.data[2] >> 16) & 0xff)
+	x[10] = u8((addr.data[2] >> 8) & 0xff)
+	x[11] = u8((addr.data[2] >> 0) & 0xff)
 
-	// last 3 u32 was final address
-	binary.big_endian_put_u32(mut x[20..24], addr.data[5])
-	binary.big_endian_put_u32(mut x[24..28], addr.data[6])
-	binary.big_endian_put_u32(mut x[28..32], addr.data[7])
+	x[12] = u8((addr.data[3] >> 24) & 0xff)
+	x[13] = u8((addr.data[3] >> 16) & 0xff)
+	x[14] = u8((addr.data[3] >> 8) & 0xff)
+	x[15] = u8((addr.data[3] >> 0) & 0xff)
+
+	x[16] = u8((addr.data[4] >> 24) & 0xff)
+	x[17] = u8((addr.data[4] >> 16) & 0xff)
+	x[18] = u8((addr.data[4] >> 8) & 0xff)
+	x[19] = u8((addr.data[4] >> 0) & 0xff)
+
+	x[20] = u8((addr.data[5] >> 24) & 0xff)
+	x[21] = u8((addr.data[5] >> 16) & 0xff)
+	x[22] = u8((addr.data[5] >> 8) & 0xff)
+	x[23] = u8((addr.data[5] >> 0) & 0xff)
+
+	x[24] = u8((addr.data[6] >> 24) & 0xff)
+	x[25] = u8((addr.data[6] >> 16) & 0xff)
+	x[26] = u8((addr.data[6] >> 8) & 0xff)
+	x[27] = u8((addr.data[6] >> 0) & 0xff)
+
+	x[28] = u8((addr.data[7] >> 24) & 0xff)
+	x[29] = u8((addr.data[7] >> 16) & 0xff)
+	x[30] = u8((addr.data[7] >> 8) & 0xff)
+	x[31] = u8((addr.data[7] >> 0) & 0xff)
 
 	return x
 }
@@ -61,17 +85,29 @@ fn (mut addr Address) reset() {
 @[direct_array_access; inline]
 fn (addr Address) compress() []u8 {
 	mut x := []u8{len: 22}
-	// layer, byte at 3-4
+	// TODO: using binary.big_endian variant
 	x[0] = u8(addr.data[0] & 0xff)
-	// tree
-	binary.big_endian_put_u32(mut x[1..5], addr.data[2])
-	binary.big_endian_put_u32(mut x[5..9], addr.data[3])
-	// type
+	x[1] = u8((addr.data[2] >> 24) & 0xff)
+	x[2] = u8((addr.data[2] >> 16) & 0xff)
+	x[3] = u8((addr.data[2] >> 8) & 0xff)
+	x[4] = u8((addr.data[2] >> 0) & 0xff)
+	x[5] = u8((addr.data[3] >> 24) & 0xff)
+	x[6] = u8((addr.data[3] >> 16) & 0xff)
+	x[7] = u8((addr.data[3] >> 8) & 0xff)
+	x[8] = u8((addr.data[3] >> 0) & 0xff)
 	x[9] = u8(addr.data[4] & 0xff)
-	// final
-	binary.big_endian_put_u32(mut x[10..14], addr.data[5])
-	binary.big_endian_put_u32(mut x[14..18], addr.data[6])
-	binary.big_endian_put_u32(mut x[18..22], addr.data[7])
+	x[10] = u8((addr.data[5] >> 24) & 0xff)
+	x[11] = u8((addr.data[5] >> 16) & 0xff)
+	x[12] = u8((addr.data[5] >> 8) & 0xff)
+	x[13] = u8((addr.data[5] >> 0) & 0xff)
+	x[14] = u8((addr.data[6] >> 24) & 0xff)
+	x[15] = u8((addr.data[6] >> 16) & 0xff)
+	x[16] = u8((addr.data[6] >> 8) & 0xff)
+	x[17] = u8((addr.data[6] >> 0) & 0xff)
+	x[18] = u8((addr.data[7] >> 24) & 0xff)
+	x[19] = u8((addr.data[7] >> 16) & 0xff)
+	x[20] = u8((addr.data[7] >> 8) & 0xff)
+	x[21] = u8((addr.data[7] >> 0) & 0xff)
 	return x
 }
 

@@ -22,7 +22,7 @@ fn slh_sign_internal(c Context, m []u8, sk Sk, addrnd []u8, opt SignerOpts) ![]u
 	// ADRS ← toByte(0, 32)
 	mut addr := Address{}
 	// substitute 𝑜𝑝𝑡_𝑟𝑎𝑛𝑑 ← PK.seed for the deterministic variant, 𝑜𝑝𝑡_𝑟𝑎𝑛𝑑 ← 𝑎𝑑𝑑𝑟𝑛
-	mut opt_rand := addrnd.clone()
+	mut opt_rand := sk.pk.seed.clone() // addrnd.clone()
 	if opt.deterministic {
 		opt_rand = unsafe { sk.pk.seed }
 	}

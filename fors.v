@@ -176,7 +176,7 @@ fn fors_pkfromsig(c Context, sig_fors []u8, md []u8, pk_seed []u8, addr_ Address
 
 	// compute the FORS public key
 	// 24: 𝑝𝑘 ← T𝑘(PK.seed, forspkADRS, 𝑟𝑜𝑜𝑡) ▷
-	pk := c.tlen(pk_seed, fors_pkaddr, root)!
+	pk := c.tlen(c.k, pk_seed, fors_pkaddr, root)!
 
 	return pk
 }

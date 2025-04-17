@@ -57,8 +57,8 @@ fn mgf1_sha256(seed []u8, mlen int) []u8 {
 	mut out := []u8{}
 	for c := 0; c < cdiv(mlen, sha256_hash_size); c++ {
 		mut data := seed.clone()
-		data << to_byte(u64(c), 4)
-		// seed + to_byte(c, 4)
+		data << to_bytes(u64(c), 4)
+		// seed + to_bytes(c, 4)
 		out << sha256.sum256(data)
 	}
 	return out[..mlen]
@@ -71,8 +71,8 @@ fn mgf1_sha512(seed []u8, mlen int) []u8 {
 	mut out := []u8{}
 	for c := 0; c < cdiv(mlen, sha512_hash_size); c++ {
 		mut data := seed.clone()
-		data << to_byte(u64(c), 4)
-		// seed + to_byte(c, 4)
+		data << to_bytes(u64(c), 4)
+		// seed + to_bytes(c, 4)
 		out << sha512.sum512(data)
 	}
 	return out[..mlen]
@@ -145,7 +145,7 @@ fn (c Context) prf(pk_seed []u8, sk_seed []u8, addr Address) ![]u8 {
 	addrs_c := addr.compress()
 	mut data := []u8{}
 	data << pk_seed
-	data << to_byte(0, 64 - c.n)
+	data << to_bytes(0, 64 - c.n)
 	data << addrs_c
 	data << sk_seed
 	mut out := sha256.sum256(data)
@@ -202,7 +202,7 @@ fn (c Context) f(pk_seed []u8, addr Address, m1 []u8) ![]u8 {
 	addrs_c := addr.compress()
 	mut data := []u8{}
 	data << pk_seed
-	data << to_byte(0, 64 - c.n)
+	data << to_bytes(0, 64 - c.n)
 	data << addrs_c
 	data << m1
 
@@ -229,9 +229,9 @@ fn (c Context) h(pk_seed []u8, addr Address, m2 []u8) ![]u8 {
 	data << pk_seed
 
 	if c.sc == 1 {
-		data << to_byte(0, 64 - c.n)
+		data << to_bytes(0, 64 - c.n)
 	} else {
-		data << to_byte(0, 128 - c.n)
+		data << to_bytes(0, 128 - c.n)
 	}
 	data << addrs_c
 	data << m2
@@ -245,7 +245,8 @@ fn (c Context) h(pk_seed []u8, addr Address, m2 []u8) ![]u8 {
 
 // Tℓ(PK.seed, ADRS, 𝑀ℓ) (𝔹𝑛 × 𝔹32 × 𝔹ℓ𝑛 → 𝔹𝑛) is a hash function that maps an
 // ℓ𝑛-byte message to an 𝑛-byte message.
-fn (c Context) tlen(pk_seed []u8, addr Address, ml []u8) ![]u8 {
+fn (c Context) tlen(el_len int, pk_seed []u8, addr Address, ml []u8) ![]u8 {
+	assert ml.len == el_len * c.n
 	if c.is_shake() {
 		// Tℓ(PK.seed, ADRS, 𝑀ℓ) = SHAKE256(PK.seed ∥ ADRS ∥ 𝑀ℓ, 8𝑛)
 		mut data := []u8{}
@@ -263,9 +264,9 @@ fn (c Context) tlen(pk_seed []u8, addr Address, ml []u8) ![]u8 {
 	mut data := []u8{}
 	data << pk_seed
 	if c.sc == 1 {
-		data << to_byte(0, 64 - c.n)
+		data << to_bytes(0, 64 - c.n)
 	} else {
-		data << to_byte(0, 128 - c.n)
+		data << to_bytes(0, 128 - c.n)
 	}
 	data << addrs_c
 	data << ml
@@ -352,23 +353,37 @@ fn (n Kind) long_name() string {
 
 fn (n Kind) str() string {
 	match n {
-		// vfmt off
 		// SHA2-based family
-		.sha2_128s { return "sha2_128s" }
-		.sha2_128f { return "sha2_128f" }
-		.sha2_192s { return "sha2_192s" }
-		.sha2_192f { return "sha2_192f" }
-		.sha2_256s { return "sha2_256s" }
-		.sha2_256f { return "sha2_256f" }
+		.sha2_128s { return 'sha2_128s' }
+		.sha2_128f { return 'sha2_128f' }
+		.sha2_192s { return 'sha2_192s' }
+		.sha2_192f { return 'sha2_192f' }
+		.sha2_256s { return 'sha2_256s' }
+		.sha2_256f { return 'sha2_256f' }
 		// SHAKE-based family
-		.shake_128s { return "shake_128s" }
-		.shake_128f { return "shake_128f" }
-		.shake_192s { return "shake_192s" }
-		.shake_192f { return "shake_192f" }
-		.shake_256s { return "shake_256s" }
-		.shake_256f { return "shake_256f" }
-		// vfmt on
+		.shake_128s { return 'shake_128s' }
+		.shake_128f { return 'shake_128f' }
+		.shake_192s { return 'shake_192s' }
+		.shake_192f { return 'shake_192f' }
+		.shake_256s { return 'shake_256s' }
+		.shake_256f { return 'shake_256f' }
 	}
+}
+
+struct ParamSet {
+	// Chapter 11. Parameters Set
+	id  string
+	n   int
+	h   int
+	d   int
+	hp  int
+	a   int
+	k   int
+	lgw int = 4
+	m   int
+	sc  int
+	pkb int
+	sig int
 }
 
 // Table 2. SLH-DSA parameter sets

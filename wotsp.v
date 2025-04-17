@@ -47,11 +47,11 @@ fn wots_pkgen(c Context, sk_seed []u8, pk_seed []u8, addr_ Address) ![]u8 {
 		// skADRS.setChainAddress(𝑖)
 		sk_addr.set_chain_address(u32(i))
 		// compute secret value for chain i, 𝑠𝑘 ← PRF(PK.seed, SK.seed, skADRS)
-		sk := c.prf(pk_seed, sk_seed, sk_addr)!
+		skey := c.prf(pk_seed, sk_seed, sk_addr)!
 		// ADRS.setChainAddress(𝑖)
 		addr.set_chain_address(u32(i))
 		// compute public value for chain 𝑖, 𝑡𝑚𝑝[𝑖] ← chain(𝑠𝑘, 0, 𝑤 − 1, PK.seed, ADRS)
-		tmp_i := chain(c, sk, 0, w - 1, pk_seed, addr)!
+		tmp_i := chain(c, skey, 0, w - 1, pk_seed, addr)!
 		tmp << tmp_i
 	}
 	// copy address to create WOTS+public key address, wotspkADRS ← ADRS
@@ -62,7 +62,7 @@ fn wots_pkgen(c Context, sk_seed []u8, pk_seed []u8, addr_ Address) ![]u8 {
 	// TODO: remove int cast
 	wots_pk_addr.set_keypair_address(addr.get_keypair_address())
 	// compress public key, 𝑝𝑘 ← T𝑙𝑒𝑛(PK.seed, wotspkADRS,𝑡𝑚𝑝)
-	pk := c.tlen(pk_seed, wots_pk_addr, tmp)!
+	pk := c.tlen(c.wots_len(), pk_seed, wots_pk_addr, tmp)!
 
 	return pk
 }
@@ -91,10 +91,10 @@ fn wots_sign(c Context, m []u8, sk_seed []u8, pk_seed []u8, addr_ Address) ![]u8
 	csum <<= 4 // u64((8 - ((len2 * c.lgw) % 8)) % 8)
 
 	// convert to base w, 𝑚𝑠𝑔 ← 𝑚𝑠𝑔 ∥ base_2b (toByte (𝑐𝑠𝑢𝑚, ⌈(𝑙𝑒𝑛2*𝑙𝑔𝑤)/8⌉) , 𝑙𝑔𝑤, 𝑙𝑒𝑛2)
-	mlen := 2 // cdiv(len2 * c.lgw, 8)
+	// mlen := 2 // cdiv(len2 * c.lgw, 8)
 	// dump(mlen)
-	bytes := to_byte(csum, mlen)
-	msgs << base_2exp_b(bytes, c.lgw, len2)
+	// bytes := to_bytes(csum, mlen)
+	msgs << base_2exp_b(to_bytes(csum, 2), c.lgw, len2)
 
 	// copy address to create key generation key address
 	mut sk_addr := addr.clone()
@@ -109,10 +109,10 @@ fn wots_sign(c Context, m []u8, sk_seed []u8, pk_seed []u8, addr_ Address) ![]u8
 		// skADRS.setChainAddress(𝑖)
 		sk_addr.set_chain_address(u32(i))
 		// compute chain 𝑖 secret value, 𝑠𝑘 ← PRF(PK.seed, SK.seed, skADRS)
-		sk := c.prf(pk_seed, sk_seed, sk_addr)!
+		skey := c.prf(pk_seed, sk_seed, sk_addr)!
 		addr.set_chain_address(u32(i))
 		// compute chain 𝑖 signature value, 𝑠𝑖𝑔[𝑖] ← chain(𝑠𝑘, 0, 𝑚𝑠𝑔[𝑖], PK.seed, ADRS)
-		sig_i := chain(c, sk, 0, int(msgs[i]), pk_seed, addr)!
+		sig_i := chain(c, skey, 0, int(msgs[i]), pk_seed, addr)!
 		sig << sig_i
 	}
 	return sig
@@ -135,16 +135,16 @@ fn wots_pkfromsig(c Context, sig []u8, m []u8, pk_seed []u8, addr_ Address) ![]u
 	// for 𝑖 from 0 to 𝑙𝑒𝑛1 − 1 do
 	for i := 0; i < len1; i++ {
 		// 𝑐𝑠𝑢𝑚 ← 𝑐𝑠𝑢𝑚 + 𝑤 − 1 − 𝑚𝑠𝑔[𝑖]
-		csum += w - 1 - msgs[i]
+		csum += (w - 1 - msgs[i])
 	}
 	// for 𝑙𝑔𝑤 = 4, left shift by 4, its only values supported in this module
 	// 𝑐𝑠𝑢𝑚 ← 𝑐𝑠𝑢𝑚 ≪ ((8 − ((𝑙𝑒𝑛2 ⋅ 𝑙𝑔𝑤) mod 8)) mod 8)
 	csum <<= 4 // u64((8 - ((len2 * c.lgw) % 8)) % 8)
 
 	// convert to base w, 𝑚𝑠𝑔 ← 𝑚𝑠𝑔 ∥ base_2b (toByte (𝑐𝑠𝑢𝑚, ⌈(𝑙𝑒𝑛2*𝑙𝑔𝑤)/8⌉) , 𝑙𝑔𝑤, 𝑙𝑒𝑛2)
-	mlen := 2 // cdiv(len2 * c.lgw, 8)
-	bytes := to_byte(csum, mlen)
-	msgs << base_2exp_b(bytes, c.lgw, len2)
+	// mlen := 2 // cdiv(len2 * c.lgw, 8)
+	// bytes := to_bytes(csum, mlen)
+	msgs << base_2exp_b(to_bytes(csum, 2), c.lgw, len2)
 
 	mut tmp := []u8{}
 	for i := 0; i < c.wots_len(); i++ {
@@ -165,7 +165,7 @@ fn wots_pkfromsig(c Context, sig []u8, m []u8, pk_seed []u8, addr_ Address) ![]u
 	// TODO: remove int casts ??
 	wots_pk_addr.set_keypair_address(addr.get_keypair_address())
 	// 𝑝𝑘𝑠𝑖𝑔 ← T𝑙𝑒𝑛(PK.seed, wotspkADRS,𝑡𝑚𝑝)
-	pk_sig := c.tlen(pk_seed, wots_pk_addr, tmp)!
+	pk_sig := c.tlen(c.wots_len(), pk_seed, wots_pk_addr, tmp)!
 
 	return pk_sig
 }

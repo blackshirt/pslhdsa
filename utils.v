@@ -9,12 +9,12 @@ fn to_int(x []u8, n int) u64 {
 	if n == 0 {
 		return 0
 	}
-	mut out := u64(0)
+	mut total := u64(0)
 	for i := 0; i < n; i++ {
-		out <<= 8
-		out += u64(x[i])
+		total = total << 8
+		total += u64(x[i])
 	}
-	return out
+	return total
 }
 
 // Algorithm 3 toByte(𝑥, 𝑛)
@@ -23,7 +23,7 @@ fn to_int(x []u8, n int) u64 {
 // Input: Integer 𝑥, string length 𝑛.
 // Output: Byte string of length 𝑛 containing binary representation of 𝑥 in big-endian byte-order.
 @[inline]
-fn to_byte(x u64, n int) []u8 {
+fn to_bytes(x u64, n int) []u8 {
 	if n == 0 {
 		return []u8{}
 	}

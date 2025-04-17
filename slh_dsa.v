@@ -22,7 +22,7 @@ fn slh_sign_internal(c Context, m []u8, sk Sk, addrnd []u8, opt SignerOpts) ![]u
 	// ADRS ← toByte(0, 32)
 	mut addr := Address{}
 	// substitute 𝑜𝑝𝑡_𝑟𝑎𝑛𝑑 ← PK.seed for the deterministic variant, 𝑜𝑝𝑡_𝑟𝑎𝑛𝑑 ← 𝑎𝑑𝑑𝑟𝑛
-	mut opt_rand := sk.pk.seed.clone() // addrnd.clone()
+	mut opt_rand := addrnd.clone()
 	if opt.deterministic {
 		opt_rand = unsafe { sk.pk.seed }
 	}
@@ -40,11 +40,11 @@ fn slh_sign_internal(c Context, m []u8, sk Sk, addrnd []u8, opt SignerOpts) ![]u
 	md := digest[0..cdiv(c.k * c.a, 8)].clone()
 
 	// ∶ ⌈(k*a)/8⌉ .. ∶ ⌈(k*a)/8⌉ + ∶ ⌈(h-h/d)/8⌉
-	tmp_idxtree := digest[cdiv(c.k * c.a, 8)..cdiv(c.k * c.a, 8) + cdiv(c.h - (c.h / c.d), 8)].clone()
+	tmp_idxtree := digest[cdiv(c.k * c.a, 8)..cdiv(c.k * c.a, 8) + cdiv(c.h - c.h / c.d, 8)].clone()
 
 	// ⌈(k*a)/8⌉ + ⌈(h-h/d)/8⌉ .. ⌈(k*a)/8⌉ + ⌈(h-h/d)/8⌉ + ⌈h/8d⌉
-	tmp_idxleaf := digest[cdiv(c.k * c.a, 8) + cdiv(c.h - (c.h / c.d), 8)..cdiv(c.k * c.a, 8) +
-		cdiv(c.h - (c.h / c.d), 8) + cdiv(c.h, 8 * c.d)]
+	tmp_idxleaf := digest[cdiv(c.k * c.a, 8) + cdiv(c.h - c.h / c.d, 8)..cdiv(c.k * c.a, 8) +
+		cdiv(c.h - c.h / c.d, 8) + cdiv(c.h, 8 * c.d)]
 
 	idxtree_mask := u64(1 << (c.h - c.h / c.d)) - 1 // mod 2^(ℎ−ℎ/d)
 	idxtree := to_int(tmp_idxtree, cdiv(c.h - c.h / c.d, 8)) & idxtree_mask
@@ -224,8 +224,8 @@ fn slh_sign(c Context, m []u8, cx []u8, sk Sk, opt SignerOpts) ![]u8 {
 
 	// 𝑀′ ← toByte(0, 1) ∥ toByte(|𝑐𝑡𝑥|, 1) ∥ 𝑐𝑡𝑥 ∥ m
 	mut msg := []u8{}
-	msg << to_byte(0, 1)
-	msg << to_byte(u64(cx.len), 1)
+	msg << to_bytes(0, 1)
+	msg << to_bytes(u64(cx.len), 1)
 	msg << cx
 	msg << m
 
@@ -253,7 +253,7 @@ fn hash_slh_sign(c Context, m []u8, cx []u8, ph crypto.Hash, sk Sk, opt SignerOp
 
 	// default to sha256
 	// OID ← toByte(0x0609608648016503040201, 11)
-	mut oid := to_byte(u64(0x0609608648016503040201), 11)
+	mut oid := to_bytes(u64(0x0609608648016503040201), 11)
 	// PH𝑀 ← SHA-256(𝑀 )
 	mut phm := sha256.sum256(m)
 
@@ -263,21 +263,21 @@ fn hash_slh_sign(c Context, m []u8, cx []u8, ph crypto.Hash, sk Sk, opt SignerOp
 		}
 		.sha512 {
 			// OID ← toByte(0x0609608648016503040203, 11) ▷ 2.16.840.1.101.3.4.2.3
-			oid = to_byte(u64(0x0609608648016503040203), 11)
+			oid = to_bytes(u64(0x0609608648016503040203), 11)
 			// PH𝑀 ← SHA-512(𝑀 )
 			phm = sha512.sum512(m)
 		}
 		// need to be patched into .shake128
 		.sha3_224 {
 			// OID ← toByte(0x060960864801650304020B, 11) ▷ 2.16.840.1.101.3.4.2.11
-			oid = to_byte(u64(0x060960864801650304020B), 11)
+			oid = to_bytes(u64(0x060960864801650304020B), 11)
 			// 17: PH𝑀 ← SHAKE128(𝑀, 256)
 			phm = sha3.shake128(m, 256)
 		}
 		// // need to be patched into .shake256
 		.sha3_256 {
 			// OID ← toByte(0x060960864801650304020C, 11) ▷ 2.16.840.1.101.3.4.2.12
-			oid = to_byte(u64(0x060960864801650304020C), 11)
+			oid = to_bytes(u64(0x060960864801650304020C), 11)
 			// PH𝑀 ← SHAKE256(𝑀, 512)
 			phm = sha3.shake256(m, 512)
 		}
@@ -288,8 +288,8 @@ fn hash_slh_sign(c Context, m []u8, cx []u8, ph crypto.Hash, sk Sk, opt SignerOp
 
 	// 𝑀′ ← toByte(1, 1) ∥ toByte(|𝑐𝑡𝑥|, 1) ∥ 𝑐𝑡𝑥 ∥ OID ∥ PHm
 	mut msg := []u8{}
-	msg << to_byte(1, 1)
-	msg << to_byte(cx.len, 1)
+	msg << to_bytes(1, 1)
+	msg << to_bytes(cx.len, 1)
 	msg << cx
 	msg << oid
 	msg << phm
@@ -313,8 +313,8 @@ fn slh_verify(c Context, m []u8, sig []u8, cx []u8, pk Pk) !bool {
 	}
 	// 𝑀′ ← toByte(0, 1) ∥ toByte(|𝑐𝑡𝑥|, 1) ∥ 𝑐𝑡𝑥 ∥ m
 	mut msg := []u8{}
-	msg << to_byte(0, 1)
-	msg << to_byte(u64(cx.len), 1)
+	msg << u8(0x00)
+	msg << u8(cx.len)
 	msg << cx
 	msg << m
 
@@ -333,7 +333,7 @@ fn hash_slh_verify(c Context, m []u8, sig []u8, cx []u8, ph crypto.Hash, pk Pk) 
 	}
 	// default to sha256
 	// OID ← toByte(0x0609608648016503040201, 11)
-	mut oid := to_byte(u64(0x0609608648016503040201), 11)
+	mut oid := to_bytes(u64(0x0609608648016503040201), 11)
 	// PH𝑀 ← SHA-256(𝑀 )
 	mut phm := sha256.sum256(m)
 
@@ -343,21 +343,21 @@ fn hash_slh_verify(c Context, m []u8, sig []u8, cx []u8, ph crypto.Hash, pk Pk) 
 		}
 		.sha512 {
 			// OID ← toByte(0x0609608648016503040203, 11) ▷ 2.16.840.1.101.3.4.2.3
-			oid = to_byte(u64(0x0609608648016503040203), 11)
+			oid = to_bytes(u64(0x0609608648016503040203), 11)
 			// PH𝑀 ← SHA-512(𝑀 )
 			phm = sha512.sum512(m)
 		}
 		// need to be patched into .shake128
 		.sha3_224 {
 			// OID ← toByte(0x060960864801650304020B, 11) ▷ 2.16.840.1.101.3.4.2.11
-			oid = to_byte(u64(0x060960864801650304020B), 11)
+			oid = to_bytes(u64(0x060960864801650304020B), 11)
 			// 17: PH𝑀 ← SHAKE128(𝑀, 256)
 			phm = sha3.shake128(m, 256)
 		}
 		// // need to be patched into .shake256
 		.sha3_256 {
 			// OID ← toByte(0x060960864801650304020C, 11) ▷ 2.16.840.1.101.3.4.2.12
-			oid = to_byte(u64(0x060960864801650304020C), 11)
+			oid = to_bytes(u64(0x060960864801650304020C), 11)
 			// PH𝑀 ← SHAKE256(𝑀, 512)
 			phm = sha3.shake256(m, 512)
 		}
@@ -367,8 +367,8 @@ fn hash_slh_verify(c Context, m []u8, sig []u8, cx []u8, ph crypto.Hash, pk Pk) 
 	}
 	// 𝑀′ ← toByte(1, 1) ∥ toByte(|𝑐𝑡𝑥|, 1) ∥ 𝑐𝑡𝑥 ∥ OID ∥ PHm
 	mut msg := []u8{}
-	msg << to_byte(1, 1)
-	msg << to_byte(u64(cx.len), 1)
+	msg << u8(0x01)
+	msg << u8(cx.len)
 	msg << cx
 	msg << oid
 	msg << phm

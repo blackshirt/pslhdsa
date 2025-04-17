@@ -62,20 +62,6 @@ fn (addr Address) bytes() []u8 {
 	return x
 }
 
-@[direct_array_access; inline]
-fn (addr Address) clone() Address {
-	return Address{
-		data: addr.data.clone()
-	}
-}
-
-@[direct_array_access; inline]
-fn (mut addr Address) reset() {
-	unsafe {
-		addr.data.reset()
-	}
-}
-
 // 18. Compressed address (ADRS ) 22 bytes
 //
 // layer address 1 byte
@@ -86,7 +72,10 @@ fn (mut addr Address) reset() {
 fn (addr Address) compress() []u8 {
 	mut x := []u8{len: 22}
 	// TODO: using binary.big_endian variant
+	// 1 byte at 3..4
 	x[0] = u8(addr.data[0] & 0xff)
+
+	// 8 bytes at 8..16
 	x[1] = u8((addr.data[2] >> 24) & 0xff)
 	x[2] = u8((addr.data[2] >> 16) & 0xff)
 	x[3] = u8((addr.data[2] >> 8) & 0xff)
@@ -95,7 +84,11 @@ fn (addr Address) compress() []u8 {
 	x[6] = u8((addr.data[3] >> 16) & 0xff)
 	x[7] = u8((addr.data[3] >> 8) & 0xff)
 	x[8] = u8((addr.data[3] >> 0) & 0xff)
+
+	// 1 byte at 19..20
 	x[9] = u8(addr.data[4] & 0xff)
+
+	// 12 bytes at 20..32,
 	x[10] = u8((addr.data[5] >> 24) & 0xff)
 	x[11] = u8((addr.data[5] >> 16) & 0xff)
 	x[12] = u8((addr.data[5] >> 8) & 0xff)
@@ -109,6 +102,20 @@ fn (addr Address) compress() []u8 {
 	x[20] = u8((addr.data[7] >> 8) & 0xff)
 	x[21] = u8((addr.data[7] >> 0) & 0xff)
 	return x
+}
+
+@[direct_array_access; inline]
+fn (addr Address) clone() Address {
+	return Address{
+		data: addr.data.clone()
+	}
+}
+
+@[direct_array_access; inline]
+fn (mut addr Address) reset() {
+	unsafe {
+		addr.data.reset()
+	}
 }
 
 // Member functions for addresses
@@ -157,7 +164,7 @@ fn (addr Address) get_keypair_address() u32 {
 @[direct_array_access; inline]
 fn (mut addr Address) set_chain_address(v u32) {
 	// TODO: assert correct type, 𝑡𝑦𝑝𝑒 = 0 (WOTS_HASH), 𝑡𝑦𝑝𝑒 = 5 (WOTS_PRF)
-	// bytes := to_byte(x, 4)
+	// bytes := to_bytes(x, 4)
 	// at 24..28
 	// addr.data[24..28] = bytes
 	addr.data[6] = v
@@ -177,7 +184,7 @@ fn (mut addr Address) set_tree_height(v u32) {
 fn (mut addr Address) set_tree_index(v u32) {
 	// TODO: assert correct type, 𝑡𝑦𝑝𝑒 = 2 (TREE), 𝑡𝑦𝑝𝑒 = 6 (FORS_PRF)
 	// at 28..32
-	// bytes := to_byte(x, 4)
+	// bytes := to_bytes(x, 4)
 	// addr.data[28..32] = bytes
 	addr.data[7] = v
 }
@@ -195,7 +202,7 @@ fn (addr Address) get_tree_index() u32 {
 @[direct_array_access; inline]
 fn (mut addr Address) set_hash_address(v u32) {
 	// 𝑡𝑦𝑝𝑒 = 0 (WOTS_HASH), 𝑡𝑦𝑝𝑒 = 5 (WOTS_PRF)
-	// bytes := to_byte(x, 4)
+	// bytes := to_bytes(x, 4)
 	// addr.data[28..32] = bytes
 	addr.data[7] = v
 }

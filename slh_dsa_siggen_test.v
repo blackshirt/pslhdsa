@@ -27,18 +27,18 @@ fn test_slh_sign_internal() ! {
 		assert sk_bytes.len == 4 * c.n
 
 		sk := Sk{
-			seed: sk_bytes[0..c.n]
-			prf:  sk_bytes[c.n..2 * c.n]
+			seed: unsafe { sk_bytes[0..c.n] }
+			prf:  unsafe { sk_bytes[c.n..2 * c.n] }
 
 			pk: Pk{
-				seed: sk_bytes[2 * c.n..3 * c.n]
-				root: sk_bytes[3 * c.n..4 * c.n]
+				seed: unsafe { sk_bytes[2 * c.n..3 * c.n] }
+				root: unsafe { sk_bytes[3 * c.n..4 * c.n] }
 			}
 		}
 		// slh_sign_internal(c Context, m []u8, sk Sk, addrnd []u8
 		sig := slh_sign_internal(c, m, sk, addrnd)!
-		dump(sig.len == signature.len)
-		dump(sig == signature)
+		assert sig.len == signature.len
+		dump(sig.hex() == signature.hex())
 	}
 }
 

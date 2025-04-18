@@ -83,7 +83,7 @@ fn fors_sign(c Context, md []u8, sk_seed []u8, pk_seed []u8, addr_ Address) ![]u
 	// compute signature elements
 	for i := 0; i < c.k; i++ {
 		// fors_skGen(SK.seed, PK.seed, ADRS,𝑖 ⋅ 2^𝑎 + 𝑖𝑛𝑑𝑖𝑐𝑒𝑠[𝑖])
-		fors_item := fors_skgen(c, sk_seed, pk_seed, addr, i << c.a + int(indices[i]))!
+		fors_item := fors_skgen(c, sk_seed, pk_seed, addr, int(u32(i) << c.a) + int(indices[i]))!
 		sig_fors << fors_item
 
 		// compute auth path
@@ -115,7 +115,8 @@ fn fors_pkfromsig(c Context, sig_fors []u8, md []u8, pk_seed []u8, addr_ Address
 	mut addr := addr_.clone()
 	// 𝑖𝑛𝑑𝑖𝑐𝑒𝑠 ← base_2b(𝑚𝑑, 𝑎, 𝑘)
 	indices := base_2exp_b(md, c.a, c.k)
-	mut node := [][]u8{len: 2}
+	mut node_0 := []u8{}
+	mut node_1 := []u8{}
 	mut root := []u8{}
 	for i := 0; i < c.k; i++ {
 		// 𝑠𝑘 ← SIG𝐹𝑂𝑅𝑆.getSK(𝑖), SIG𝐹𝑂𝑅𝑆[𝑖 ⋅ (𝑎 + 1) ⋅ 𝑛 ∶ (𝑖 ⋅ (𝑎 + 1) + 1) ⋅ 𝑛]
@@ -129,7 +130,7 @@ fn fors_pkfromsig(c Context, sig_fors []u8, md []u8, pk_seed []u8, addr_ Address
 		tree_idx := u32(i) << c.a + indices[i]
 		addr.set_tree_index(tree_idx)
 		// 𝑛𝑜𝑑𝑒[0] ← F(PK.seed, ADRS, 𝑠𝑘)
-		node[0] = c.f(pk_seed, addr, skey)!
+		node_0 = c.f(pk_seed, addr, skey)!
 
 		// compute root from leaf and AUTH
 		// 𝑎𝑢𝑡ℎ ← SIG𝐹𝑂𝑅𝑆.getAUTH(𝑖) ▷ SIG𝐹𝑂𝑅𝑆[(𝑖 ⋅ (𝑎 + 1) + 1) ⋅ 𝑛 ∶ (𝑖 + 1) ⋅ (𝑎 + 1) ⋅ 𝑛]
@@ -140,32 +141,30 @@ fn fors_pkfromsig(c Context, sig_fors []u8, md []u8, pk_seed []u8, addr_ Address
 			// ADRS.setTreeHeight(𝑗 + 1)
 			addr.set_tree_height(u32(j + 1))
 			// if ⌊𝑖𝑛𝑑𝑖𝑐𝑒𝑠[𝑖]/2^𝑗⌋ is even
-			if (indices[i] >> j) & 1 == 0 {
+			if (indices[i] >> j) % 2 == 0 {
 				// ADRS.setTreeIndex(ADRS.getTreeIndex()/2)
 				addr.set_tree_index(addr.get_tree_index() >> 1)
 				// 𝑛𝑜𝑑𝑒[1] ← H(PK.seed, ADRS, 𝑛𝑜𝑑𝑒[0] ∥ 𝑎𝑢𝑡ℎ[𝑗])
 				mut msi := []u8{}
 				auth_j := auth[j * c.n..(j + 1) * c.n]
-				// auth[j * c.n..(j + 1) * c.n]
-				msi << node[0]
+				msi << node_0
 				msi << auth_j
-				node[1] = c.h(pk_seed, addr, msi)!
+				node_1 = c.h(pk_seed, addr, msi)!
 			} else {
 				// ADRS.setTreeIndex((ADRS.getTreeIndex() − 1)/2)
 				addr.set_tree_index((addr.get_tree_index() - 1) >> 1)
 				// 15: 𝑛𝑜𝑑𝑒[1] ← H(PK.seed, ADRS, 𝑎𝑢𝑡ℎ[𝑗] ∥ 𝑛𝑜𝑑𝑒[0])
 				mut msi := []u8{}
-				// msi << auth[j * c.n..(j + 1) * c.n]
 				auth_j := auth[j * c.n..(j + 1) * c.n]
 				msi << auth_j
-				msi << node[0]
-				node[1] = c.h(pk_seed, addr, msi)!
+				msi << node_0
+				node_1 = c.h(pk_seed, addr, msi)!
 			}
 			// 𝑛𝑜𝑑𝑒[0] ← 𝑛𝑜𝑑𝑒[1]
-			node[0] = unsafe { node[1] }
+			node_0 = unsafe { node_1 }
 		}
 		// 𝑟𝑜𝑜𝑡[𝑖] ← 𝑛𝑜𝑑𝑒[0]
-		root << node[0]
+		root << node_0
 	}
 	// copy address to create a FORS public-key address, 	forspkADRS ← ADRS ▷
 	mut fors_pkaddr := addr.clone()

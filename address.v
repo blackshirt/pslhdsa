@@ -1,7 +1,5 @@
 module pslhdsa
 
-import encoding.binary
-
 // Address fundamentally 32 bytes long composed from:
 // -- layer address  4 bytes 	0	0..4
 // -- tree address  12 bytes 	1	4..8
@@ -142,7 +140,7 @@ fn (addr Address) get_tree_address() u64 {
 @[direct_array_access; inline]
 fn (mut addr Address) set_tree_address(v u64) {
 	addr.data[1] = 0
-	addr.data[2] = u32(v >> 32)
+	addr.data[2] = u32((v >> 32) & 0xFFFF_FFFF)
 	addr.data[3] = u32(v & 0xFFFF_FFFF)
 }
 

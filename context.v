@@ -175,10 +175,12 @@ fn (c Context) prf_msg(sk_prf []u8, opt_rand []u8, msg []u8) ![]u8 {
 	mut data := []u8{}
 	data << msg
 	data << opt_rand
-	mut out := hmac_sha256(sk_prf, data)
-
-	if c.sc != 1 {
-		out = hmac_sha512(sk_prf, data)
+	out := if c.sc == 1 {
+		// security category 1
+		hmac_sha256(sk_prf, data)
+	} else {
+		// security category 3 and 5
+		hmac_sha512(sk_prf, data)
 	}
 	return out[..c.n]
 }
@@ -236,10 +238,7 @@ fn (c Context) h(pk_seed []u8, addr Address, m2 []u8) ![]u8 {
 	data << addrs_c
 	data << m2
 
-	mut out := sha256.sum256(data)
-	if c.sc != 1 {
-		out = sha512.sum512(data)
-	}
+	out := if c.sc == 1 { sha256.sum256(data) } else { sha512.sum512(data) }
 	return out[..c.n]
 }
 
@@ -270,11 +269,12 @@ fn (c Context) tlen(el_len int, pk_seed []u8, addr Address, ml []u8) ![]u8 {
 	}
 	data << addrs_c
 	data << ml
-	mut out := sha256.sum256(data)
-	// SLH-DSA Using SHA2 for Security Categories 3 and 5
-	// Tℓ(PK.seed, ADRS, 𝑀ℓ) = Trunc𝑛(SHA-512(PK.seed ∥ toByte(0, 128 − 𝑛) ∥ ADRS𝑐 ∥ 𝑀ℓ))
-	if c.sc != 1 {
-		out = sha512.sum512(data)
+	out := if c.sc == 1 {
+		sha256.sum256(data)
+	} else {
+		// SLH-DSA Using SHA2 for Security Categories 3 and 5
+		// Tℓ(PK.seed, ADRS, 𝑀ℓ) = Trunc𝑛(SHA-512(PK.seed ∥ toByte(0, 128 − 𝑛) ∥ ADRS𝑐 ∥ 𝑀ℓ))
+		sha512.sum512(data)
 	}
 	return out[..c.n]
 }

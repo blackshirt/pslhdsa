@@ -1,9 +1,6 @@
 module pslhdsa
 
 import crypto.rand
-// import crypto.sha3
-// import crypto.sha256
-// import crypto.sha512
 
 @[params]
 struct SignerOpts {
@@ -23,12 +20,12 @@ fn slh_sign_internal(c Context, m []u8, sk Sk, addrnd []u8, opt SignerOpts) ![]u
 	mut addr := Address{}
 	// substitute 𝑜𝑝𝑡_𝑟𝑎𝑛𝑑 ← PK.seed for the deterministic variant, 𝑜𝑝𝑡_𝑟𝑎𝑛𝑑 ← 𝑎𝑑𝑑𝑟𝑛
 	mut opt_rand := addrnd.clone()
-	if opt.deterministic {
-		opt_rand = unsafe { sk.pk.seed }
-	}
-	if opt.randomize {
-		opt_rand = unsafe { rand.read(c.n)! }
-	}
+	// if opt.deterministic {
+	//	opt_rand = unsafe { sk.pk.seed }
+	//}
+	// if opt.randomize {
+	//	opt_rand = unsafe { rand.read(c.n)! }
+	//}
 	// generate randomizer, 𝑅 ← PRF𝑚𝑠𝑔(SK.prf, 𝑜𝑝𝑡_𝑟𝑎𝑛𝑑, 𝑀 )
 	r := c.prf_msg(sk.prf, opt_rand, m)!
 	// SIG ← r
@@ -37,10 +34,10 @@ fn slh_sign_internal(c Context, m []u8, sk Sk, addrnd []u8, opt SignerOpts) ![]u
 	// compute message digest, 	𝑑𝑖𝑔𝑒𝑠𝑡 ← H𝑚𝑠𝑔(𝑅, PK.seed, PK.root, 𝑀 )
 	digest := c.h_msg(r, sk.pk.seed, sk.pk.root, m)!
 	// 𝑚𝑑 ← 𝑑𝑖𝑔𝑒𝑠𝑡 [0 ∶ (𝑘⋅𝑎 ⌉ 8 )]
-	md := digest[0..cdiv(c.k * c.a, 8)].clone()
+	md := digest[0..cdiv(c.k * c.a, 8)]
 
 	// ∶ ⌈(k*a)/8⌉ .. ∶ ⌈(k*a)/8⌉ + ∶ ⌈(h-h/d)/8⌉
-	tmp_idxtree := digest[cdiv(c.k * c.a, 8)..cdiv(c.k * c.a, 8) + cdiv(c.h - c.h / c.d, 8)].clone()
+	tmp_idxtree := digest[cdiv(c.k * c.a, 8)..cdiv(c.k * c.a, 8) + cdiv(c.h - c.h / c.d, 8)]
 
 	// ⌈(k*a)/8⌉ + ⌈(h-h/d)/8⌉ .. ⌈(k*a)/8⌉ + ⌈(h-h/d)/8⌉ + ⌈h/8d⌉
 	tmp_idxleaf := digest[cdiv(c.k * c.a, 8) + cdiv(c.h - c.h / c.d, 8)..cdiv(c.k * c.a, 8) +

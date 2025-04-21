@@ -18,7 +18,7 @@ fn test_slh_sign_internal() ! {
 	for item in siggen_samples {
 		kind := kind_from_longname(item.kind)!
 		c := new_context(kind)
-		assert c.id.long_name() == item.kind
+		assert c.kind.long_name() == item.kind
 
 		m := hex.decode(item.message)!
 		signature := hex.decode(item.signature)!

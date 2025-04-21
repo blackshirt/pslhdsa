@@ -26,18 +26,26 @@ fn test_slh_sign_internal() ! {
 		sk_bytes := hex.decode(item.sk)!
 		assert sk_bytes.len == 4 * c.n
 
-		sk := Sk{
-			seed: unsafe { sk_bytes[0..c.n] }
-			prf:  unsafe { sk_bytes[c.n..2 * c.n] }
+		// calcs
+		sk_seed := unsafe { sk_bytes[0..c.n] }
+		sk_prf := unsafe { sk_bytes[c.n..2 * c.n] }
+		pk_seed := unsafe { sk_bytes[2 * c.n..3 * c.n] }
 
-			pk: Pk{
-				seed: unsafe { sk_bytes[2 * c.n..3 * c.n] }
+		skey, pkey := slh_keygen_internal(c, sk_seed, sk_prf, pk_seed)!
+		assert pkey.root == sk_bytes[3 * c.n..4 * c.n] // PASS
+
+		sk := Sk{
+			seed: sk_seed
+			prf:  sk_prf
+			pk:   Pk{
+				seed: pk_seed
 				root: unsafe { sk_bytes[3 * c.n..4 * c.n] }
 			}
 		}
 		// slh_sign_internal(c Context, m []u8, sk Sk, addrnd []u8
 		sig := slh_sign_internal(c, m, sk, addrnd)!
 		assert sig.len == signature.len
+		// NEED TO BE FIXED
 		dump(sig.hex() == signature.hex())
 	}
 }

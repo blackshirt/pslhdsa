@@ -1,6 +1,5 @@
 module pslhdsa
 
-import hash
 import crypto.sha256
 import crypto.sha512
 import crypto.sha3 // for shake
@@ -226,12 +225,11 @@ fn (mut c Context) prf_msg(sk_prf []u8, opt_rand []u8, msg []u8) ![]u8 {
 		data << opt_rand
 		data << msg
 
-		hms := hmac_sha256(sk_prf, data)
-		return hms[..c.n]
+		digest := hmac_sha256(sk_prf, data)
+		return digest[..c.n]
 	}
-
+	// SLH-DSA Using SHA2 for Security Categories 3 and 5
 	// PRF𝑚𝑠𝑔(SK.prf, 𝑜𝑝𝑡_𝑟𝑎𝑛𝑑, 𝑀 ) = Trunc𝑛(HMAC-SHA-512(SK.prf, 𝑜𝑝𝑡_𝑟𝑎𝑛𝑑 ∥ 𝑀 ))
-	// security category 3 and 5
 	mut data := []u8{}
 	data << opt_rand
 	data << msg
@@ -254,15 +252,27 @@ fn (mut c Context) f(pk_seed []u8, addr Address, m1 []u8) ![]u8 {
 	}
 	// 11.2.1 SLH-DSA Using SHA2 for Security Category 1
 	// F(PK.seed, ADRS, 𝑀1) = Trunc𝑛(SHA-256(PK.seed ∥ toByte(0, 64 − 𝑛) ∥ ADRS𝑐 ∥ 𝑀1))
-	// SLH-DSA Using SHA2 for Security Categories 3 and 5
-	// F(PK.seed, ADRS, 𝑀1) = Trunc𝑛(SHA-256(PK.seed ∥ toByte(0, 64 − 𝑛) ∥ ADRS𝑐 ∥ 𝑀1))
 	addrs_c := addr.compress()
-	_ := c.sha256_digest.write(pk_seed)!
-	_ := c.sha256_digest.write(to_bytes(0, 64 - c.n))!
-	_ := c.sha256_digest.write(addrs_c)!
-	_ := c.sha256_digest.write(m1)!
+	if c.kind == .sha2_128s || c.kind == .sha2_128f {
+		mut data := []u8{}
+		data << pk_seed
+		data << to_bytes(0, 64 - c.n)
+		data << addrs_c
+		data << m1
 
-	digest := c.sha256_digest.sum([]u8{})
+		digest := sha256.sum256(data)
+		return digest[..c.n]
+	}
+	// SLH-DSA Using SHA2 for Security Categories 3 and 5
+	//
+	// F(PK.seed, ADRS, 𝑀1) = Trunc𝑛(SHA-256(PK.seed ∥ toByte(0, 64 − 𝑛) ∥ ADRS𝑐 ∥ 𝑀1))
+	mut data := []u8{}
+	data << pk_seed
+	data << to_bytes(0, 64 - c.n)
+	data << addrs_c
+	data << m1
+
+	digest := sha256.sum256(data)
 	return digest[..c.n]
 }
 
@@ -278,36 +288,32 @@ fn (mut c Context) h(pk_seed []u8, addr Address, m2 []u8) ![]u8 {
 
 		return sha3.shake256(data, c.n)
 	}
-	// H(PK.seed, ADRS, 𝑀2) = Trunc𝑛(SHA-256(PK.seed ∥ toByte(0, 64 − 𝑛) ∥ ADRS𝑐 ∥ 𝑀2))
-	// H(PK.seed, ADRS, 𝑀2) = Trunc𝑛(SHA-512(PK.seed ∥ toByte(0, 128 − 𝑛) ∥ ADRS𝑐 ∥ 𝑀2))
+	// compressed form used in sha2 hashing routines
 	addrs_c := addr.compress()
-	match c.kind {
-		.sha2_128f, .sha2_128s {
-			_ := c.sha256_digest.write(pk_seed)!
-			_ := c.sha256_digest.write(to_bytes(0, 64 - c.n))!
-			_ := c.sha256_digest.write(addrs_c)!
-			_ := c.sha256_digest.write(m2)!
-			sha256_digest := c.sha256_digest.sum([]u8{})
-			return sha256_digest[..c.n]
-		}
-		.sha2_192f, .sha2_192s, .sha2_256f, .sha2_256s {
-			_ := c.sha512_digest.write(pk_seed)!
-			_ := c.sha512_digest.write(to_bytes(0, 128 - c.n))!
-			_ := c.sha512_digest.write(addrs_c)!
-			_ := c.sha512_digest.write(m2)!
-			digest := c.sha512_digest.sum([]u8{})
-			return digest[..c.n]
-		}
-		else {
-			// H(PK.seed, ADRS, 𝑀2) = SHAKE256(PK.seed ∥ ADRS ∥ 𝑀2, 8𝑛)
-			mut data := []u8{}
-			data << pk_seed
-			data << addr.bytes()
-			data << m2
+	// SLH-DSA Using SHA2 for Security Category 1
+	//
+	// H(PK.seed, ADRS, 𝑀2) = Trunc𝑛(SHA-256(PK.seed ∥ toByte(0, 64 − 𝑛) ∥ ADRS𝑐 ∥ 𝑀2))
+	if c.kind == .sha2_128f || c.kind == .sha2_128s {
+		mut data := []u8{}
+		data << pk_seed
+		data << to_bytes(0, 64 - c.n)
+		data << addrs_c
+		data << m2
 
-			return sha3.shake256(data, c.n)
-		}
+		digest := sha256.sum256(data)
+		return digest[..c.n]
 	}
+	// SLH-DSA Using SHA2 for Security Categories 3 and 5
+	//
+	// H(PK.seed, ADRS, 𝑀2) = Trunc𝑛(SHA-512(PK.seed ∥ toByte(0, 128 − 𝑛) ∥ ADRS𝑐 ∥ 𝑀2))
+	mut data := []u8{}
+	data << pk_seed
+	data << to_bytes(0, 128 - c.n)
+	data << addrs_c
+	data << m2
+
+	digest := sha512.sum512(data)
+	return digest[..c.n]
 }
 
 // Tℓ(PK.seed, ADRS, 𝑀ℓ) (𝔹𝑛 × 𝔹32 × 𝔹ℓ𝑛 → 𝔹𝑛) is a hash function that maps an
@@ -328,31 +334,25 @@ fn (mut c Context) tlen(pk_seed []u8, addr Address, ml []u8) ![]u8 {
 	// SLH-DSA Using SHA2 for Security Category 1
 	// Tℓ(PK.seed, ADRS, 𝑀ℓ) = Trunc𝑛(SHA-256(PK.seed ∥ toByte(0, 64 − 𝑛) ∥ ADRS𝑐 ∥ 𝑀ℓ))
 	addrs_c := addr.compress()
-	match c.kind {
-		.sha2_128f, .sha2_128s {
-			_ := c.sha256_digest.write(pk_seed)!
-			_ := c.sha256_digest.write(to_bytes(0, 64 - c.n))!
-			_ := c.sha256_digest.write(addrs_c)!
-			_ := c.sha256_digest.write(ml)!
-			sha256_digest := c.sha256_digest.sum([]u8{})
-			return sha256_digest[..c.n]
-		}
-		.sha2_192f, .sha2_192s, .sha2_256f, .sha2_256s {
-			_ := c.sha512_digest.write(pk_seed)!
-			_ := c.sha512_digest.write(to_bytes(0, 128 - c.n))!
-			_ := c.sha512_digest.write(addrs_c)!
-			_ := c.sha512_digest.write(ml)!
-			digest := c.sha512_digest.sum([]u8{})
-			return digest[..c.n]
-		}
-		else {
-			// Tℓ(PK.seed, ADRS, 𝑀ℓ) = SHAKE256(PK.seed ∥ ADRS ∥ 𝑀ℓ, 8𝑛)
-			mut data := []u8{}
-			data << pk_seed
-			data << addr.bytes()
-			data << ml
+	if c.kind == .sha2_128f || c.kind == .sha2_128s {
+		mut data := []u8{}
+		data << pk_seed
+		data << to_bytes(0, 64 - c.n)
+		data << addrs_c
+		data << ml
 
-			return sha3.shake256(data, c.n)
-		}
+		digest := sha256.sum256(data)
+		return digest[..c.n]
 	}
+	// SLH-DSA Using SHA2 for Security Categories 3 and 5
+	//
+	// Tℓ(PK.seed, ADRS, 𝑀ℓ) = Trunc𝑛(SHA-512(PK.seed ∥ toByte(0, 128 − 𝑛) ∥ ADRS𝑐 ∥ 𝑀ℓ))
+	mut data := []u8{}
+	data << pk_seed
+	data << to_bytes(0, 128 - c.n)
+	data << addrs_c
+	data << ml
+
+	digest := sha512.sum512(data)
+	return digest[..c.n]
 }

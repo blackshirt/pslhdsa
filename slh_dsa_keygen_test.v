@@ -18,8 +18,6 @@ fn test_basic_slh_keygen_internal() ! {
 	for item in keygen_samples {
 		kind := kind_from_longname(item.kind)!
 		mut c := new_context(kind)
-		dump(item.tcid)
-		dump(c)
 		sk_seed := hex.decode(item.sk_seed)!
 		sk_prf := hex.decode(item.sk_prf)!
 		pk_seed := hex.decode(item.pk_seed)!

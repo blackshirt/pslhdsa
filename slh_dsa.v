@@ -15,7 +15,7 @@ struct SignerOpts {
 // Input: Message 𝑀, private key SK = (SK.seed, SK.prf, PK.seed, PK.root),
 // (optional) additional random 𝑎𝑑𝑑𝑟𝑛𝑑
 // Output: SLH-DSA signature SIG.
-fn slh_sign_internal(c Context, m []u8, sk Sk, addrnd []u8, opt SignerOpts) ![]u8 {
+fn slh_sign_internal(mut c Context, m []u8, sk Sk, addrnd []u8, opt SignerOpts) ![]u8 {
 	// ADRS ← toByte(0, 32)
 	mut addr := Address{}
 	// substitute 𝑜𝑝𝑡_𝑟𝑎𝑛𝑑 ← PK.seed for the deterministic variant, 𝑜𝑝𝑡_𝑟𝑎𝑛𝑑 ← 𝑎𝑑𝑑𝑟𝑛
@@ -52,19 +52,19 @@ fn slh_sign_internal(c Context, m []u8, sk Sk, addrnd []u8, opt SignerOpts) ![]u
 	// ADRS.setTreeAddress(𝑖𝑑𝑥𝑡𝑟𝑒𝑒)
 	addr.set_tree_address(idxtree)
 	// ADRS.setTypeAndClear(FORS_TREE)
-	addr.set_type_and_clear(.fors_tree)
+	addr.set_type_and_clear_not_kp(.fors_tree)
 	// ADRS.setKeyPairAddress(𝑖𝑑𝑥𝑙𝑒𝑎𝑓)
 	addr.set_keypair_address(u32(idxleaf))
 
 	// SIG𝐹𝑂𝑅𝑆 ← fors_sign(𝑚𝑑, SK.seed, PK.seed, ADRS)
-	sig_fors := fors_sign(c, md, sk.seed, sk.pk.seed, addr)!
+	sig_fors := fors_sign(mut c, md, sk.seed, sk.pk.seed, addr)!
 	// SIG ← SIG ∥ SIG𝐹𝑂𝑅s
 	sig << sig_fors
 
 	// get FORS key, PK𝐹𝑂𝑅𝑆 ← fors_pkFromSig(SIG𝐹𝑂𝑅𝑆, 𝑚𝑑, PK.seed, ADRS)
-	pk_fors := fors_pkfromsig(c, sig_fors, md, sk.pk.seed, addr)!
+	pk_fors := fors_pkfromsig(mut c, sig_fors, md, sk.pk.seed, addr)!
 	// 17: SIG𝐻𝑇 ← ht_sign(PK𝐹𝑂𝑅𝑆, SK.seed, PK.seed,𝑖𝑑𝑥𝑡𝑟𝑒𝑒,𝑖𝑑𝑥𝑙𝑒𝑎𝑓)
-	sig_ht := ht_sign(c, pk_fors, sk.seed, sk.pk.seed, int(idxtree), int(idxleaf))!
+	sig_ht := ht_sign(mut c, pk_fors, sk.seed, sk.pk.seed, int(idxtree), int(idxleaf))!
 
 	// : SIG ← SIG ∥ SIG𝐻t
 	sig << sig_ht
@@ -112,13 +112,13 @@ fn (pk Pk) bytes() []u8 {
 // Generates an SLH-DSA key pair.
 // Input: (none)
 // Output: SLH-DSA key pair (SK, PK)
-fn slh_keygen(c Context) !(Sk, Pk) {
+fn slh_keygen(mut c Context) !(Sk, Pk) {
 	// set SK.seed, SK.prf, and PK.seed to random 𝑛-byte
 	sk_seed := rand.read(c.n)!
 	sk_prf := rand.read(c.n)!
 	pk_seed := rand.read(c.n)!
 
-	return slh_keygen_internal(c, sk_seed, sk_prf, pk_seed)!
+	return slh_keygen_internal(mut c, sk_seed, sk_prf, pk_seed)!
 }
 
 // Algorithm 18 slh_keygen_internal(SK.seed, SK.prf, PK.seed)
@@ -126,14 +126,14 @@ fn slh_keygen(c Context) !(Sk, Pk) {
 // Generates an SLH-DSA key pair.
 // Input: Secret seed SK.seed, PRF key SK.prf, public seed PK.seed
 // Output: SLH-DSA key pair (SK, PK).
-fn slh_keygen_internal(c Context, sk_seed []u8, sk_prf []u8, pk_seed []u8) !(Sk, Pk) {
+fn slh_keygen_internal(mut c Context, sk_seed []u8, sk_prf []u8, pk_seed []u8) !(Sk, Pk) {
 	// generate the public key for the top-level XMSS tree
 	// 1: ADRS ← toByte(0, 32) ▷
 	mut addr := Address{}
 	// 2: ADRS.setLayerAddress(𝑑 − 1)
 	addr.set_layer_address(u32(c.d - 1))
 	// 3: PK.root ← xmss_node(SK.seed, 0, ℎ′ , PK.seed, ADRS)
-	pk_root := xmss_node(c, sk_seed, 0, c.hp, pk_seed, addr)!
+	pk_root := xmss_node(mut c, sk_seed, 0, c.hp, pk_seed, addr)!
 	// 4: return ( (SK.seed, SK.prf, PK.seed, PK.root), (PK.seed, PK.root) )
 	pk := Pk{
 		seed: pk_seed
@@ -153,7 +153,7 @@ fn slh_keygen_internal(c Context, sk_seed []u8, sk_prf []u8, pk_seed []u8) !(Sk,
 // Verifies an SLH-DSA signature.
 // Input: Message 𝑀, signature SIG, public key PK = (PK.seed, PK.root).
 // Output: Boolean.
-fn slh_verify_internal(c Context, m []u8, sig []u8, pk Pk) !bool {
+fn slh_verify_internal(mut c Context, m []u8, sig []u8, pk Pk) !bool {
 	// if |SIG| ≠ (1 + 𝑘(1 + 𝑎) + ℎ + 𝑑 ⋅ 𝑙𝑒𝑛) ⋅ 𝑛 { return false }
 	exp_length := (1 + c.k * (1 + c.a) + c.h + c.d * c.wots_len()) * c.n
 	if sig.len != exp_length {
@@ -197,10 +197,10 @@ fn slh_verify_internal(c Context, m []u8, sig []u8, pk Pk) !bool {
 	addr.set_keypair_address(u32(idxleaf))
 
 	// PK𝐹𝑂𝑅𝑆 ← fors_pkFromSig(SIG𝐹𝑂𝑅𝑆, 𝑚𝑑, PK.seed, ADRS)
-	pk_fors := fors_pkfromsig(c, sig_fors, md, pk.seed, addr)!
+	pk_fors := fors_pkfromsig(mut c, sig_fors, md, pk.seed, addr)!
 
 	// return ht_verify(PK𝐹𝑂𝑅𝑆, SIG𝐻𝑇, PK.seed,𝑖𝑑𝑥𝑡𝑟𝑒𝑒,𝑖𝑑𝑥𝑙𝑒𝑎𝑓, PK.root)
-	return ht_verify(c, pk_fors, sig_ht, pk.seed, int(idxtree), int(idxleaf), pk.root)!
+	return ht_verify(mut c, pk_fors, sig_ht, pk.seed, int(idxtree), int(idxleaf), pk.root)!
 }
 
 const max_allowed_context_string = 255
@@ -210,7 +210,7 @@ const max_allowed_context_string = 255
 // Generates a pure SLH-DSA signature.
 // Input: Message 𝑀, context string 𝑐𝑥, private key SK.
 // Output: SLH-DSA signature SIG.
-fn slh_sign(c Context, m []u8, cx []u8, sk Sk, opt SignerOpts) ![]u8 {
+fn slh_sign(mut c Context, m []u8, cx []u8, sk Sk, opt SignerOpts) ![]u8 {
 	if cx.len > max_allowed_context_string {
 		return error('pure SLH-DSA signature failed: exceed context-string')
 	}
@@ -227,7 +227,7 @@ fn slh_sign(c Context, m []u8, cx []u8, sk Sk, opt SignerOpts) ![]u8 {
 	msg << m
 
 	// SIG ← slh_sign_internal(𝑀′, SK, 𝑎𝑑𝑑𝑟𝑛𝑑) ▷ omit 𝑎𝑑𝑑𝑟𝑛𝑑 for the deterministic variant
-	sig := slh_sign_internal(c, msg, sk, addrnd, opt)!
+	sig := slh_sign_internal(mut c, msg, sk, addrnd, opt)!
 
 	return sig
 }
@@ -239,7 +239,7 @@ fn slh_sign(c Context, m []u8, cx []u8, sk Sk, opt SignerOpts) ![]u8 {
 // Generates a pre-hash SLH-DSA signature.
 // Input: Message 𝑀, context string 𝑐𝑡𝑥, pre-hash function PH, private key SK.
 // Output: SLH-DSA signature SIG.
-fn hash_slh_sign(c Context, m []u8, cx []u8, ph crypto.Hash, sk Sk, opt SignerOpts) ![]u8 {
+fn hash_slh_sign(mut c Context, m []u8, cx []u8, ph crypto.Hash, sk Sk, opt SignerOpts) ![]u8 {
 	if cx.len > max_allowed_context_string {
 		return error('pure SLH-DSA signature failed: exceed context-string')
 	}
@@ -304,7 +304,7 @@ fn hash_slh_sign(c Context, m []u8, cx []u8, ph crypto.Hash, sk Sk, opt SignerOp
 // Verifies a pure SLH-DSA signature.
 // Input: Message 𝑀, signature sig , context string 𝑐𝑡𝑥, public key PK.
 // Output: Boolean.
-fn slh_verify(c Context, m []u8, sig []u8, cx []u8, pk Pk) !bool {
+fn slh_verify(mut c Context, m []u8, sig []u8, cx []u8, pk Pk) !bool {
 	if cx.len > max_allowed_context_string {
 		return error('pure SLH-DSA signature failed: exceed context-string')
 	}
@@ -316,7 +316,7 @@ fn slh_verify(c Context, m []u8, sig []u8, cx []u8, pk Pk) !bool {
 	msg << m
 
 	// return slh_verify_internal(𝑀′, SIG, PK)
-	return slh_verify_internal(c, msg, sig, pk)!
+	return slh_verify_internal(mut c, msg, sig, pk)!
 }
 
 /*
@@ -324,7 +324,7 @@ fn slh_verify(c Context, m []u8, sig []u8, cx []u8, pk Pk) !bool {
 // Verifies a pre-hash SLH-DSA signature.
 // Input: Message 𝑀, signature SIG, context string 𝑐𝑡𝑥, pre-hash function PH, public key PK.
 // Output: Boolean.
-fn hash_slh_verify(c Context, m []u8, sig []u8, cx []u8, ph crypto.Hash, pk Pk) !bool {
+fn hash_slh_verify(mut c Context, m []u8, sig []u8, cx []u8, ph crypto.Hash, pk Pk) !bool {
 	if cx.len > max_allowed_context_string {
 		return error('pure SLH-DSA signature failed: exceed context-string')
 	}
@@ -371,6 +371,6 @@ fn hash_slh_verify(c Context, m []u8, sig []u8, cx []u8, ph crypto.Hash, pk Pk) 
 	msg << phm
 
 	// return slh_verify_internal(𝑀′, SIG, PK)
-	return slh_verify_internal(c, msg, sig, pk)!
+	return slh_verify_internal(mut c, msg, sig, pk)!
 }
 */

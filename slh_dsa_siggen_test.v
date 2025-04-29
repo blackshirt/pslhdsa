@@ -17,7 +17,7 @@ struct SigGenTest {
 fn test_slh_sign_internal() ! {
 	for item in siggen_samples {
 		kind := kind_from_longname(item.kind)!
-		c := new_context(kind)
+		mut c := new_context(kind)
 		assert c.kind.long_name() == item.kind
 
 		m := hex.decode(item.message)!
@@ -31,7 +31,7 @@ fn test_slh_sign_internal() ! {
 		sk_prf := unsafe { sk_bytes[c.n..2 * c.n] }
 		pk_seed := unsafe { sk_bytes[2 * c.n..3 * c.n] }
 
-		skey, pkey := slh_keygen_internal(c, sk_seed, sk_prf, pk_seed)!
+		skey, pkey := slh_keygen_internal(mut c, sk_seed, sk_prf, pk_seed)!
 		assert pkey.root == sk_bytes[3 * c.n..4 * c.n] // PASS
 
 		sk := Sk{
@@ -42,8 +42,8 @@ fn test_slh_sign_internal() ! {
 				root: unsafe { sk_bytes[3 * c.n..4 * c.n] }
 			}
 		}
-		// slh_sign_internal(c Context, m []u8, sk Sk, addrnd []u8
-		sig := slh_sign_internal(c, m, sk, addrnd)!
+		// slh_sign_internal(mut c Context, m []u8, sk Sk, addrnd []u8
+		sig := slh_sign_internal(mut c, m, sk, addrnd)!
 		assert sig.len == signature.len
 		// NEED TO BE FIXED
 		dump(sig.hex() == signature.hex())

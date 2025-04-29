@@ -14,11 +14,12 @@ struct KeygenTest {
 }
 
 fn test_basic_slh_keygen_internal() ! {
-	// slh_keygen_internal(c Context, sk_seed []u8, sk_prf []u8, pk_seed []u8) !(Sk, Pk)
+	// slh_keygen_internal(mut c Context, sk_seed []u8, sk_prf []u8, pk_seed []u8) !(Sk, Pk)
 	for item in keygen_samples {
 		kind := kind_from_longname(item.kind)!
-		c := new_context(kind)
-
+		mut c := new_context(kind)
+		dump(item.tcid)
+		dump(c)
 		sk_seed := hex.decode(item.sk_seed)!
 		sk_prf := hex.decode(item.sk_prf)!
 		pk_seed := hex.decode(item.pk_seed)!
@@ -29,7 +30,7 @@ fn test_basic_slh_keygen_internal() ! {
 		// pk_root was splitted from pk_out, where its pk_seed+pk_root
 		pk_root := pk_out[c.n..]
 
-		sk, pk := slh_keygen_internal(c, sk_seed, sk_prf, pk_seed)!
+		sk, pk := slh_keygen_internal(mut c, sk_seed, sk_prf, pk_seed)!
 
 		assert sk.pk.root == pk_root
 		assert sk.bytes() == sk_out

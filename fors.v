@@ -8,7 +8,7 @@ module pslhdsa
 // Generates a FORS private-key value.
 // Input: Secret seed SK.seed, public seed PK.seed, address ADRS, secret key index 𝑖𝑑𝑥.
 // Output: 𝑛-byte FORS private-key value.
-fn fors_skgen(c Context, sk_seed []u8, pk_seed []u8, addr Address, idx int) ![]u8 {
+fn fors_skgen(mut c Context, sk_seed []u8, pk_seed []u8, addr Address, idx int) ![]u8 {
 	// idx >=0
 	// copy address to create key generation address
 	mut sk_addr := addr.clone()
@@ -29,7 +29,7 @@ fn fors_skgen(c Context, sk_seed []u8, pk_seed []u8, addr Address, idx int) ![]u
 // Computes the root of a Merkle subtree of FORS public values.
 // Input: Secret seed SK.seed, target node index 𝑖, target node height 𝑧, public seed PK.seed, address ADRS.
 // Output: 𝑛-byte root 𝑛𝑜𝑑𝑒.
-fn fors_node(c Context, sk_seed []u8, i int, z int, pk_seed []u8, addr_ Address) ![]u8 {
+fn fors_node(mut c Context, sk_seed []u8, i int, z int, pk_seed []u8, addr_ Address) ![]u8 {
 	// if z > ctx.a or i >= ctx.k * 2**(ctx.a - z):
 	if z > c.a || i >= c.k * (1 << (c.a - z)) {
 		return error('Bad fors_node params')
@@ -39,7 +39,7 @@ fn fors_node(c Context, sk_seed []u8, i int, z int, pk_seed []u8, addr_ Address)
 	mut addr := addr_.clone()
 	if z == 0 {
 		// 𝑠𝑘 ← fors_skGen(SK.seed, PK.seed, ADRS,𝑖)
-		skey := fors_skgen(c, sk_seed, pk_seed, addr, i)!
+		skey := fors_skgen(mut c, sk_seed, pk_seed, addr, i)!
 		// 3: ADRS.setTreeHeight(0)
 		addr.set_tree_height(u32(0))
 		// 4: ADRS.setTreeIndex(𝑖)
@@ -50,9 +50,9 @@ fn fors_node(c Context, sk_seed []u8, i int, z int, pk_seed []u8, addr_ Address)
 	}
 	// else
 	// 𝑙𝑛𝑜𝑑𝑒 ← fors_node(SK.seed, 2𝑖, 𝑧 − 1, PK.seed, ADRS)
-	lnode := fors_node(c, sk_seed, 2 * i, z - 1, pk_seed, addr)!
+	lnode := fors_node(mut c, sk_seed, 2 * i, z - 1, pk_seed, addr)!
 	// 8: 𝑟𝑛𝑜𝑑𝑒 ← fors_node(SK.seed, 2𝑖 + 1, 𝑧 − 1, PK.seed, ADRS)
-	rnode := fors_node(c, sk_seed, 2 * i + 1, z - 1, pk_seed, addr)!
+	rnode := fors_node(mut c, sk_seed, 2 * i + 1, z - 1, pk_seed, addr)!
 	// 9: ADRS.setTreeHeight(𝑧)
 	addr.set_tree_height(u32(z))
 	// 10: ADRS.setTreeIndex(𝑖)
@@ -72,7 +72,7 @@ fn fors_node(c Context, sk_seed []u8, i int, z int, pk_seed []u8, addr_ Address)
 // Generates a FORS signature.
 // Input: Message digest 𝑚𝑑, secret seed SK.seed, address ADRS, public seed PK.seed.
 // Output: FORS signature SIG𝐹𝑂𝑅𝑆.
-fn fors_sign(c Context, md []u8, sk_seed []u8, pk_seed []u8, addr_ Address) ![]u8 {
+fn fors_sign(mut c Context, md []u8, sk_seed []u8, pk_seed []u8, addr_ Address) ![]u8 {
 	assert md.len == cdiv(c.k * c.a, 8)
 	mut addr := addr_.clone()
 	// initialize SIG𝐹𝑂𝑅𝑆 as a zero-length byte string
@@ -83,7 +83,7 @@ fn fors_sign(c Context, md []u8, sk_seed []u8, pk_seed []u8, addr_ Address) ![]u
 	// compute signature elements
 	for i := 0; i < c.k; i++ {
 		// fors_skGen(SK.seed, PK.seed, ADRS,𝑖 ⋅ 2^𝑎 + 𝑖𝑛𝑑𝑖𝑐𝑒𝑠[𝑖])
-		fors_item := fors_skgen(c, sk_seed, pk_seed, addr, int(u32(i) << c.a) + int(indices[i]))!
+		fors_item := fors_skgen(mut c, sk_seed, pk_seed, addr, int(u32(i) << c.a) + int(indices[i]))!
 		sig_fors << fors_item
 
 		// compute auth path
@@ -94,7 +94,7 @@ fn fors_sign(c Context, md []u8, sk_seed []u8, pk_seed []u8, addr_ Address) ![]u
 			s := (indices[i] >> j) ^ 1
 			// AUTH[𝑗] ← fors_node(SK.seed,𝑖 * 2^(𝑎−𝑗) + 𝑠, 𝑗, PK.seed, ADRS)
 			idx := u32(i) << (c.a - j) + s
-			auth_j := fors_node(c, sk_seed, int(idx), j, pk_seed, addr)!
+			auth_j := fors_node(mut c, sk_seed, int(idx), j, pk_seed, addr)!
 			auth << auth_j
 		}
 		// SIG𝐹𝑂𝑅𝑆 ← SIG𝐹𝑂𝑅𝑆 ∥ AUTH
@@ -109,7 +109,7 @@ fn fors_sign(c Context, md []u8, sk_seed []u8, pk_seed []u8, addr_ Address) ![]u
 // Computes a FORS public key from a FORS signature.
 // Input: FORS signature SIG𝐹𝑂𝑅𝑆, message digest 𝑚𝑑, public seed PK.seed, address ADRS.
 // Output: FORS public key
-fn fors_pkfromsig(c Context, sig_fors []u8, md []u8, pk_seed []u8, addr_ Address) ![]u8 {
+fn fors_pkfromsig(mut c Context, sig_fors []u8, md []u8, pk_seed []u8, addr_ Address) ![]u8 {
 	// assert sig_fors.len == c.k * (c.a + 1) * c.n
 	assert md.len == cdiv(c.k * c.a, 8)
 	mut addr := addr_.clone()
@@ -175,7 +175,7 @@ fn fors_pkfromsig(c Context, sig_fors []u8, md []u8, pk_seed []u8, addr_ Address
 
 	// compute the FORS public key
 	// 24: 𝑝𝑘 ← T𝑘(PK.seed, forspkADRS, 𝑟𝑜𝑜𝑡) ▷
-	pk := c.tlen(c.k, pk_seed, fors_pkaddr, root)!
+	pk := c.tlen(pk_seed, fors_pkaddr, root)!
 
 	return pk
 }

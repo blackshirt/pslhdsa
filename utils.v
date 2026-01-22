@@ -1,9 +1,14 @@
+// Copyright © 2024 blackshirt.
+// Use of this source code is governed by an MIT license
+// that can be found in the LICENSE file.
+//
 module pslhdsa
 
 // Algorithm 2 toInt(𝑋, 𝑛)
 //
 // Converts a byte string to an integer
 // Input: 𝑛-byte string 𝑋.
+@[direct_array_access; inline]
 fn to_int(x []u8, n int) u64 {
 	assert n <= 8
 	if n == 0 {
@@ -23,17 +28,17 @@ fn to_int(x []u8, n int) u64 {
 // Input: Integer 𝑥, string length 𝑛.
 // Output: Byte string of length 𝑛 containing binary representation of 𝑥 in big-endian byte-order.
 @[inline]
-fn to_bytes(x u64, n int) []u8 {
+fn to_byte(x u64, n int) []u8 {
 	if n == 0 {
 		return []u8{}
 	}
 	mut t := x
-	mut s := []u8{len: n}
+	mut out := []u8{len: n}
 	for i := 0; i < n; i++ {
-		s[n - 1 - i] = u8(t & 0xFF)
+		out[n - 1 - i] = u8(t & 0xFF)
 		t >>= 8
 	}
-	return s
+	return out
 }
 
 // Compute ceil(n/k)
@@ -49,27 +54,29 @@ fn cdiv(n int, k int) int {
 // Output: Array of 𝑜𝑢𝑡_𝑙𝑒𝑛 integers in the range [0, … , 2𝑏 − 1].
 // The base_2exp_b function is used to break the message to be signed and the checksum value
 // into arrays of base-𝑤 integers.
+@[direct_array_access; inline]
 fn base_2exp_b(x []u8, b int, out_len int) []u32 {
 	assert b > 0
-	assert out_len >= 0
-	assert x.len >= cdiv(out_len * b, 8)
+	assert out_len > 0
 
+	mut idx := 0
 	mut bits := 0
 	mut total := u32(0)
-	mut pos := 0
-	bmask := (u32(1) << b) - 1
-	mut baseb := []u32{len: out_len}
 
-	for out := 0; out < out_len; out++ {
+	mask := (u32(1) << b) - 1
+	mut out := []u32{cap: out_len}
+
+	for i := 0; out < out_len; out++ {
 		for bits < b {
-			total = (total << 8) + x[pos]
-			pos += 1
+			total = (total << 8) + x[idx]
+			idx += 1
 			bits += 8
 		}
 		bits -= b
-		baseb[out] = (total >> bits) & bmask
+		tmp := (total >> bits) & mask
+		out << tmp
 	}
-	return baseb
+	return out
 }
 
 //  revert if not big endian

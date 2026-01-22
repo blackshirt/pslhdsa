@@ -75,8 +75,8 @@ fn mgf1_sha256(seed []u8, mlen int) []u8 {
 	for c := 0; c < cdiv(mlen, sha256_hash_size); c++ {
 		mut data := []u8{}
 		data << seed
-		data << to_bytes(u64(c), 4)
-		// seed + to_bytes(c, 4)
+		data << to_byte(u64(c), 4)
+		// seed + to_byte(c, 4)
 		out << sha256.sum256(data)
 	}
 	return out[..mlen]
@@ -90,22 +90,11 @@ fn mgf1_sha512(seed []u8, mlen int) []u8 {
 	for c := 0; c < cdiv(mlen, sha512_hash_size); c++ {
 		mut data := []u8{}
 		data << seed
-		data << to_bytes(u64(c), 4)
-		// seed + to_bytes(c, 4)
+		data << to_byte(u64(c), 4)
+		// seed + to_byte(c, 4)
 		out << sha512.sum512(data)
 	}
 	return out[..mlen]
-}
-
-@[inline]
-fn hmac_sha256(seed []u8, data []u8) []u8 {
-	out := hmac.new(seed, data, sha256.sum256, sha256.size)
-	return out
-}
-
-@[inline]
-fn hmac_sha512(seed []u8, data []u8) []u8 {
-	return hmac.new(seed, data, sha512.sum512, sha512.size)
 }
 
 // 4.1 Hash Functions and Pseudorandom Functions
@@ -182,7 +171,7 @@ fn (mut c Context) prf(pk_seed []u8, sk_seed []u8, addr Address) ![]u8 {
 	if c.kind == .sha2_128f || c.kind == .sha2_128s {
 		mut data := []u8{}
 		data << pk_seed
-		data << to_bytes(0, 64 - c.n)
+		data << to_byte(0, 64 - c.n)
 		data << addrs_c
 		data << sk_seed
 
@@ -195,7 +184,7 @@ fn (mut c Context) prf(pk_seed []u8, sk_seed []u8, addr Address) ![]u8 {
 	// Really the same with category 1
 	mut data := []u8{}
 	data << pk_seed
-	data << to_bytes(0, 64 - c.n)
+	data << to_byte(0, 64 - c.n)
 	data << addrs_c
 	data << sk_seed
 
@@ -256,7 +245,7 @@ fn (mut c Context) f(pk_seed []u8, addr Address, m1 []u8) ![]u8 {
 	if c.kind == .sha2_128s || c.kind == .sha2_128f {
 		mut data := []u8{}
 		data << pk_seed
-		data << to_bytes(0, 64 - c.n)
+		data << to_byte(0, 64 - c.n)
 		data << addrs_c
 		data << m1
 
@@ -268,7 +257,7 @@ fn (mut c Context) f(pk_seed []u8, addr Address, m1 []u8) ![]u8 {
 	// F(PK.seed, ADRS, 𝑀1) = Trunc𝑛(SHA-256(PK.seed ∥ toByte(0, 64 − 𝑛) ∥ ADRS𝑐 ∥ 𝑀1))
 	mut data := []u8{}
 	data << pk_seed
-	data << to_bytes(0, 64 - c.n)
+	data << to_byte(0, 64 - c.n)
 	data << addrs_c
 	data << m1
 
@@ -296,7 +285,7 @@ fn (mut c Context) h(pk_seed []u8, addr Address, m2 []u8) ![]u8 {
 	if c.kind == .sha2_128f || c.kind == .sha2_128s {
 		mut data := []u8{}
 		data << pk_seed
-		data << to_bytes(0, 64 - c.n)
+		data << to_byte(0, 64 - c.n)
 		data << addrs_c
 		data << m2
 
@@ -308,7 +297,7 @@ fn (mut c Context) h(pk_seed []u8, addr Address, m2 []u8) ![]u8 {
 	// H(PK.seed, ADRS, 𝑀2) = Trunc𝑛(SHA-512(PK.seed ∥ toByte(0, 128 − 𝑛) ∥ ADRS𝑐 ∥ 𝑀2))
 	mut data := []u8{}
 	data << pk_seed
-	data << to_bytes(0, 128 - c.n)
+	data << to_byte(0, 128 - c.n)
 	data << addrs_c
 	data << m2
 
@@ -337,7 +326,7 @@ fn (mut c Context) tlen(pk_seed []u8, addr Address, ml []u8) ![]u8 {
 	if c.kind == .sha2_128f || c.kind == .sha2_128s {
 		mut data := []u8{}
 		data << pk_seed
-		data << to_bytes(0, 64 - c.n)
+		data << to_byte(0, 64 - c.n)
 		data << addrs_c
 		data << ml
 
@@ -349,7 +338,7 @@ fn (mut c Context) tlen(pk_seed []u8, addr Address, ml []u8) ![]u8 {
 	// Tℓ(PK.seed, ADRS, 𝑀ℓ) = Trunc𝑛(SHA-512(PK.seed ∥ toByte(0, 128 − 𝑛) ∥ ADRS𝑐 ∥ 𝑀ℓ))
 	mut data := []u8{}
 	data << pk_seed
-	data << to_bytes(0, 128 - c.n)
+	data << to_byte(0, 128 - c.n)
 	data << addrs_c
 	data << ml
 

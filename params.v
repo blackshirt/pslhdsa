@@ -12,9 +12,18 @@ import cyrpto.sha512
 @[noinit]
 struct SlhContext {
 mut:
-	kind   Kind
-	psfunc PsFuncs
+	kind   Kind // set on creation
+	psfunc PrfFuncs
 	prm    Param
+}
+
+@[inline]
+fn new_slhcontext(k Kind) !&SlhContext {
+	return &SlhContext{
+		kind:   k
+		psfunc: new_psfunc(k)
+		prm:    new_param(k)
+	}
 }
 
 // SLH-DSA Parameter set
@@ -49,6 +58,12 @@ mut:
 	siglen int
 }
 
+// new_param creates SLH-DSA parameter set from Kind k
+@[inline]
+fn new_param(k Kind) Param {
+	return paramset[k.str()]
+}
+
 // Table 2. SLH-DSA parameter sets
 const paramset = {
 	// 						     			id   𝑛  ℎ   𝑑  ℎp  𝑎  𝑘  𝑙𝑔𝑤 𝑚 sc pklen  siglen
@@ -69,30 +84,31 @@ const paramset = {
 
 // Hash Functions and Pseudorandom Functions
 //
-// PsFuncs is a hashing and or pseudorandom functions used in the mean time of SLH-DSA operation.
-interface PsFuncs {
+// PrfFuncs is a hashing and or pseudorandom functions used in the mean time of SLH-DSA operation.
+interface PrfFuncs {
 	// pseudorandom function (PRF) that generates the randomizer (𝑅)
 	// for the randomized hashing of the message to be signed
-	prf_msg(sk_prf []u8, opt_rand []u8, msg []u8, outlen int) []u8
+	prf_msg(sk_prf []u8, opt_rand []u8, msg []u8, outlen int) ![]u8
 	// hmsg was used to generate the digest of the message to be signed.
-	hmsg(r []u8, pk_seed []u8, pk_root []u8, msg []u8, outlen int) []u8
+	hmsg(r []u8, pk_seed []u8, pk_root []u8, msg []u8, outlen int) ![]u8
 	// prf is a pseudorandom function  (PRF) that is used to generate the secret values
 	// in WOTS+ and FORS private keys.
-	prf(pk_seed []u8, sk_seed []u8, adrs Address, outlen int) []u8
-	// tlhash is a hash function that maps an ℓ𝑛-byte message to an 𝑛-byte message.
-	tlhash(pk_seed []u8, adrs Address, ml [][]u8, outlen int) []u8
-	// hhash is a special case of Tℓ that takes a 2𝑛-byte message as input.
-	hhash(pk_seed []u8, adrs Address, m2 []u8, outlen int) []u8
-	// fhash is a hash function that takes an 𝑛-byte message as input and produces an 𝑛-byte output.
-	fhash(pk_seed []u8, adrs Address, m1 []u8, outlen int) []u8
+	prf(pk_seed []u8, sk_seed []u8, adrs Address, outlen int) ![]u8
+	// tl is a hash function that maps an ℓ𝑛-byte message to an 𝑛-byte message.
+	tl(pk_seed []u8, adrs Address, ml [][]u8, outlen int) ![]u8
+	// h is a special case of Tℓ that takes a 2𝑛-byte message as input.
+	h(pk_seed []u8, adrs Address, m2 []u8, outlen int) ![]u8
+	// f is a hash function that takes an 𝑛-byte message as input and produces an 𝑛-byte output.
+	f(pk_seed []u8, adrs Address, m1 []u8, outlen int) ![]u8
 }
 
-// SHAKE based Parameter Set
+// SHAKE based SLH-DSA pseudorandom function
+//
 // See 11.1 SLH-DSA Using SHAKE
-struct ShakePs {}
+struct ShakePrf {}
 
 @[direct_array_access]
-fn (s ShakePs) prf_msg(sk_prf []u8, opt_rand []u8, msg []u8, outlen int) []u8 {
+fn (s ShakePrf) prf_msg(sk_prf []u8, opt_rand []u8, msg []u8, outlen int) ![]u8 {
 	// PRF𝑚𝑠𝑔(SK.prf, 𝑜𝑝𝑡_𝑟𝑎𝑛𝑑, 𝑀 ) = SHAKE256(SK.prf ∥ 𝑜𝑝𝑡_𝑟𝑎𝑛𝑑 ∥ 𝑀, 8𝑛)
 	mut data := []u8{cap: sk_prf.len + opt_rand.len + msg.len}
 
@@ -104,7 +120,7 @@ fn (s ShakePs) prf_msg(sk_prf []u8, opt_rand []u8, msg []u8, outlen int) []u8 {
 }
 
 @[direct_array_access]
-fn (s ShakePs) hmsg(r []u8, pk_seed []u8, pk_root []u8, msg []u8, outlen int) []u8 {
+fn (s ShakePrf) hmsg(r []u8, pk_seed []u8, pk_root []u8, msg []u8, outlen int) ![]u8 {
 	size := r.len + pk_seed.len + pk_root.len + msg.len
 	mut data := []u8{cap: size}
 	data << r
@@ -115,7 +131,7 @@ fn (s ShakePs) hmsg(r []u8, pk_seed []u8, pk_root []u8, msg []u8, outlen int) []
 }
 
 @[direct_array_access]
-fn (s ShakePs) prf(pk_seed []u8, sk_seed []u8, adrs Address, outlen int) []u8 {
+fn (s ShakePrf) prf(pk_seed []u8, sk_seed []u8, adrs Address, outlen int) ![]u8 {
 	// PRF(PK.seed, SK.seed, ADRS) = SHAKE256(PK.seed ∥ ADRS ∥ SK.seed, 8𝑛)
 	// adrs.bytes() = =32
 	size := pk_seed.len + sk_seed.len + 32 + sk_seed.len
@@ -127,7 +143,7 @@ fn (s ShakePs) prf(pk_seed []u8, sk_seed []u8, adrs Address, outlen int) []u8 {
 }
 
 @[direct_array_access]
-fn (s ShakePs) tlhash(pk_seed []u8, adrs Address, m1 [][]u8, outlen int) []u8 {
+fn (s ShakePrf) tl(pk_seed []u8, adrs Address, m1 [][]u8, outlen int) ![]u8 {
 	// Tℓ(PK.seed, ADRS, 𝑀ℓ) = SHAKE256(PK.seed ∥ ADRS ∥ 𝑀ℓ, 8𝑛)
 	mut m1size := 0
 	for o in m1 {
@@ -145,7 +161,7 @@ fn (s ShakePs) tlhash(pk_seed []u8, adrs Address, m1 [][]u8, outlen int) []u8 {
 }
 
 @[direct_array_access]
-fn (s ShakePs) hhash(pk_seed []u8, adrs Address, m2 []u8, outlen int) []u8 {
+fn (s ShakePrf) h(pk_seed []u8, adrs Address, m2 []u8, outlen int) ![]u8 {
 	// H(PK.seed, ADRS, 𝑀2) = SHAKE256(PK.seed ∥ ADRS ∥ 𝑀2, 8𝑛)
 	mut data := []u8{cap: pk_seed.len + 32 + m2.len}
 	data << pk_seed
@@ -156,7 +172,7 @@ fn (s ShakePs) hhash(pk_seed []u8, adrs Address, m2 []u8, outlen int) []u8 {
 }
 
 @[direct_array_access]
-fn (s ShakePs) fhash(pk_seed []u8, adrs Address, m1 []u8, outlen int) []u8 {
+fn (s ShakePrf) f(pk_seed []u8, adrs Address, m1 []u8, outlen int) ![]u8 {
 	// F(PK.seed, ADRS, 𝑀1) = SHAKE256(PK.seed ∥ ADRS ∥ 𝑀1, 8𝑛)
 	mut data := []u8{cap: pk_seed.len + 32 + m1.len}
 	data << pk_seed
@@ -164,6 +180,177 @@ fn (s ShakePs) fhash(pk_seed []u8, adrs Address, m1 []u8, outlen int) []u8 {
 	data << m1
 
 	return sha3.shake256(data, outlen)
+}
+
+// 11.2.1 SLH-DSA Using SHA2 for Security Category 1
+//
+struct Sha2PRFCategory1 {}
+
+// PRF𝑚𝑠𝑔(SK.prf, 𝑜𝑝𝑡_𝑟𝑎𝑛𝑑, 𝑀 ) = Trunc𝑛(HMAC-SHA-256(SK.prf, 𝑜𝑝𝑡_𝑟𝑎𝑛𝑑 ∥ 𝑀 ))
+fn (s &Sha2PRFCategory1) prf_msg(sk_prf []u8, opt_rand []u8, msg []u8, outlen int) ![]u8 {
+	mut data := []u8{cap: opt_rand.len + msg.len}
+	data << opt_rand
+	data << msg
+
+	digest := hmac_sha256(sk_prf, data)
+	return digest[..outlen].clone()
+}
+
+fn (s &Sha2PRFCategory1) hmsg(r []u8, pk_seed []u8, pk_root []u8, msg []u8, outlen int) ![]u8 {
+	// H𝑚𝑠𝑔(𝑅, PK.seed, PK.root, 𝑀 ) = MGF1-SHA-256(𝑅 ∥ PK.seed ∥ SHA-256(𝑅 ∥ PK.seed ∥ PK.root ∥ 𝑀 ), 𝑚)
+	mut h := sha256.new()
+	mut seed := []u8{cap: r.len + pk_seed.len}
+	seed << r
+	seed << pk_seed
+
+	mut inner := sha256.new()
+	inner.write(r)!
+	inner.write(pk_seed)!
+	inner.write(pk_root)!
+	inner.write(msg)!
+
+	innerhash := inner.sum([]u8{})
+
+	mut newseed := []u8{cap: seed.len + innerhash.len}
+	newseed << seed
+	newseed << innerhash
+
+	// mgf1(seed []u8, masklen int, mut h hash.Hash) ![]u8
+	return mgf1(newseed, outlen, mut h)!
+}
+
+// PRF(PK.seed, SK.seed, ADRS) = Trunc𝑛(SHA-256(PK.seed ∥ toByte(0, 64 − 𝑛) ∥ ADRS𝑐 ∥ SK.seed))
+fn (s &Sha2PRFCategory1) prf(pk_seed []u8, sk_seed []u8, adrs Address, outlen int) ![]u8 {
+	cadr := adrs.compress()
+	// For category 1, n == 16, and 64-16 = 48
+	size := pk_seed.len + 48 + 22 + sk_seed.len
+	mut data := []u8{cap: size}
+	data << pk_seed
+	data << to_byte(0, 64 - 16)
+	data << cadr
+	data << sk_seed
+
+	digest := sha256.sum256(data)
+	return digest[..outlen].clone()
+}
+
+fn (s &Sha2PRFCategory1) tl(pk_seed []u8, adrs Address, ml [][]u8, outlen int) ![]u8 {
+	// SLH-DSA Using SHA2 for Security Category 1
+	// Tℓ(PK.seed, ADRS, 𝑀ℓ) = Trunc𝑛(SHA-256(PK.seed ∥ toByte(0, 64 − 𝑛) ∥ ADRS𝑐 ∥ 𝑀ℓ))
+	cadrs := adrs.compress()
+
+	mut h := sha256.new()
+	h.write(pk_seed)!
+	h.write(to_byte(0, 48))!
+	h.write(cadrs)!
+	for item in ml {
+		h.write(item)!
+	}
+	out := h.sum([]u8{})
+	return out[0..outlen].clone()
+}
+
+fn (s &Sha2PRFCategory1) h(pk_seed []u8, adrs Address, m2 []u8, outlen int) ![]u8 {
+	// SLH-DSA Using SHA2 for Security Category 1
+	//
+	// H(PK.seed, ADRS, 𝑀2) = Trunc𝑛(SHA-256(PK.seed ∥ toByte(0, 64 − 𝑛) ∥ ADRS𝑐 ∥ 𝑀2))
+	addrs_c := addr.compress()
+	// get the size and n == 16
+	size := pk_seed.len + 48 + 22 + m2.len
+	mut data := []u8{cap: size}
+
+	data << pk_seed
+	data << to_byte(0, 64 - 16)
+	data << addrs_c
+	data << m2
+
+	digest := sha256.sum256(data)
+	return digest[..outlen].clone()
+}
+
+fn (s &Sha2PRFCategory1) f(pk_seed []u8, adrs Address, m1 []u8, outlen int) ![]u8 {
+	// 11.2.1 SLH-DSA Using SHA2 for Security Category 1
+	// F(PK.seed, ADRS, 𝑀1) = Trunc𝑛(SHA-256(PK.seed ∥ toByte(0, 64 − 𝑛) ∥ ADRS𝑐 ∥ 𝑀1))
+	addrs_c := addr.compress()
+	// get the size and n == 16
+	size := pk_seed.len + 48 + 22 + m1.len
+	mut data := []u8{cap: size}
+
+	// concatenates the message
+	data << pk_seed
+	data << to_byte(0, 64 - 16)
+	data << addrs_c
+	data << m1
+
+	digest := sha256.sum256(data)
+	return digest[..outlen].clone()
+}
+
+// 11.2.2 SLH-DSA Using SHA2 for Security Categories 3 and 5
+//
+struct Sha2PRFCategory3 {}
+
+fn (s &Sha2PRFCategory3) prf_msg(sk_prf []u8, opt_rand []u8, msg []u8, outlen int) []u8 {}
+
+fn (s &Sha2PRFCategory3) hmsg(r []u8, pk_seed []u8, pk_root []u8, msg []u8, outlen int) []u8 {}
+
+fn (s &Sha2PRFCategory3) prf(pk_seed []u8, sk_seed []u8, adrs Address, outlen int) []u8 {}
+
+fn (s &Sha2PRFCategory3) tl(pk_seed []u8, adrs Address, ml [][]u8, outlen int) []u8 {}
+
+fn (s &Sha2PRFCategory3) h(pk_seed []u8, adrs Address, m2 []u8, outlen int) []u8 {}
+
+fn (s &Sha2PRFCategory3) f(pk_seed []u8, adrs Address, m1 []u8, outlen int) []u8 {}
+
+// // 11.2.2 SLH-DSA Using SHA2 for Security Categories 5
+struct Sha2PRFCategory5 {}
+
+fn (s &Sha2PRFCategory5) prf_msg(sk_prf []u8, opt_rand []u8, msg []u8, outlen int) []u8 {}
+
+fn (s &Sha2PRFCategory5) hmsg(r []u8, pk_seed []u8, pk_root []u8, msg []u8, outlen int) []u8 {}
+
+fn (s &Sha2PRFCategory5) prf(pk_seed []u8, sk_seed []u8, adrs Address, outlen int) []u8 {}
+
+fn (s &Sha2PRFCategory5) tl(pk_seed []u8, adrs Address, ml [][]u8, outlen int) []u8 {}
+
+fn (s &Sha2PRFCategory5) h(pk_seed []u8, adrs Address, m2 []u8, outlen int) []u8 {}
+
+fn (s &Sha2PRFCategory5) f(pk_seed []u8, adrs Address, m1 []u8, outlen int) []u8 {}
+
+// Helpers for pseudorandom function
+//
+@[direct_array_access; inline]
+fn sha256_generic(n int, cadr CompressedAddress, pk_seed []u8, msg []u8, outlen int) ![]u8 {
+	mut h := sha256.new()
+	h.write(pk_seed)!
+	h.write(to_byte(0, 64 - n))!
+	h.write(cadr.bytes())!
+	h.write(nsg)!
+	out := h.sum([]u8{})
+	return out[0..outlen].clone()
+}
+
+@[direct_array_access; inline]
+fn sha512_generic(n int, cadr CompressedAddress, pk_seed []u8, msg []u8, outlen int) ![]u8 {
+	mut h := sha512.new()
+	h.write(pk_seed)!
+	h.write(to_byte(0, 128 - n))!
+	h.write(cadr.bytes())!
+	h.write(nsg)!
+	out := h.sum([]u8{})
+	return out[0..outlen].clone()
+}
+
+@[inline]
+fn hmac_sha256(seed []u8, data []u8) []u8 {
+	// fn new(key []u8, data []u8, hash_func fn ([]u8) []u8, blocksize int) []u8
+	return hmac.new(seed, data, sha256.sum256, sha256.block_size)
+}
+
+@[inline]
+fn hmac_sha512(seed []u8, data []u8) []u8 {
+	// fn new(key []u8, data []u8, hash_func fn ([]u8) []u8, blocksize int) []u8
+	return hmac.new(seed, data, sha512.sum512, sha512.block_size)
 }
 
 // The enumeration type of the SLH-DSA key.

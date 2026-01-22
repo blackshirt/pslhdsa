@@ -261,3 +261,13 @@ fn new_addrtype(v u32) !AddressType {
 		else { return error('Bad address type value') }
 	}
 }
+
+@[noinit]
+struct CompressedAddress {
+mut:
+	data [22]u8
+}
+
+fn (c CompressedAddress) bytes() []u8 {
+	return data[..]
+}

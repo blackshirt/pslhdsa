@@ -66,7 +66,7 @@ fn base_2exp_b(x []u8, b int, out_len int) []u32 {
 	mask := (u32(1) << b) - 1
 	mut out := []u32{cap: out_len}
 
-	for i := 0; out < out_len; out++ {
+	for i := 0; i < out_len; i++ {
 		for bits < b {
 			total = (total << 8) + x[idx]
 			idx += 1

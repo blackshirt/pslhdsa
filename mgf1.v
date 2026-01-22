@@ -2,7 +2,7 @@
 // Use of this source code is governed by an MIT license
 // that can be found in the LICENSE file.
 //
-// SLH-DSA Parameter Set
+// Mask Generation Function based on a hash function (MGF1)
 module pslhdsa
 
 import hash
@@ -10,7 +10,8 @@ import math
 import encoding.binary
 
 // B.2.1 MGF1
-// https://www.ietf.org/rfc/rfc3447.txt
+// Seehttps://www.ietf.org/rfc/rfc3447.txt
+//
 // MGF1 is a Mask Generation Function based on a hash function.
 //   MGF1 (mgfSeed, maskLen)
 //   Options:
@@ -21,9 +22,8 @@ import encoding.binary
 //   maskLen  intended length in octets of the mask, at most 2^32 hLen
 //   Output:
 //   mask     mask, an octet string of length maskLen
-
 @[direct_array_access; inline]
-fn mgf1(seed []u8, masklen int, mut h crypto.Hash) ![]u8 {
+fn mgf1(seed []u8, masklen int, mut h hash.Hash) ![]u8 {
 	// If maskLen > 2^32 hLen, output "mask too long" and stop.
 	// Its should happen, masklen was u32-based value
 	if u64(masklen) > u64(max_u32) * u64(h.size()) {
@@ -33,7 +33,7 @@ fn mgf1(seed []u8, masklen int, mut h crypto.Hash) ![]u8 {
 	mut maskout := []u8{len: masklen}
 
 	// Calculate how many hash outputs we need
-	hlen := u32(h.size())
+	hlen := h.size()
 	iterations := u32(math.ceil(f64(masklen) / f64(hlen)))
 
 	mut counter := []u8{len: 4}
@@ -61,7 +61,7 @@ fn mgf1(seed []u8, masklen int, mut h crypto.Hash) ![]u8 {
 		if remaining >= hlen {
 			copy(mut maskout[offset..offset + hlen], digest)
 		} else {
-			copy(maskout[offset..], digest[..remaining])
+			copy(mut maskout[offset..], digest[..remaining])
 			break
 		}
 	}

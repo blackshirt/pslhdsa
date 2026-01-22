@@ -2,7 +2,8 @@
 // Use of this source code is governed by an MIT license
 // that can be found in the LICENSE file.
 //
-// Mask Generation Function based on a hash function (MGF1)
+// Mask Generation Function based on a hash function (MGF1) x
+// used in accross of SLH-DSA
 module pslhdsa
 
 import hash
@@ -10,7 +11,7 @@ import math
 import encoding.binary
 
 // B.2.1 MGF1
-// Seehttps://www.ietf.org/rfc/rfc3447.txt
+// See https://www.ietf.org/rfc/rfc3447.txt
 //
 // MGF1 is a Mask Generation Function based on a hash function.
 //   MGF1 (mgfSeed, maskLen)
@@ -22,10 +23,14 @@ import encoding.binary
 //   maskLen  intended length in octets of the mask, at most 2^32 hLen
 //   Output:
 //   mask     mask, an octet string of length maskLen
+//
+// mgf1 is a mask generation function (MGF) is a cryptographic primitive similar
+// to a cryptographic hash function except that while a hash function's
+// output has a fixed size, a MGF supports output of a variable length.
 @[direct_array_access; inline]
 fn mgf1(seed []u8, masklen int, mut h hash.Hash) ![]u8 {
 	// If maskLen > 2^32 hLen, output "mask too long" and stop.
-	// Its should happen, masklen was u32-based value
+	// Its should never happen, masklen was int-based value
 	if u64(masklen) > u64(max_u32) * u64(h.size()) {
 		return error('mask too long')
 	}
@@ -55,7 +60,7 @@ fn mgf1(seed []u8, masklen int, mut h hash.Hash) ![]u8 {
 		// Calculate hash
 		digest := h.sum([]u8{})
 
-		// Copy to output buffer, ensuring we don't go beyond its end
+		// Copy to output buffer
 		offset := i * hlen
 		remaining := masklen - offset
 		if remaining >= hlen {

@@ -5,12 +5,16 @@
 // SLH-DSA Parameter Set
 module pslhdsa
 
+import crypto.sha3
+import crypto.sha256
+import cyrpto.sha512
+
 @[noinit]
 struct SlhContext {
 mut:
 	kind   Kind
-	psfunc ParamSetFuncs
-	ps     Param
+	psfunc PsFuncs
+	prm    Param
 }
 
 // SLH-DSA Parameter set
@@ -65,22 +69,101 @@ const paramset = {
 
 // Hash Functions and Pseudorandom Functions
 //
-// ParamSetFuncs is a hashing and or pseudorandom functions used in the mean time of SLH-DSA operation.
-interface ParamSetFuncs {
+// PsFuncs is a hashing and or pseudorandom functions used in the mean time of SLH-DSA operation.
+interface PsFuncs {
 	// pseudorandom function (PRF) that generates the randomizer (𝑅)
 	// for the randomized hashing of the message to be signed
-	prf_msg(sk_prf []u8, opt_rand []u8, msg []u8, outlen int) ![]u8
+	prf_msg(sk_prf []u8, opt_rand []u8, msg []u8, outlen int) []u8
 	// hmsg was used to generate the digest of the message to be signed.
-	hmsg(r []u8, pk_seed []u8, pk_root []u8, msg []u8, outlen int) ![]u8
+	hmsg(r []u8, pk_seed []u8, pk_root []u8, msg []u8, outlen int) []u8
 	// prf is a pseudorandom function  (PRF) that is used to generate the secret values
 	// in WOTS+ and FORS private keys.
-	prf(pk_seed []u8, sk_seed []u8, adrs Address, outlen int) ![]u8
+	prf(pk_seed []u8, sk_seed []u8, adrs Address, outlen int) []u8
 	// tlhash is a hash function that maps an ℓ𝑛-byte message to an 𝑛-byte message.
-	tlhash(pk_seed []u8, adrs Address, ml [][]u8, outlen int) ![]u8
+	tlhash(pk_seed []u8, adrs Address, ml [][]u8, outlen int) []u8
 	// hhash is a special case of Tℓ that takes a 2𝑛-byte message as input.
-	hhash(pk_seed []u8, adrs Address, m2 []u8, outlen int) ![]u8
+	hhash(pk_seed []u8, adrs Address, m2 []u8, outlen int) []u8
 	// fhash is a hash function that takes an 𝑛-byte message as input and produces an 𝑛-byte output.
-	fhash(pk_seed []u8, adrs Address, m1 []u8, outlen int) ![]u8
+	fhash(pk_seed []u8, adrs Address, m1 []u8, outlen int) []u8
+}
+
+// SHAKE based Parameter Set
+// See 11.1 SLH-DSA Using SHAKE
+struct ShakePs {}
+
+@[direct_array_access]
+fn (s ShakePs) prf_msg(sk_prf []u8, opt_rand []u8, msg []u8, outlen int) []u8 {
+	// PRF𝑚𝑠𝑔(SK.prf, 𝑜𝑝𝑡_𝑟𝑎𝑛𝑑, 𝑀 ) = SHAKE256(SK.prf ∥ 𝑜𝑝𝑡_𝑟𝑎𝑛𝑑 ∥ 𝑀, 8𝑛)
+	mut data := []u8{cap: sk_prf.len + opt_rand.len + msg.len}
+
+	data << sk_prf
+	data << opt_rand
+	data << msg
+
+	return sha3.shake256(data, outlen)
+}
+
+@[direct_array_access]
+fn (s ShakePs) hmsg(r []u8, pk_seed []u8, pk_root []u8, msg []u8, outlen int) []u8 {
+	size := r.len + pk_seed.len + pk_root.len + msg.len
+	mut data := []u8{cap: size}
+	data << r
+	data << pk_seed
+	data << pk_root
+	data << m
+	return sha3.shake256(data, outlen)
+}
+
+@[direct_array_access]
+fn (s ShakePs) prf(pk_seed []u8, sk_seed []u8, adrs Address, outlen int) []u8 {
+	// PRF(PK.seed, SK.seed, ADRS) = SHAKE256(PK.seed ∥ ADRS ∥ SK.seed, 8𝑛)
+	// adrs.bytes() = =32
+	size := pk_seed.len + sk_seed.len + 32 + sk_seed.len
+	mut data := []u8{cap: size}
+	data << pk_seed
+	data << addr.bytes()
+	data << sk_seed
+	return sha3.shake256(data, outlen)
+}
+
+@[direct_array_access]
+fn (s ShakePs) tlhash(pk_seed []u8, adrs Address, m1 [][]u8, outlen int) []u8 {
+	// Tℓ(PK.seed, ADRS, 𝑀ℓ) = SHAKE256(PK.seed ∥ ADRS ∥ 𝑀ℓ, 8𝑛)
+	mut m1size := 0
+	for o in m1 {
+		m1size += o.len
+	}
+	size := pk_seed.len + 32 + m1size
+	mut data := []u8{cap: size}
+	data << pk_seed
+	data << addr.bytes()
+	for item in m1 {
+		data << item
+	}
+
+	return sha3.shake256(data, outlen)
+}
+
+@[direct_array_access]
+fn (s ShakePs) hhash(pk_seed []u8, adrs Address, m2 []u8, outlen int) []u8 {
+	// H(PK.seed, ADRS, 𝑀2) = SHAKE256(PK.seed ∥ ADRS ∥ 𝑀2, 8𝑛)
+	mut data := []u8{cap: pk_seed.len + 32 + m2.len}
+	data << pk_seed
+	data << addr.bytes()
+	data << m2
+
+	return sha3.shake256(data, outlen)
+}
+
+@[direct_array_access]
+fn (s ShakePs) fhash(pk_seed []u8, adrs Address, m1 []u8, outlen int) []u8 {
+	// F(PK.seed, ADRS, 𝑀1) = SHAKE256(PK.seed ∥ ADRS ∥ 𝑀1, 8𝑛)
+	mut data := []u8{cap: pk_seed.len + 32 + m1.len}
+	data << pk_seed
+	data << addr.bytes()
+	data << m1
+
+	return sha3.shake256(data, outlen)
 }
 
 // The enumeration type of the SLH-DSA key.

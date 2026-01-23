@@ -5,9 +5,10 @@
 // SLH-DSA Parameter Set
 module pslhdsa
 
+import crypto.hmac
 import crypto.sha3
 import crypto.sha256
-import cyrpto.sha512
+import crypto.sha512
 
 @[noinit]
 struct SlhContext {
@@ -23,6 +24,27 @@ fn new_slhcontext(k Kind) !&SlhContext {
 		kind:   k
 		psfunc: new_psfunc(k)
 		prm:    new_param(k)
+	}
+}
+
+@[inline]
+fn new_psfunc(k Kind) PrfFuncs {
+	match k {
+		.shake_128f, .shake_128s, .shake_192f, .shake_192s, .shake_256f, .shake_256s {
+			return new_shakeprf()
+		}
+		// for the SLH-DSA-SHA2-128s and SLH-DSA-SHA2-128f parameter sets Using SHA2 for Security Category 1
+		.sha2_128f, .sha2_128s {
+			return new_sha2prf_cat1()
+		}
+		// for sha2_192s and sha2_192f has Security Category 3
+		.sha2_192f, .sha2_192s {
+			return new_sha2prf_cat3()
+		}
+		// otherwise is Security Category 5
+		.sha2_256f, .sha2_256s {
+			return new_sha2prf_cat5()
+		}
 	}
 }
 
@@ -66,7 +88,7 @@ fn new_param(k Kind) Param {
 
 // Table 2. SLH-DSA parameter sets
 const paramset = {
-	// 						     			id   𝑛  ℎ   𝑑  ℎp  𝑎  𝑘  𝑙𝑔𝑤 𝑚 sc pklen  siglen
+	// 						     		id   𝑛   ℎ   𝑑  ℎp  𝑎  𝑘  𝑙𝑔𝑤 𝑚  sc pklen siglen
 	'sha2_128s':  Param{'SLH-DSA-SHA2-128s', 16, 63, 7, 9, 12, 14, 4, 30, 1, 32, 7856}
 	'sha2_128f':  Param{'SLH-DSA-SHA2-128f', 16, 66, 22, 3, 6, 33, 4, 34, 1, 32, 17088}
 	'sha2_192s':  Param{'SLH-DSA-SHA2-192s', 24, 63, 7, 9, 14, 17, 4, 39, 3, 48, 16224}
@@ -88,18 +110,18 @@ const paramset = {
 interface PrfFuncs {
 	// pseudorandom function (PRF) that generates the randomizer (𝑅)
 	// for the randomized hashing of the message to be signed
-	prf_msg(sk_prf []u8, opt_rand []u8, msg []u8, outlen int) ![]u8
+	prf_msg(skprf []u8, optrand []u8, msg []u8, outlen int) ![]u8
 	// hmsg was used to generate the digest of the message to be signed.
-	hmsg(r []u8, pk_seed []u8, pk_root []u8, msg []u8, outlen int) ![]u8
+	hmsg(r []u8, pkseed []u8, pkroot []u8, msg []u8, outlen int) ![]u8
 	// prf is a pseudorandom function  (PRF) that is used to generate the secret values
 	// in WOTS+ and FORS private keys.
-	prf(pk_seed []u8, sk_seed []u8, adrs Address, outlen int) ![]u8
+	prf(pkseed []u8, skseed []u8, adr Address, outlen int) ![]u8
 	// tl is a hash function that maps an ℓ𝑛-byte message to an 𝑛-byte message.
-	tl(pk_seed []u8, adrs Address, ml [][]u8, outlen int) ![]u8
+	tl(pkseed []u8, adr Address, ml [][]u8, outlen int) ![]u8
 	// h is a special case of Tℓ that takes a 2𝑛-byte message as input.
-	h(pk_seed []u8, adrs Address, m2 []u8, outlen int) ![]u8
+	h(pkseed []u8, adr Address, m2 []u8, outlen int) ![]u8
 	// f is a hash function that takes an 𝑛-byte message as input and produces an 𝑛-byte output.
-	f(pk_seed []u8, adrs Address, m1 []u8, outlen int) ![]u8
+	f(pkseed []u8, adr Address, m1 []u8, outlen int) ![]u8
 }
 
 // SHAKE based SLH-DSA pseudorandom function
@@ -107,52 +129,56 @@ interface PrfFuncs {
 // See 11.1 SLH-DSA Using SHAKE
 struct ShakePrf {}
 
-@[direct_array_access]
-fn (s ShakePrf) prf_msg(sk_prf []u8, opt_rand []u8, msg []u8, outlen int) ![]u8 {
-	// PRF𝑚𝑠𝑔(SK.prf, 𝑜𝑝𝑡_𝑟𝑎𝑛𝑑, 𝑀 ) = SHAKE256(SK.prf ∥ 𝑜𝑝𝑡_𝑟𝑎𝑛𝑑 ∥ 𝑀, 8𝑛)
-	mut data := []u8{cap: sk_prf.len + opt_rand.len + msg.len}
+fn new_shakeprf() &ShakePrf {
+	return &ShakePrf{}
+}
 
-	data << sk_prf
-	data << opt_rand
+@[direct_array_access]
+fn (s &ShakePrf) prf_msg(skprf []u8, optrand []u8, msg []u8, outlen int) ![]u8 {
+	// PRF𝑚𝑠𝑔(SK.prf, 𝑜𝑝𝑡_𝑟𝑎𝑛𝑑, 𝑀 ) = SHAKE256(SK.prf ∥ 𝑜𝑝𝑡_𝑟𝑎𝑛𝑑 ∥ 𝑀, 8𝑛)
+	mut data := []u8{cap: skprf.len + optrand.len + msg.len}
+
+	data << skprf
+	data << optrand
 	data << msg
 
 	return sha3.shake256(data, outlen)
 }
 
 @[direct_array_access]
-fn (s ShakePrf) hmsg(r []u8, pk_seed []u8, pk_root []u8, msg []u8, outlen int) ![]u8 {
-	size := r.len + pk_seed.len + pk_root.len + msg.len
+fn (s &ShakePrf) hmsg(r []u8, pkseed []u8, pkroot []u8, msg []u8, outlen int) ![]u8 {
+	size := r.len + pkseed.len + pkroot.len + msg.len
 	mut data := []u8{cap: size}
 	data << r
-	data << pk_seed
-	data << pk_root
-	data << m
+	data << pkseed
+	data << pkroot
+	data << msg
 	return sha3.shake256(data, outlen)
 }
 
 @[direct_array_access]
-fn (s ShakePrf) prf(pk_seed []u8, sk_seed []u8, adrs Address, outlen int) ![]u8 {
+fn (s &ShakePrf) prf(pkseed []u8, skseed []u8, adr Address, outlen int) ![]u8 {
 	// PRF(PK.seed, SK.seed, ADRS) = SHAKE256(PK.seed ∥ ADRS ∥ SK.seed, 8𝑛)
-	// adrs.bytes() = =32
-	size := pk_seed.len + sk_seed.len + 32 + sk_seed.len
+	// adr.bytes() == 32
+	size := pkseed.len + skseed.len + 32 + skseed.len
 	mut data := []u8{cap: size}
-	data << pk_seed
-	data << addr.bytes()
-	data << sk_seed
+	data << pkseed
+	data << adr.bytes()
+	data << skseed
 	return sha3.shake256(data, outlen)
 }
 
 @[direct_array_access]
-fn (s ShakePrf) tl(pk_seed []u8, adrs Address, m1 [][]u8, outlen int) ![]u8 {
+fn (s &ShakePrf) tl(pkseed []u8, adr Address, m1 [][]u8, outlen int) ![]u8 {
 	// Tℓ(PK.seed, ADRS, 𝑀ℓ) = SHAKE256(PK.seed ∥ ADRS ∥ 𝑀ℓ, 8𝑛)
 	mut m1size := 0
 	for o in m1 {
 		m1size += o.len
 	}
-	size := pk_seed.len + 32 + m1size
+	size := pkseed.len + 32 + m1size
 	mut data := []u8{cap: size}
-	data << pk_seed
-	data << addr.bytes()
+	data << pkseed
+	data << adr.bytes()
 	for item in m1 {
 		data << item
 	}
@@ -161,22 +187,22 @@ fn (s ShakePrf) tl(pk_seed []u8, adrs Address, m1 [][]u8, outlen int) ![]u8 {
 }
 
 @[direct_array_access]
-fn (s ShakePrf) h(pk_seed []u8, adrs Address, m2 []u8, outlen int) ![]u8 {
+fn (s &ShakePrf) h(pkseed []u8, adr Address, m2 []u8, outlen int) ![]u8 {
 	// H(PK.seed, ADRS, 𝑀2) = SHAKE256(PK.seed ∥ ADRS ∥ 𝑀2, 8𝑛)
-	mut data := []u8{cap: pk_seed.len + 32 + m2.len}
-	data << pk_seed
-	data << addr.bytes()
+	mut data := []u8{cap: pkseed.len + 32 + m2.len}
+	data << pkseed
+	data << adr.bytes()
 	data << m2
 
 	return sha3.shake256(data, outlen)
 }
 
 @[direct_array_access]
-fn (s ShakePrf) f(pk_seed []u8, adrs Address, m1 []u8, outlen int) ![]u8 {
+fn (s &ShakePrf) f(pkseed []u8, adr Address, m1 []u8, outlen int) ![]u8 {
 	// F(PK.seed, ADRS, 𝑀1) = SHAKE256(PK.seed ∥ ADRS ∥ 𝑀1, 8𝑛)
-	mut data := []u8{cap: pk_seed.len + 32 + m1.len}
-	data << pk_seed
-	data << addr.bytes()
+	mut data := []u8{cap: pkseed.len + 32 + m1.len}
+	data << pkseed
+	data << adr.bytes()
 	data << m1
 
 	return sha3.shake256(data, outlen)
@@ -186,27 +212,31 @@ fn (s ShakePrf) f(pk_seed []u8, adrs Address, m1 []u8, outlen int) ![]u8 {
 //
 struct Sha2PRFCategory1 {}
 
+fn new_sha2prf_cat1() &Sha2PRFCategory1 {
+	return &Sha2PRFCategory1{}
+}
+
 // PRF𝑚𝑠𝑔(SK.prf, 𝑜𝑝𝑡_𝑟𝑎𝑛𝑑, 𝑀 ) = Trunc𝑛(HMAC-SHA-256(SK.prf, 𝑜𝑝𝑡_𝑟𝑎𝑛𝑑 ∥ 𝑀 ))
-fn (s &Sha2PRFCategory1) prf_msg(sk_prf []u8, opt_rand []u8, msg []u8, outlen int) ![]u8 {
-	mut data := []u8{cap: opt_rand.len + msg.len}
-	data << opt_rand
+fn (s &Sha2PRFCategory1) prf_msg(skprf []u8, optrand []u8, msg []u8, outlen int) ![]u8 {
+	mut data := []u8{cap: optrand.len + msg.len}
+	data << optrand
 	data << msg
 
-	digest := hmac_sha256(sk_prf, data)
+	digest := hmac_sha256(skprf, data)
 	return digest[..outlen].clone()
 }
 
-fn (s &Sha2PRFCategory1) hmsg(r []u8, pk_seed []u8, pk_root []u8, msg []u8, outlen int) ![]u8 {
+fn (s &Sha2PRFCategory1) hmsg(r []u8, pkseed []u8, pkroot []u8, msg []u8, outlen int) ![]u8 {
 	// H𝑚𝑠𝑔(𝑅, PK.seed, PK.root, 𝑀 ) = MGF1-SHA-256(𝑅 ∥ PK.seed ∥ SHA-256(𝑅 ∥ PK.seed ∥ PK.root ∥ 𝑀 ), 𝑚)
 	mut h := sha256.new()
-	mut seed := []u8{cap: r.len + pk_seed.len}
+	mut seed := []u8{cap: r.len + pkseed.len}
 	seed << r
-	seed << pk_seed
+	seed << pkseed
 
 	mut inner := sha256.new()
 	inner.write(r)!
-	inner.write(pk_seed)!
-	inner.write(pk_root)!
+	inner.write(pkseed)!
+	inner.write(pkroot)!
 	inner.write(msg)!
 
 	innerhash := inner.sum([]u8{})
@@ -220,27 +250,27 @@ fn (s &Sha2PRFCategory1) hmsg(r []u8, pk_seed []u8, pk_root []u8, msg []u8, outl
 }
 
 // PRF(PK.seed, SK.seed, ADRS) = Trunc𝑛(SHA-256(PK.seed ∥ toByte(0, 64 − 𝑛) ∥ ADRS𝑐 ∥ SK.seed))
-fn (s &Sha2PRFCategory1) prf(pk_seed []u8, sk_seed []u8, adrs Address, outlen int) ![]u8 {
-	cadr := adrs.compress()
+fn (s &Sha2PRFCategory1) prf(pkseed []u8, skseed []u8, adr Address, outlen int) ![]u8 {
+	cadr := adr.compress()
 	// For category 1, n == 16, and 64-16 = 48
-	size := pk_seed.len + 48 + 22 + sk_seed.len
+	size := pkseed.len + 48 + 22 + skseed.len
 	mut data := []u8{cap: size}
-	data << pk_seed
+	data << pkseed
 	data << to_byte(0, 64 - 16)
 	data << cadr
-	data << sk_seed
+	data << skseed
 
 	digest := sha256.sum256(data)
 	return digest[..outlen].clone()
 }
 
-fn (s &Sha2PRFCategory1) tl(pk_seed []u8, adrs Address, ml [][]u8, outlen int) ![]u8 {
+fn (s &Sha2PRFCategory1) tl(pkseed []u8, adr Address, ml [][]u8, outlen int) ![]u8 {
 	// SLH-DSA Using SHA2 for Security Category 1
 	// Tℓ(PK.seed, ADRS, 𝑀ℓ) = Trunc𝑛(SHA-256(PK.seed ∥ toByte(0, 64 − 𝑛) ∥ ADRS𝑐 ∥ 𝑀ℓ))
-	cadrs := adrs.compress()
+	cadrs := adr.compress()
 
 	mut h := sha256.new()
-	h.write(pk_seed)!
+	h.write(pkseed)!
 	h.write(to_byte(0, 48))!
 	h.write(cadrs)!
 	for item in ml {
@@ -250,93 +280,220 @@ fn (s &Sha2PRFCategory1) tl(pk_seed []u8, adrs Address, ml [][]u8, outlen int) !
 	return out[0..outlen].clone()
 }
 
-fn (s &Sha2PRFCategory1) h(pk_seed []u8, adrs Address, m2 []u8, outlen int) ![]u8 {
+fn (s &Sha2PRFCategory1) h(pkseed []u8, adr Address, m2 []u8, outlen int) ![]u8 {
 	// SLH-DSA Using SHA2 for Security Category 1
 	//
 	// H(PK.seed, ADRS, 𝑀2) = Trunc𝑛(SHA-256(PK.seed ∥ toByte(0, 64 − 𝑛) ∥ ADRS𝑐 ∥ 𝑀2))
-	addrs_c := addr.compress()
+	adrsc := adr.compress()
 	// get the size and n == 16
-	size := pk_seed.len + 48 + 22 + m2.len
+	size := pkseed.len + 48 + 22 + m2.len
 	mut data := []u8{cap: size}
 
-	data << pk_seed
+	data << pkseed
 	data << to_byte(0, 64 - 16)
-	data << addrs_c
+	data << adrsc
 	data << m2
 
 	digest := sha256.sum256(data)
 	return digest[..outlen].clone()
 }
 
-fn (s &Sha2PRFCategory1) f(pk_seed []u8, adrs Address, m1 []u8, outlen int) ![]u8 {
+fn (s &Sha2PRFCategory1) f(pkseed []u8, adr Address, m1 []u8, outlen int) ![]u8 {
 	// 11.2.1 SLH-DSA Using SHA2 for Security Category 1
 	// F(PK.seed, ADRS, 𝑀1) = Trunc𝑛(SHA-256(PK.seed ∥ toByte(0, 64 − 𝑛) ∥ ADRS𝑐 ∥ 𝑀1))
-	addrs_c := addr.compress()
+	adrsc := adr.compress()
 	// get the size and n == 16
-	size := pk_seed.len + 48 + 22 + m1.len
+	size := pkseed.len + 48 + 22 + m1.len
 	mut data := []u8{cap: size}
 
 	// concatenates the message
-	data << pk_seed
+	data << pkseed
 	data << to_byte(0, 64 - 16)
-	data << addrs_c
+	data << adrsc
 	data << m1
 
 	digest := sha256.sum256(data)
 	return digest[..outlen].clone()
 }
 
-// 11.2.2 SLH-DSA Using SHA2 for Security Categories 3 and 5
+// 11.2.2 SLH-DSA Using SHA2 for Security Categories 3
 //
+// n == 24
 struct Sha2PRFCategory3 {}
 
-fn (s &Sha2PRFCategory3) prf_msg(sk_prf []u8, opt_rand []u8, msg []u8, outlen int) []u8 {}
+fn new_sha2prf_cat3() &Sha2PRFCategory3 {
+	return &Sha2PRFCategory3{}
+}
 
-fn (s &Sha2PRFCategory3) hmsg(r []u8, pk_seed []u8, pk_root []u8, msg []u8, outlen int) []u8 {}
+@[direct_array_access]
+fn (s &Sha2PRFCategory3) prf_msg(skprf []u8, optrand []u8, msg []u8, outlen int) ![]u8 {
+	// SLH-DSA Using SHA2 for Security Categories 3
+	// PRF𝑚𝑠𝑔(SK.prf, 𝑜𝑝𝑡_𝑟𝑎𝑛𝑑, 𝑀 ) = Trunc𝑛(HMAC-SHA-512(SK.prf, 𝑜𝑝𝑡_𝑟𝑎𝑛𝑑 ∥ 𝑀 ))
+	mut data := []u8{cap: optrand.len + msg.len}
+	data << optrand
+	data << msg
 
-fn (s &Sha2PRFCategory3) prf(pk_seed []u8, sk_seed []u8, adrs Address, outlen int) []u8 {}
+	digest := hmac_sha512(skprf, data)
+	return digest[0..outlen].clone()
+}
 
-fn (s &Sha2PRFCategory3) tl(pk_seed []u8, adrs Address, ml [][]u8, outlen int) []u8 {}
+@[direct_array_access]
+fn (s &Sha2PRFCategory3) hmsg(r []u8, pkseed []u8, pkroot []u8, msg []u8, outlen int) ![]u8 {
+	// H𝑚𝑠𝑔(𝑅, PK.seed, PK.root, 𝑀 ) = MGF1-SHA-512(𝑅 ∥ PK.seed ∥ SHA-512(𝑅 ∥ PK.seed ∥ PK.root ∥ 𝑀 ), 𝑚)
+	mut h := sha512.new()
+	mut seed := []u8{cap: r.len + pkseed.len}
+	seed << r
+	seed << pkseed
 
-fn (s &Sha2PRFCategory3) h(pk_seed []u8, adrs Address, m2 []u8, outlen int) []u8 {}
+	mut inner := sha512.new()
 
-fn (s &Sha2PRFCategory3) f(pk_seed []u8, adrs Address, m1 []u8, outlen int) []u8 {}
+	inner.write(r)!
+	inner.write(pkseed)!
+	inner.write(pkroot)!
+	inner.write(msg)!
+	innerhash := inner.sum([]u8{})
+	seed << innerhash
 
-// // 11.2.2 SLH-DSA Using SHA2 for Security Categories 5
-struct Sha2PRFCategory5 {}
+	return mgf1(seed, outlen, mut h)
+}
 
-fn (s &Sha2PRFCategory5) prf_msg(sk_prf []u8, opt_rand []u8, msg []u8, outlen int) []u8 {}
-
-fn (s &Sha2PRFCategory5) hmsg(r []u8, pk_seed []u8, pk_root []u8, msg []u8, outlen int) []u8 {}
-
-fn (s &Sha2PRFCategory5) prf(pk_seed []u8, sk_seed []u8, adrs Address, outlen int) []u8 {}
-
-fn (s &Sha2PRFCategory5) tl(pk_seed []u8, adrs Address, ml [][]u8, outlen int) []u8 {}
-
-fn (s &Sha2PRFCategory5) h(pk_seed []u8, adrs Address, m2 []u8, outlen int) []u8 {}
-
-fn (s &Sha2PRFCategory5) f(pk_seed []u8, adrs Address, m1 []u8, outlen int) []u8 {}
-
-// Helpers for pseudorandom function
-//
-@[direct_array_access; inline]
-fn sha256_generic(n int, cadr CompressedAddress, pk_seed []u8, msg []u8, outlen int) ![]u8 {
+@[direct_array_access]
+fn (s &Sha2PRFCategory3) prf(pkseed []u8, skseed []u8, adr Address, outlen int) ![]u8 {
+	cadrs := adr.compress()
+	// security category 3, n == 24,
+	// PRF(PK.seed, SK.seed, ADRS) = Trunc𝑛(SHA-256(PK.seed ∥ toByte(0, 64 − 𝑛) ∥ ADRS𝑐 ∥ SK.seed))
 	mut h := sha256.new()
-	h.write(pk_seed)!
-	h.write(to_byte(0, 64 - n))!
-	h.write(cadr.bytes())!
-	h.write(nsg)!
+	h.write(pkseed)!
+	h.write(to_byte(0, 64 - 24))!
+	h.write(cadrs)!
+	h.write(skseed)!
 	out := h.sum([]u8{})
 	return out[0..outlen].clone()
 }
 
-@[direct_array_access; inline]
-fn sha512_generic(n int, cadr CompressedAddress, pk_seed []u8, msg []u8, outlen int) ![]u8 {
+@[direct_array_access]
+fn (s &Sha2PRFCategory3) tl(pkseed []u8, adr Address, ml [][]u8, outlen int) ![]u8 {
+	cadrs := adr.compress()
+	// Tℓ(PK.seed, ADRS, 𝑀ℓ) = Trunc𝑛(SHA-512(PK.seed ∥ toByte(0, 128 − 𝑛) ∥ ADRS𝑐 ∥ 𝑀ℓ))
 	mut h := sha512.new()
-	h.write(pk_seed)!
+	h.write(pkseed)!
+	h.write(to_byte(0, 128 - 24))!
+	h.write(cadrs)!
+	for val in ml {
+		h.write(val)!
+	}
+	out := h.sum([]u8{})
+	return out[0..outlen].clone()
+}
+
+@[direct_array_access]
+fn (s &Sha2PRFCategory3) h(pkseed []u8, adr Address, m2 []u8, outlen int) ![]u8 {
+	// H(PK.seed, ADRS, 𝑀2) = Trunc𝑛(SHA-512(PK.seed ∥ toByte(0, 128 − 𝑛) ∥ ADRS𝑐 ∥ 𝑀2))
+	return sha512_generic(24, pkseed, adr, m2, outlen)
+}
+
+@[direct_array_access]
+fn (s &Sha2PRFCategory3) f(pkseed []u8, adr Address, m1 []u8, outlen int) ![]u8 {
+	// F(PK.seed, ADRS, 𝑀1) = Trunc𝑛(SHA-256(PK.seed ∥ toByte(0, 64 − 𝑛) ∥ ADRS𝑐 ∥ 𝑀1))
+	return sha256_generic(24, pkseed, adr, m1, outlen)
+}
+
+// // 11.2.2 SLH-DSA Using SHA2 for Security Categories 5
+struct Sha2PRFCategory5 {}
+
+@[inline]
+fn new_sha2prf_cat5() &Sha2PRFCategory5 {
+	return &Sha2PRFCategory5{}
+}
+
+fn (s &Sha2PRFCategory5) prf_msg(skprf []u8, optrand []u8, msg []u8, outlen int) ![]u8 {
+	// SLH-DSA Using SHA2 for Security Categories 5
+	// PRF𝑚𝑠𝑔(SK.prf, 𝑜𝑝𝑡_𝑟𝑎𝑛𝑑, 𝑀 ) = Trunc𝑛(HMAC-SHA-512(SK.prf, 𝑜𝑝𝑡_𝑟𝑎𝑛𝑑 ∥ 𝑀 ))
+	mut data := []u8{}
+	data << optrand
+	data << msg
+	digest := hmac_sha512(skprf, data)
+
+	return digest[0..outlen].clone()
+}
+
+fn (s &Sha2PRFCategory5) hmsg(r []u8, pkseed []u8, pkroot []u8, msg []u8, outlen int) ![]u8 {
+	// H𝑚𝑠𝑔(𝑅, PK.seed, PK.root, 𝑀 ) = MGF1-SHA-512(𝑅 ∥ PK.seed ∥ SHA-512(𝑅 ∥ PK.seed ∥ PK.root ∥ 𝑀 ), 𝑚)
+	mut h := sha512.new()
+	mut seed := []u8{cap: 2 * r.len + 2 * pkseed.len + pkroot.len + msg.len}
+	seed << r
+	seed << pkseed
+
+	mut inner := sha512.new()
+	inner.write(r)!
+	inner.write(pkseed)!
+	inner.write(pkroot)!
+	inner.write(msg)!
+	innerhash := inner.sum([]u8{})
+	seed << innerhash
+
+	return mgf1(seed, outlen, mut h)
+}
+
+fn (s &Sha2PRFCategory5) prf(pkseed []u8, skseed []u8, adr Address, outlen int) ![]u8 {
+	cadrs := adr.compress()
+	// n == 32
+	mut h := sha256.new()
+	h.write(pkseed)!
+	h.write(to_byte(0, 64 - 32))!
+	h.write(cadrs)!
+	h.write(skseed)!
+	out := h.sum([]u8{})
+	return out[0..outlen].clone()
+}
+
+fn (s &Sha2PRFCategory5) tl(pkseed []u8, adr Address, ml [][]u8, outlen int) ![]u8 {
+	cadrs := adr.compress()
+	mut h := sha512.new()
+	h.write(pkseed)!
+	h.write(to_byte(0, 128 - 32))!
+	h.write(cadrs)!
+	for val in ml {
+		h.write(val)!
+	}
+	out := h.sum([]u8{})
+	return out[0..outlen].clone()
+}
+
+fn (s &Sha2PRFCategory5) h(pkseed []u8, adr Address, m2 []u8, outlen int) ![]u8 {
+	return sha512_generic(32, pkseed, adr, m2, outlen)
+}
+
+fn (s &Sha2PRFCategory5) f(pkseed []u8, adr Address, m1 []u8, outlen int) ![]u8 {
+	return sha256_generic(32, pkseed, adr, m1, outlen)
+}
+
+// Helpers for pseudorandom function
+//
+@[direct_array_access; inline]
+fn sha256_generic(n int, pkseed []u8, adr Address, msg []u8, outlen int) ![]u8 {
+	// SHA-512(PK.seed ∥ toByte(0, 128 − 𝑛) ∥ ADRS𝑐 ∥ 𝑀2))
+	cadr := adr.compress()
+
+	mut h := sha256.new()
+
+	h.write(pkseed)!
+	h.write(to_byte(0, 64 - n))!
+	h.write(cadr)!
+	h.write(msg)!
+	out := h.sum([]u8{})
+
+	return out[0..outlen].clone()
+}
+
+@[direct_array_access; inline]
+fn sha512_generic(n int, pkseed []u8, adr Address, msg []u8, outlen int) ![]u8 {
+	cadr := adr.compress()
+	mut h := sha512.new()
+	h.write(pkseed)!
 	h.write(to_byte(0, 128 - n))!
-	h.write(cadr.bytes())!
-	h.write(nsg)!
+	h.write(cadr)!
+	h.write(msg)!
 	out := h.sum([]u8{})
 	return out[0..outlen].clone()
 }

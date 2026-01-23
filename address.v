@@ -269,5 +269,5 @@ mut:
 }
 
 fn (c CompressedAddress) bytes() []u8 {
-	return data[..]
+	return c.data[..]
 }

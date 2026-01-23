@@ -11,7 +11,7 @@ import math
 import encoding.binary
 
 // B.2.1 MGF1
-// See https://www.ietf.org/rfc/rfc3447.txt
+// https://www.rfc-editor.org/rfc/rfc8017.html#appendix-B.2
 //
 // MGF1 is a Mask Generation Function based on a hash function.
 //   MGF1 (mgfSeed, maskLen)
@@ -24,9 +24,10 @@ import encoding.binary
 //   Output:
 //   mask     mask, an octet string of length maskLen
 //
-// mgf1 is a mask generation function (MGF) is a cryptographic primitive similar
+// mgf1 is a mask generation function (MGF) acts as a cryptographic primitive similar
 // to a cryptographic hash function except that while a hash function's
 // output has a fixed size, a MGF supports output of a variable length.
+// h is SHA-256 or SHA-512, respectively.
 @[direct_array_access; inline]
 fn mgf1(seed []u8, masklen int, mut h hash.Hash) ![]u8 {
 	// If maskLen > 2^32 hLen, output "mask too long" and stop.
@@ -70,5 +71,6 @@ fn mgf1(seed []u8, masklen int, mut h hash.Hash) ![]u8 {
 			break
 		}
 	}
+	// Output the leading maskLen octets of T as the octet string mask.
 	return maskout
 }

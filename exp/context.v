@@ -101,32 +101,32 @@ fn mgf1_sha512(seed []u8, mlen int) []u8 {
 //
 // H𝑚𝑠𝑔(𝑅, PK.seed, PK.root, 𝑀 ) (𝔹𝑛 × 𝔹𝑛 × 𝔹𝑛 × 𝔹∗ → 𝔹𝑚) is used to generate the
 // sha256_digest of the message to be signed.
-fn (mut c Context) h_msg(r []u8, pk_seed []u8, pk_root []u8, m []u8) ![]u8 {
+fn (mut c Context) h_msg(r []u8, pkseed []u8, pkroot []u8, msg []u8) ![]u8 {
 	if c.is_shake() {
 		// H𝑚𝑠𝑔(𝑅, PK.seed, PK.root, 𝑀 ) = SHAKE256(𝑅 ∥ PK.seed ∥ PK.root ∥ 𝑀, 8𝑚)
-		mut data := []u8{}
+		mut data := []u8{cap: r.len + pkseed.len + pkroot.len + msg.len}
 		data << r
-		data << pk_seed
-		data << pk_root
-		data << m
+		data << pkseed
+		data << pkroot
+		data << msg
 		return sha3.shake256(data, c.m)
 	}
 	// SLH-DSA Using SHA2 for Security Category 1
 	//
-	// mgf1_sha256(R + pk_seed + sha256(R + pk_seed + pk_root + M)
+	// mgf1_sha256(R + pkseed + sha256(R + pkseed + pkroot + M)
 	// H𝑚𝑠𝑔(𝑅, PK.seed, PK.root, 𝑀 ) = MGF1-SHA-256(𝑅 ∥ PK.seed ∥ SHA-256(𝑅 ∥ PK.seed ∥ PK.root ∥ 𝑀 ), 𝑚)
 	if c.kind == .sha2_128f || c.kind == .sha2_128s {
 		mut data := []u8{}
 		data << r
-		data << pk_seed
-		data << pk_root
+		data << pkseed
+		data << pkroot
 		data << m
 
 		digest := sha256.sum256(data)
 
 		mut seed := []u8{}
 		seed << r
-		seed << pk_seed
+		seed << pkseed
 		seed << digest
 
 		return mgf1_sha256(seed, c.m)
@@ -139,15 +139,15 @@ fn (mut c Context) h_msg(r []u8, pk_seed []u8, pk_root []u8, m []u8) ![]u8 {
 	// H𝑚𝑠𝑔(𝑅, PK.seed, PK.root, 𝑀 ) = MGF1-SHA-512(𝑅 ∥ PK.seed ∥ SHA-512(𝑅 ∥ PK.seed ∥ PK.root ∥ 𝑀 ), 𝑚)
 	mut data := []u8{}
 	data << r
-	data << pk_seed
-	data << pk_root
+	data << pkseed
+	data << pkroot
 	data << m
 
 	digest := sha512.sum512(data)
 
 	mut seed := []u8{}
 	seed << r
-	seed << pk_seed
+	seed << pkseed
 	seed << digest
 
 	return mgf1_sha512(seed, c.m)
@@ -155,11 +155,11 @@ fn (mut c Context) h_msg(r []u8, pk_seed []u8, pk_root []u8, m []u8) ![]u8 {
 
 // PRF(PK.seed, SK.seed, ADRS) (𝔹𝑛 × 𝔹𝑛 × 𝔹32 → 𝔹𝑛) is a PRF that is used to
 // generate the secret values in WOTS+ and FORS private keys.
-fn (mut c Context) prf(pk_seed []u8, sk_seed []u8, addr Address) ![]u8 {
+fn (mut c Context) prf(pkseed []u8, sk_seed []u8, addr Address) ![]u8 {
 	if c.is_shake() {
 		// PRF(PK.seed, SK.seed, ADRS) = SHAKE256(PK.seed ∥ ADRS ∥ SK.seed, 8𝑛)
 		mut data := []u8{}
-		data << pk_seed
+		data << pkseed
 		data << addr.bytes()
 		data << sk_seed
 		return sha3.shake256(data, c.n)
@@ -170,7 +170,7 @@ fn (mut c Context) prf(pk_seed []u8, sk_seed []u8, addr Address) ![]u8 {
 	addrs_c := addr.compress()
 	if c.kind == .sha2_128f || c.kind == .sha2_128s {
 		mut data := []u8{}
-		data << pk_seed
+		data << pkseed
 		data << to_byte(0, 64 - c.n)
 		data << addrs_c
 		data << sk_seed
@@ -183,7 +183,7 @@ fn (mut c Context) prf(pk_seed []u8, sk_seed []u8, addr Address) ![]u8 {
 	// PRF(PK.seed, SK.seed, ADRS) = Trunc𝑛(SHA-256(PK.seed ∥ toByte(0, 64 − 𝑛) ∥ ADRS𝑐 ∥ SK.seed))
 	// Really the same with category 1
 	mut data := []u8{}
-	data << pk_seed
+	data << pkseed
 	data << to_byte(0, 64 - c.n)
 	data << addrs_c
 	data << sk_seed
@@ -195,12 +195,12 @@ fn (mut c Context) prf(pk_seed []u8, sk_seed []u8, addr Address) ![]u8 {
 // PRF𝑚𝑠𝑔(SK.prf, 𝑜𝑝𝑡_𝑟𝑎𝑛𝑑, 𝑀 ) (𝔹𝑛 × 𝔹𝑛 × 𝔹∗ → 𝔹𝑛) is a pseudorandom function
 // (PRF) that generates the randomizer (𝑅) for the randomized hashing of the message to be
 // signed.
-fn (mut c Context) prf_msg(sk_prf []u8, opt_rand []u8, msg []u8) ![]u8 {
+fn (mut c Context) prf_msg(skprf []u8, optrand []u8, msg []u8) ![]u8 {
 	if c.is_shake() {
 		// PRF𝑚𝑠𝑔(SK.prf, 𝑜𝑝𝑡_𝑟𝑎𝑛𝑑, 𝑀 ) = SHAKE256(SK.prf ∥ 𝑜𝑝𝑡_𝑟𝑎𝑛𝑑 ∥ 𝑀, 8𝑛)
-		mut data := []u8{}
-		data << sk_prf
-		data << opt_rand
+		mut data := []u8{cap: skprf.len + optrand.len + msg.len}
+		data << skprf
+		data << optrand
 		data << msg
 
 		return sha3.shake256(data, c.n)
@@ -210,30 +210,30 @@ fn (mut c Context) prf_msg(sk_prf []u8, opt_rand []u8, msg []u8) ![]u8 {
 	//
 	// PRF𝑚𝑠𝑔(SK.prf, 𝑜𝑝𝑡_𝑟𝑎𝑛𝑑, 𝑀 ) = Trunc𝑛(HMAC-SHA-256(SK.prf, 𝑜𝑝𝑡_𝑟𝑎𝑛𝑑 ∥ 𝑀 ))
 	if c.kind == .sha2_128f || c.kind == .sha2_128s {
-		mut data := []u8{}
-		data << opt_rand
+		mut data := []u8{cap: optrand.len + msg.len}
+		data << optrand
 		data << msg
 
-		digest := hmac_sha256(sk_prf, data)
+		digest := hmac_sha256(skprf, data)
 		return digest[..c.n]
 	}
 	// SLH-DSA Using SHA2 for Security Categories 3 and 5
 	// PRF𝑚𝑠𝑔(SK.prf, 𝑜𝑝𝑡_𝑟𝑎𝑛𝑑, 𝑀 ) = Trunc𝑛(HMAC-SHA-512(SK.prf, 𝑜𝑝𝑡_𝑟𝑎𝑛𝑑 ∥ 𝑀 ))
 	mut data := []u8{}
-	data << opt_rand
+	data << optrand
 	data << msg
-	digest := hmac_sha512(sk_prf, data)
+	digest := hmac_sha512(skprf, data)
 
 	return digest[..c.n]
 }
 
 // F(PK.seed, ADRS, 𝑀1) (𝔹𝑛 × 𝔹32 × 𝔹𝑛 → 𝔹𝑛) is a hash function that takes an 𝑛-byte
 // message as input and produces an 𝑛-byte output.
-fn (mut c Context) f(pk_seed []u8, addr Address, m1 []u8) ![]u8 {
+fn (mut c Context) f(pkseed []u8, addr Address, m1 []u8) ![]u8 {
 	if c.is_shake() {
 		// F(PK.seed, ADRS, 𝑀1) = SHAKE256(PK.seed ∥ ADRS ∥ 𝑀1, 8𝑛)
 		mut data := []u8{}
-		data << pk_seed
+		data << pkseed
 		data << addr.bytes()
 		data << m1
 
@@ -244,7 +244,7 @@ fn (mut c Context) f(pk_seed []u8, addr Address, m1 []u8) ![]u8 {
 	addrs_c := addr.compress()
 	if c.kind == .sha2_128s || c.kind == .sha2_128f {
 		mut data := []u8{}
-		data << pk_seed
+		data << pkseed
 		data << to_byte(0, 64 - c.n)
 		data << addrs_c
 		data << m1
@@ -256,7 +256,7 @@ fn (mut c Context) f(pk_seed []u8, addr Address, m1 []u8) ![]u8 {
 	//
 	// F(PK.seed, ADRS, 𝑀1) = Trunc𝑛(SHA-256(PK.seed ∥ toByte(0, 64 − 𝑛) ∥ ADRS𝑐 ∥ 𝑀1))
 	mut data := []u8{}
-	data << pk_seed
+	data << pkseed
 	data << to_byte(0, 64 - c.n)
 	data << addrs_c
 	data << m1
@@ -267,11 +267,11 @@ fn (mut c Context) f(pk_seed []u8, addr Address, m1 []u8) ![]u8 {
 
 // H(PK.seed, ADRS, 𝑀2) (𝔹𝑛 × 𝔹32 × 𝔹2𝑛 → 𝔹𝑛) is a special case of Tℓ that takes a
 // 2𝑛-byte message as input.
-fn (mut c Context) h(pk_seed []u8, addr Address, m2 []u8) ![]u8 {
+fn (mut c Context) h(pkseed []u8, addr Address, m2 []u8) ![]u8 {
 	if c.is_shake() {
 		// H(PK.seed, ADRS, 𝑀2) = SHAKE256(PK.seed ∥ ADRS ∥ 𝑀2, 8𝑛)
 		mut data := []u8{}
-		data << pk_seed
+		data << pkseed
 		data << addr.bytes()
 		data << m2
 
@@ -284,7 +284,7 @@ fn (mut c Context) h(pk_seed []u8, addr Address, m2 []u8) ![]u8 {
 	// H(PK.seed, ADRS, 𝑀2) = Trunc𝑛(SHA-256(PK.seed ∥ toByte(0, 64 − 𝑛) ∥ ADRS𝑐 ∥ 𝑀2))
 	if c.kind == .sha2_128f || c.kind == .sha2_128s {
 		mut data := []u8{}
-		data << pk_seed
+		data << pkseed
 		data << to_byte(0, 64 - c.n)
 		data << addrs_c
 		data << m2
@@ -296,7 +296,7 @@ fn (mut c Context) h(pk_seed []u8, addr Address, m2 []u8) ![]u8 {
 	//
 	// H(PK.seed, ADRS, 𝑀2) = Trunc𝑛(SHA-512(PK.seed ∥ toByte(0, 128 − 𝑛) ∥ ADRS𝑐 ∥ 𝑀2))
 	mut data := []u8{}
-	data << pk_seed
+	data << pkseed
 	data << to_byte(0, 128 - c.n)
 	data << addrs_c
 	data << m2
@@ -307,12 +307,12 @@ fn (mut c Context) h(pk_seed []u8, addr Address, m2 []u8) ![]u8 {
 
 // Tℓ(PK.seed, ADRS, 𝑀ℓ) (𝔹𝑛 × 𝔹32 × 𝔹ℓ𝑛 → 𝔹𝑛) is a hash function that maps an
 // ℓ𝑛-byte message to an 𝑛-byte message.
-fn (mut c Context) tlen(pk_seed []u8, addr Address, ml []u8) ![]u8 {
+fn (mut c Context) tlen(pkseed []u8, addr Address, ml []u8) ![]u8 {
 	assert ml.len % c.n == 0
 	if c.is_shake() {
 		// Tℓ(PK.seed, ADRS, 𝑀ℓ) = SHAKE256(PK.seed ∥ ADRS ∥ 𝑀ℓ, 8𝑛)
 		mut data := []u8{}
-		data << pk_seed
+		data << pkseed
 		data << addr.bytes()
 		data << ml
 
@@ -325,7 +325,7 @@ fn (mut c Context) tlen(pk_seed []u8, addr Address, ml []u8) ![]u8 {
 	addrs_c := addr.compress()
 	if c.kind == .sha2_128f || c.kind == .sha2_128s {
 		mut data := []u8{}
-		data << pk_seed
+		data << pkseed
 		data << to_byte(0, 64 - c.n)
 		data << addrs_c
 		data << ml
@@ -337,7 +337,7 @@ fn (mut c Context) tlen(pk_seed []u8, addr Address, ml []u8) ![]u8 {
 	//
 	// Tℓ(PK.seed, ADRS, 𝑀ℓ) = Trunc𝑛(SHA-512(PK.seed ∥ toByte(0, 128 − 𝑛) ∥ ADRS𝑐 ∥ 𝑀ℓ))
 	mut data := []u8{}
-	data << pk_seed
+	data << pkseed
 	data << to_byte(0, 128 - c.n)
 	data << addrs_c
 	data << ml

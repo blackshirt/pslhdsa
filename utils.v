@@ -4,6 +4,21 @@
 //
 module pslhdsa
 
+// Algorithm 1 gen_len2(𝑛, 𝑙𝑔𝑤)
+@[inline]
+fn gen_len2(n int, lgw int) int {
+	w := 1 << lgw
+	len1 := ((n << 3) + lgw - 1) / lgw
+	max_checksum := len1 * (w - 1)
+	mut len2 := 1
+	mut capacity := w
+	for capacity <= max_checksum {
+		len2 += 1
+		capacity *= w
+	}
+	return len2
+}
+
 // Algorithm 2 toInt(𝑋, 𝑛)
 //
 // Converts a byte string to an integer
@@ -56,9 +71,6 @@ fn cdiv(n int, k int) int {
 // into arrays of base-𝑤 integers.
 @[direct_array_access; inline]
 fn base_2exp_b(x []u8, b int, outlen int) []u32 {
-	assert b > 0
-	assert outlen > 0
-
 	mut idx := 0
 	mut bits := 0
 	mut total := u32(0)
@@ -68,7 +80,7 @@ fn base_2exp_b(x []u8, b int, outlen int) []u32 {
 
 	for i := 0; i < outlen; i++ {
 		for bits < b {
-			total = (total << 8) + x[idx]
+			total = (total << 8) + u32(x[idx])
 			idx += 1
 			bits += 8
 		}

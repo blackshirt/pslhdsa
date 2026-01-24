@@ -2,8 +2,7 @@
 // Use of this source code is governed by an MIT license
 // that can be found in the LICENSE file.
 //
-// Mask Generation Function based on a hash function (MGF1) x
-// used in accross of SLH-DSA
+// Mask Generation Function based on a hash function (MGF1) used in across of SLH-DSA
 module pslhdsa
 
 import hash

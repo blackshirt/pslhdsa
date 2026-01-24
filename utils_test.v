@@ -1,3 +1,11 @@
+// Copyright © 2024 blackshirt.
+// Use of this source code is governed by an MIT license
+// that can be found in the LICENSE file.
+//
+// The test for utility algorithm used across the module
+// The material mostly taken and adapted from Go implementation of slh-dsa
+// Credits to original author
+// See https://github.com/trailofbits/go-slh-dsa
 module pslhdsa
 
 struct Glen2Test {

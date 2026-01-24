@@ -2,7 +2,7 @@
 // Use of this source code is governed by an MIT license
 // that can be found in the LICENSE file.
 //
-// SLH-DSA Parameter Set
+// SLH-DSA Parameter Set and context opaque to work on SLH-DSA parameter set
 module pslhdsa
 
 import hash
@@ -11,31 +11,37 @@ import crypto.sha3
 import crypto.sha256
 import crypto.sha512
 
-// new_slhcontext creates a new SLH-DSA Context to operate on
+// SLH-DSA Context
+//
+@[noinit]
+struct Context {
+mut:
+	// The kind (type) of this SLH-DSA context, set on context creation
+	kind Kind
+	// Underlying SLH-DSA parameter set described in the doc
+	prm Param
+}
+
+// new_context creates a new SLH-DSA Context to operate on
 @[inline]
-fn new_slhcontext(k Kind) &SlhContext {
-	return &SlhContext{
+fn new_context(k Kind) &Context {
+	return &Context{
 		kind: k
 		prm:  new_param(k)
 	}
 }
 
-// SLH-DSA Context
+// Hash Addressing and Pseudorandom Functions for SLH-DSA context
 //
-@[noinit]
-struct SlhContext {
-mut:
-	kind Kind // set on creation
-	prm  Param
-}
 
-// pseudorandom function (PRF) that generates the randomizer (𝑅)
+// prf_msg is a pseudorandom function (PRF) that generates the randomizer (𝑅)
 // for the randomized hashing of the message to be signed
 @[direct_array_access]
-fn (c &SlhContext) prf_msg(skprf []u8, optrand []u8, msg []u8, outlen int) ![]u8 {
-	// we set it a bigger capacity for sha2 to include skprf.len
+fn (c &Context) prf_msg(skprf []u8, optrand []u8, msg []u8, outlen int) ![]u8 {
+	// setup buffer with enough capacity to avoid reallocation
 	mut data := []u8{cap: skprf.len + optrand.len + msg.len}
 
+	// Is this context was a SHAKE-based type? If yes procees with SHAKE-based PRF
 	// For SHAKE-based family, use SHAKE256 hash
 	//
 	// PRF𝑚𝑠𝑔(SK.prf, 𝑜𝑝𝑡_𝑟𝑎𝑛𝑑, 𝑀 ) = SHAKE256(SK.prf ∥ 𝑜𝑝𝑡_𝑟𝑎𝑛𝑑 ∥ 𝑀, 8𝑛)
@@ -46,33 +52,37 @@ fn (c &SlhContext) prf_msg(skprf []u8, optrand []u8, msg []u8, outlen int) ![]u8
 		// return the shake256 digest
 		return sha3.shake256(data, outlen)
 	}
-	// Otherwise, process for SHA2-family, begin by appending into buffer
+	// Otherwise, process with SHA2-based type
+	//
+	// begin by appending into data buffer
 	data << optrand
 	data << msg
 
-	// For security category 1, use HMAC-SHA-256 PRF
+	// For SHA2-based type with security category 1, use HMAC-SHA-256 PRF
 	//
 	// PRF𝑚𝑠𝑔(SK.prf, 𝑜𝑝𝑡_𝑟𝑎𝑛𝑑, 𝑀 ) = Trunc𝑛(HMAC-SHA-256(SK.prf, 𝑜𝑝𝑡_𝑟𝑎𝑛𝑑 ∥ 𝑀 ))
 	if c.is_sha2family_cat1() {
 		digest := hmac_sha256(skprf, data)
 		return digest[..outlen].clone()
 	}
-	// otherwise, belongs to security categories 3 and 5 and use HMAC-SHA-512 PRF
+	// Otherwise, its should belong to type with security categories 3 or 5 and use HMAC-SHA-512 PRF
 	//
 	// PRF𝑚𝑠𝑔(SK.prf, 𝑜𝑝𝑡_𝑟𝑎𝑛𝑑, 𝑀 ) = Trunc𝑛(HMAC-SHA-512(SK.prf, 𝑜𝑝𝑡_𝑟𝑎𝑛𝑑 ∥ 𝑀 ))
 	digest := hmac_sha512(skprf, data)
+
+	// return the clone with appropriate outlen size
 	return digest[0..outlen].clone()
 }
 
 // hmsg was used to generate the digest of the message to be signed.
 @[direct_array_access]
-fn (c &SlhContext) hmsg(r []u8, pkseed []u8, pkroot []u8, msg []u8, outlen int) ![]u8 {
+fn (c &Context) hmsg(r []u8, pkseed []u8, pkroot []u8, msg []u8, outlen int) ![]u8 {
 	// setup buffer size to avoid reallocation by initializing enough capacity
 	mut basic_size := r.len + pkseed.len + pkroot.len + msg.len
 	size := if c.is_shake_family() { basic_size } else { basic_size + r.len + pkseed.len }
 	mut data := []u8{cap: size}
 
-	// SHAKE-based family
+	// Is this context was SHAKE-based family?
 	//
 	// H𝑚𝑠𝑔(𝑅, PK.seed, PK.root, 𝑀 ) = SHAKE256(𝑅 ∥ PK.seed ∥ PK.root ∥ 𝑀, 8𝑚)
 	if c.is_shake_family() {
@@ -98,7 +108,7 @@ fn (c &SlhContext) hmsg(r []u8, pkseed []u8, pkroot []u8, msg []u8, outlen int) 
 	mut h := c.sha2_prf()!
 	mut inner := c.sha2_prf()!
 
-	// write the data, SHA-256(or 512) (𝑅 ∥ PK.seed ∥ PK.root ∥ 𝑀 )
+	// write the data into hash, SHA-256(or 512) (𝑅 ∥ PK.seed ∥ PK.root ∥ 𝑀 )
 	inner.write(r)!
 	inner.write(pkseed)!
 	inner.write(pkroot)!
@@ -107,7 +117,7 @@ fn (c &SlhContext) hmsg(r []u8, pkseed []u8, pkroot []u8, msg []u8, outlen int) 
 	// The (𝑅 ∥ PK.seed ∥ PK.root ∥ 𝑀 ) digest
 	innerhash := inner.sum([]u8{})
 
-	// data as a new seed
+	// data acts as a new seed
 	data << twos
 	data << innerhash
 
@@ -117,7 +127,8 @@ fn (c &SlhContext) hmsg(r []u8, pkseed []u8, pkroot []u8, msg []u8, outlen int) 
 
 // prf is a pseudorandom function  (PRF) that is used to generate the secret values
 // in WOTS+ and FORS private keys.
-fn (c &SlhContext) prf(pkseed []u8, skseed []u8, adr Address, outlen int) ![]u8 {
+@[direct_array_access]
+fn (c &Context) prf(pkseed []u8, skseed []u8, adr Address, outlen int) ![]u8 {
 	// SHAKE-based PRF
 	//
 	// PRF(PK.seed, SK.seed, ADRS) = SHAKE256(PK.seed ∥ ADRS ∥ SK.seed, 8𝑛)
@@ -130,6 +141,8 @@ fn (c &SlhContext) prf(pkseed []u8, skseed []u8, adr Address, outlen int) ![]u8 
 		data << skseed
 		return sha3.shake256(data, outlen)
 	}
+	// Otherwise, its a SHA2-based PRF
+	//
 	// For SHA2-based PRF using SHA-256, only differs on n number, depends on the security category
 	// of underlying kind of SLH-DSA parameter set
 	// ie, n = 16, n = 24 and n = 32 for security category 1, 3 and 5 respectively
@@ -153,30 +166,33 @@ fn (c &SlhContext) prf(pkseed []u8, skseed []u8, adr Address, outlen int) ![]u8 
 
 	// generates the digest, and return it
 	digest := h.sum([]u8{})
+
+	// Only returns the clone of appropriate outlen size
 	return digest[0..outlen].clone()
 }
 
 // tl is a hash function that maps an ℓ𝑛-byte message to an 𝑛-byte message.
-fn (c &SlhContext) tl(pkseed []u8, adr Address, mln [][]u8, outlen int) ![]u8 {
+@[direct_array_access]
+fn (c &Context) tl(pkseed []u8, adr Address, msgsln [][]u8, outlen int) ![]u8 {
 	// SHAKE-based PRF
 	//
 	// Tℓ(PK.seed, ADRS, 𝑀ℓ) = SHAKE256(PK.seed ∥ ADRS ∥ 𝑀ℓ, 8𝑛)
 	if c.is_shake_family() {
 		mut mlsize := 0
-		for o in mln {
+		for o in msgsln {
 			mlsize += o.len
 		}
 		size := pkseed.len + 32 + mlsize
 		mut data := []u8{cap: size}
 		data << pkseed
 		data << adr.bytes()
-		for item in mln {
+		for item in msgsln {
 			data << item
 		}
 
 		return sha3.shake256(data, outlen)
 	}
-	// SHA2-based PRF
+	// Otherwise its a SHA2-based PRF
 	//
 	// For SHA2 family with security category 1, its using SHA-256 hash
 	// 		Tℓ(PK.seed, ADRS, 𝑀ℓ) = Trunc𝑛(SHA-256(PK.seed ∥ toByte(0, 64 − 𝑛) ∥ ADRS𝑐 ∥ 𝑀ℓ))
@@ -190,27 +206,30 @@ fn (c &SlhContext) tl(pkseed []u8, adr Address, mln [][]u8, outlen int) ![]u8 {
 	cadrs := adr.compress()
 	// write PK.seed
 	h.write(pkseed)!
+
 	// write toByte content based on the hash
 	// NOTE: we using c.prm.n directly
-	if c.is_sha2family_cat1() {
-		h.write(to_byte(0, 64 - c.prm.n))!
-	} else {
-		h.write(to_byte(0, 128 - c.prm.n))!
-	}
+	//
+	// setup base number for toByte calculation
+	bnum := if c.is_sha2family_cat1() { 64 } else { 128 }
+	h.write(to_byte(0, bnum - c.prm.n))!
 
 	// write compressed address, ADRS𝑐
 	h.write(cadrs)!
-	// write mln messages
-	for item in mln {
+	// write every message in the msgsln array into hash
+	for item in msgsln {
 		h.write(item)!
 	}
 	// generate the digest
 	digest := h.sum([]u8{})
+
+	// return with appropriate outlen size
 	return digest[0..outlen].clone()
 }
 
 // h is a special case of Tℓ that takes a 2𝑛-byte message as input.
-fn (c &SlhContext) h(pkseed []u8, adr Address, m2 []u8, outlen int) ![]u8 {
+@[direct_array_access]
+fn (c &Context) h(pkseed []u8, adr Address, m2 []u8, outlen int) ![]u8 {
 	// SHAKE-based PRF
 	//
 	// H(PK.seed, ADRS, 𝑀2) = SHAKE256(PK.seed ∥ ADRS ∥ 𝑀2, 8𝑛)
@@ -222,14 +241,14 @@ fn (c &SlhContext) h(pkseed []u8, adr Address, m2 []u8, outlen int) ![]u8 {
 
 		return sha3.shake256(data, outlen)
 	}
-	// SHA2-based PRF
+	// Otherwise, its a SHA2-based PRF
 	//
-	// Security category 1, was using SHA-256
+	// For Security category 1 use SHA-256 PRF
 	// H(PK.seed, ADRS, 𝑀2) = Trunc𝑛(SHA-256(PK.seed ∥ toByte(0, 64 − 𝑛) ∥ ADRS𝑐 ∥ 𝑀2))
 	if c.is_sha2family_cat1() {
 		return sha256_caddr_generic(c.prm.n, pkseed, adr, m2, outlen)
 	}
-	// otherwise,  its have a security category 3 and 5 using SHA-512 PRF
+	// Other else should have a security category 3 or 5 using SHA-512 PRF
 	//
 	// H(PK.seed, ADRS, 𝑀2) = Trunc𝑛(SHA-512(PK.seed ∥ toByte(0, 128 − 𝑛) ∥ ADRS𝑐 ∥ 𝑀2))
 	return sha512_caddr_generic(c.prm.n, pkseed, adr, m2, outlen)
@@ -237,7 +256,7 @@ fn (c &SlhContext) h(pkseed []u8, adr Address, m2 []u8, outlen int) ![]u8 {
 
 // f is a hash function that takes an 𝑛-byte message as input and produces an 𝑛-byte output.
 @[direct_array_access]
-fn (c &SlhContext) f(pkseed []u8, adr Address, m1 []u8, outlen int) ![]u8 {
+fn (c &Context) f(pkseed []u8, adr Address, m1 []u8, outlen int) ![]u8 {
 	// SHAKE-based PRF
 	//
 	// F(PK.seed, ADRS, 𝑀1) = SHAKE256(PK.seed ∥ ADRS ∥ 𝑀1, 8𝑛)
@@ -256,6 +275,7 @@ fn (c &SlhContext) f(pkseed []u8, adr Address, m1 []u8, outlen int) ![]u8 {
 	// 1 : 		F(PK.seed, ADRS, 𝑀1) = Trunc𝑛(SHA-256(PK.seed ∥ toByte(0, 64 − 𝑛) ∥ ADRS𝑐 ∥ 𝑀1))
 	// 3 and 5: F(PK.seed, ADRS, 𝑀1) = Trunc𝑛(SHA-256(PK.seed ∥ toByte(0, 64 − 𝑛) ∥ ADRS𝑐 ∥ 𝑀1))
 	// NOTE: use context prm.n number directly
+	//
 	return sha256_caddr_generic(c.prm.n, pkseed, adr, m1, outlen)
 }
 
@@ -286,13 +306,15 @@ fn sha512_caddr_generic(n int, pkseed []u8, adr Address, msg []u8, outlen int) !
 	return out[0..outlen].clone()
 }
 
-@[inline]
+// hmac_sha256 creates HMAC bytes with SHA256 hash
+@[direct_array_access; inline]
 fn hmac_sha256(seed []u8, data []u8) []u8 {
 	// fn new(key []u8, data []u8, hash_func fn ([]u8) []u8, blocksize int) []u8
 	return hmac.new(seed, data, sha256.sum256, sha256.block_size)
 }
 
-@[inline]
+// hmac_sha512 creates new HMAC bytes with SHA512 hash
+@[directly; inline]
 fn hmac_sha512(seed []u8, data []u8) []u8 {
 	// fn new(key []u8, data []u8, hash_func fn ([]u8) []u8, blocksize int) []u8
 	return hmac.new(seed, data, sha512.sum512, sha512.block_size)
@@ -301,7 +323,7 @@ fn hmac_sha512(seed []u8, data []u8) []u8 {
 // for other need, SHA2-based Security category 1 was return SHA256
 // and return SHA512 otherwise
 @[inline]
-fn (c &SlhContext) sha2_prf() !hash.Hash {
+fn (c &Context) sha2_prf() !hash.Hash {
 	if c.is_shake_family() {
 		return error('not sha2-based entity')
 	}
@@ -313,7 +335,7 @@ fn (c &SlhContext) sha2_prf() !hash.Hash {
 
 // is_shake_family tells if this context was a SHAKE-based family
 @[inline]
-fn (c &SlhContext) is_shake_family() bool {
+fn (c &Context) is_shake_family() bool {
 	match c.kind {
 		.shake_128f, .shake_128s, .shake_192f, .shake_192s, .shake_256f, .shake_256s {
 			return true
@@ -324,31 +346,34 @@ fn (c &SlhContext) is_shake_family() bool {
 	}
 }
 
+// is_sha2family_cat1 tells if this context was a SHA2-based family with security category 1
 @[inline]
-fn (c &SlhContext) is_sha2family_cat1() bool {
+fn (c &Context) is_sha2family_cat1() bool {
 	match c.kind {
 		.sha2_128f, .sha2_128s { return true }
 		else { return false }
 	}
 }
 
+// is_sha2family_cat1 tells if this context was a SHA2-based family with security category 3
 @[inline]
-fn (c &SlhContext) is_sha2family_cat3() bool {
+fn (c &Context) is_sha2family_cat3() bool {
 	match c.kind {
 		.sha2_192f, .sha2_192s { return true }
 		else { return false }
 	}
 }
 
+// is_sha2family_cat5 tells if this context was a SHA2-based family with security category 5
 @[inline]
-fn (c &SlhContext) is_sha2family_cat5() bool {
+fn (c &Context) is_sha2family_cat5() bool {
 	match c.kind {
 		.sha2_256f, .sha2_256s { return true }
 		else { return false }
 	}
 }
 
-// SLH-DSA Parameter set
+// Param describes SLH-DSA Parameter set
 //
 @[noinit]
 struct Param {
@@ -407,14 +432,14 @@ fn new_param(k Kind) Param {
 // SLH-DSA-SHA2-256f	32 68 17 4 9 35 4 49 5 64 49 856
 // SLH-DSA-SHAKE-256f 	32 68 17 4 9 35 4 49 5 64 49 856
 const paramset = {
-	// 						     	name     𝑛   ℎ   𝑑  ℎp  𝑎  𝑘  𝑙𝑔𝑤 𝑚  sc pksize sigsize
+	// SHA2-based family			name     𝑛   ℎ   𝑑  ℎp  𝑎  𝑘  𝑙𝑔𝑤 𝑚  sc pksize sigsize
 	'sha2_128s':  Param{'SLH-DSA-SHA2-128s', 16, 63, 7, 9, 12, 14, 4, 30, 1, 32, 7856}
 	'sha2_128f':  Param{'SLH-DSA-SHA2-128f', 16, 66, 22, 3, 6, 33, 4, 34, 1, 32, 17088}
 	'sha2_192s':  Param{'SLH-DSA-SHA2-192s', 24, 63, 7, 9, 14, 17, 4, 39, 3, 48, 16224}
 	'sha2_192f':  Param{'SLH-DSA-SHA2-192f', 24, 66, 22, 3, 8, 33, 4, 42, 3, 48, 35664}
 	'sha2_256s':  Param{'SLH-DSA-SHA2-256s', 32, 64, 8, 8, 14, 22, 4, 47, 5, 64, 29792}
 	'sha2_256f':  Param{'SLH-DSA-SHA2-256f', 32, 68, 17, 4, 9, 35, 4, 49, 5, 64, 49856}
-	// SHAKE family
+	// SHAKE-based family
 	'shake_128s': Param{'SLH-DSA-SHAKE-128s', 16, 63, 7, 9, 12, 14, 4, 30, 1, 32, 7856}
 	'shake_128f': Param{'SLH-DSA-SHAKE-128f', 16, 66, 22, 3, 6, 33, 4, 34, 1, 32, 17088}
 	'shake_192s': Param{'SLH-DSA-SHAKE-192s', 24, 63, 7, 9, 14, 17, 4, 39, 3, 48, 16224}
@@ -423,8 +448,8 @@ const paramset = {
 	'shake_256f': Param{'SLH-DSA-SHAKE-256f', 32, 68, 17, 4, 9, 35, 4, 49, 5, 64, 49856}
 }
 
-// The enumeration type of the SLH-DSA key.
-// See Table 2. SLH-DSA parameter sets of the Chapter 11. Parameter Sets<br>
+// Kind is an enumeration type of the SLH-DSA key.
+// See Table 2. SLH-DSA parameter sets of the Chapter 11. Parameter Sets
 //
 // Each sets name indicates:
 // 	- the hash function family (SHA2 or SHAKE) that is used to instantiate the hash functions.
@@ -448,9 +473,10 @@ pub enum Kind {
 	shake_256f
 }
 
+// kind_from_name make a Kind from name string
 @[inline]
-fn kind_from_longname(s string) !Kind {
-	match s {
+fn kind_from_name(name string) !Kind {
+	match name {
 		// SHA2-based family
 		'SLH-DSA-SHA2-128s' { return .sha2_128s }
 		'SLH-DSA-SHA2-128f' { return .sha2_128f }
@@ -469,9 +495,10 @@ fn kind_from_longname(s string) !Kind {
 	}
 }
 
+// name returns the famous name of this Kind
 @[inline]
-fn (n Kind) long_name() string {
-	match n {
+fn (k Kind) name() string {
+	match k {
 		// SHA2-based family
 		.sha2_128s { return 'SLH-DSA-SHA2-128s' }
 		.sha2_128f { return 'SLH-DSA-SHA2-128f' }
@@ -489,8 +516,10 @@ fn (n Kind) long_name() string {
 	}
 }
 
-fn (n Kind) str() string {
-	match n {
+// str returns string representation of this Kind k
+@[inline]
+fn (k Kind) str() string {
+	match k {
 		// SHA2-based family
 		.sha2_128s { return 'sha2_128s' }
 		.sha2_128f { return 'sha2_128f' }
@@ -506,4 +535,19 @@ fn (n Kind) str() string {
 		.shake_256s { return 'shake_256s' }
 		.shake_256f { return 'shake_256f' }
 	}
+}
+
+// When 𝑙𝑔𝑤 = 4, 𝑤 = 16, 𝑙𝑒𝑛1 = 2𝑛, 𝑙𝑒𝑛2 = 3, and 𝑙𝑒𝑛 = 2𝑛 + 3.
+// See FIPS 205 page17
+const w = 16
+const len2 = 3
+
+@[inline]
+fn (c &Context) len1() int {
+	return 2 * c.prm.n
+}
+
+@[inline]
+fn (c &Context) wots_len() int {
+	return 2 * c.prm.n + 3
 }

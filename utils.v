@@ -2,9 +2,11 @@
 // Use of this source code is governed by an MIT license
 // that can be found in the LICENSE file.
 //
+// Some utilities used across the module
 module pslhdsa
 
 // Algorithm 1 gen_len2(𝑛, 𝑙𝑔𝑤)
+//
 @[inline]
 fn gen_len2(n int, lgw int) int {
 	w := 1 << lgw
@@ -70,13 +72,16 @@ fn cdiv(n int, k int) int {
 // The base_2b function is used to break the message to be signed and the checksum value
 // into arrays of base-𝑤 integers.
 @[direct_array_access; inline]
-fn base_2b(x []u8, b u32, outlen int) []u32 {
+fn base_2b(x []u8, b int, outlen int) []u32 {
 	mut input := u32(0)
-	mut bits := u32(0)
+	mut bits := 0
 	mut total := u32(0)
-	mut out := []u32{}
-	// set up mask to be u64-value to overcome the wrapping behaviour for u32
+
+	// output buffer with outlen capacity
+	mut out := []u32{cap: outlen}
+	// set up total mask with u64-value to overcome the wrapping behaviour for u32
 	mask := u32(u64(1) << b - 1)
+
 	for i := 0; i < outlen; i++ {
 		for bits < b {
 			total = (total << 8) + u32(x[input])
@@ -84,28 +89,31 @@ fn base_2b(x []u8, b u32, outlen int) []u32 {
 			bits += 8
 		}
 		bits -= b
-		tmp := (total >> bits) & u32(mask)
+		tmp := (total >> bits) & mask
 
 		out << tmp
 	}
 	return out
 }
 
-//  revert if not big endian
+// be32 is a portable big-endian u32 helper
 @[inline]
 fn be32(x u32) u32 {
-	$if !big_endian {
-		return ((x & 0xFF000000) >> 24) | ((x & 0x00FF0000) >> 8) | ((x & 0x0000FF00) << 8) | ((x & 0x000000FF) << 24)
+	$if big_endian {
+		// already big-endian, do nothing and return it
+		return x
 	}
-
-	// otherwise not changed
-	return x
+	// revert bits into big-endian
+	return ((x & 0xFF000000) >> 24) | ((x & 0x00FF0000) >> 8) | ((x & 0x0000FF00) << 8) | ((x & 0x000000FF) << 24)
 }
 
+// be64 is a portable big-endian u64 helper
 @[inline]
 fn be64(x u64) u64 {
-	$if !big_endian {
-		return (x << 56) | ((x & 0x0000_0000_0000_FF00) << 40) | ((x & 0x0000_0000_00FF_0000) << 24) | ((x & 0x0000_0000_FF00_0000) << 8) | ((x & 0x0000_00FF_0000_0000) >> 8) | ((x & 0x0000_FF00_0000_0000) >> 24) | ((x & 0x00FF_0000_0000_0000) >> 40) | (x >> 56)
+	$if big_endian {
+		// already big-endian, do nothing and return it
+		return x
 	}
-	return x
+	// revert bits into big-endian
+	return (x << 56) | ((x & 0x0000_0000_0000_FF00) << 40) | ((x & 0x0000_0000_00FF_0000) << 24) | ((x & 0x0000_0000_FF00_0000) << 8) | ((x & 0x0000_00FF_0000_0000) >> 8) | ((x & 0x0000_FF00_0000_0000) >> 24) | ((x & 0x00FF_0000_0000_0000) >> 40) | (x >> 56)
 }

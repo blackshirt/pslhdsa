@@ -42,12 +42,12 @@ fn test_toint_and_tobyte() {
 
 struct Base2expb {
 	x        []u8
-	b        int
-	out_len  int
+	b        u32
+	outlen   int
 	expected []u32
 }
 
-fn test_base_2exp_b() {
+fn test_base_2b() {
 	tests := [
 		Base2expb{[u8(0x12), 0x34, 0x56, 0x78], 4, 8, [u32(1), 2, 3, 4, 5, 6, 7, 8]},
 		Base2expb{[u8(0x12), 0x34, 0x56, 0x78], 16, 2, [u32(0x1234), 0x5678]},
@@ -57,13 +57,9 @@ fn test_base_2exp_b() {
 			0x9abcdef0]},
 	]
 
-	for tt in tests {
-		actual := base_2exp_b(tt.x, tt.b, tt.out_len)
+	for i, tt in tests {
+		actual := base_2b(tt.x, tt.b, tt.outlen)
 		assert tt.expected.len == actual.len
-		if  tt.expected.len == actual.len {
-			for i, v in tt.expected {
-				assert v == actual[i]
-			}
-		}
+		assert tt.expected == actual
 	}
 }

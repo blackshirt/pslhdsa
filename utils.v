@@ -62,30 +62,30 @@ fn cdiv(n int, k int) int {
 	return (n + k - 1) / k
 }
 
-// Algorithm 4 base_2exp_b(𝑋, 𝑏, 𝑜𝑢𝑡_𝑙𝑒𝑛)
+// Algorithm 4 base_2b(𝑋, 𝑏, 𝑜𝑢𝑡_𝑙𝑒𝑛)
 //
 // Computes the base 2^𝑏 representation of 𝑋.
 // Input: Byte string 𝑋 of length at least ⌈ 𝑜𝑢𝑡_𝑙𝑒𝑛⋅𝑏 / 8⌉, integer 𝑏, output length 𝑜𝑢𝑡_𝑙𝑒𝑛.
 // Output: Array of 𝑜𝑢𝑡_𝑙𝑒𝑛 integers in the range [0, … , 2𝑏 − 1].
-// The base_2exp_b function is used to break the message to be signed and the checksum value
+// The base_2b function is used to break the message to be signed and the checksum value
 // into arrays of base-𝑤 integers.
 @[direct_array_access; inline]
-fn base_2exp_b(x []u8, b int, outlen int) []u32 {
-	mut idx := 0
-	mut bits := 0
+fn base_2b(x []u8, b u32, outlen int) []u32 {
+	mut input := u32(0)
+	mut bits := u32(0)
 	mut total := u32(0)
-
-	mask := (u32(1) << b) - 1
-	mut out := []u32{cap: outlen}
-
+	mut out := []u32{}
+	// set up mask to be u64-value to overcome the wrapping behaviour for u32
+	mask := u32(u64(1) << b - 1)
 	for i := 0; i < outlen; i++ {
 		for bits < b {
-			total = (total << 8) + u32(x[idx])
-			idx += 1
+			total = (total << 8) + u32(x[input])
+			input += 1
 			bits += 8
 		}
 		bits -= b
-		tmp := (total >> bits) & mask
+		tmp := (total >> bits) & u32(mask)
+
 		out << tmp
 	}
 	return out
@@ -93,7 +93,7 @@ fn base_2exp_b(x []u8, b int, outlen int) []u32 {
 
 //  revert if not big endian
 @[inline]
-fn rev8_be32(x u32) u32 {
+fn be32(x u32) u32 {
 	$if !big_endian {
 		return ((x & 0xFF000000) >> 24) | ((x & 0x00FF0000) >> 8) | ((x & 0x0000FF00) << 8) | ((x & 0x000000FF) << 24)
 	}
@@ -103,7 +103,7 @@ fn rev8_be32(x u32) u32 {
 }
 
 @[inline]
-fn rev8_be64(x u64) u64 {
+fn be64(x u64) u64 {
 	$if !big_endian {
 		return (x << 56) | ((x & 0x0000_0000_0000_FF00) << 40) | ((x & 0x0000_0000_00FF_0000) << 24) | ((x & 0x0000_0000_FF00_0000) << 8) | ((x & 0x0000_00FF_0000_0000) >> 8) | ((x & 0x0000_FF00_0000_0000) >> 24) | ((x & 0x00FF_0000_0000_0000) >> 40) | (x >> 56)
 	}

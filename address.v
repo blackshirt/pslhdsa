@@ -135,7 +135,7 @@ fn (ad Address) get_layer_address() u32 {
 @[direct_array_access; inline]
 fn (mut ad Address) set_layer_address(v u32) {
 	// reverts bits into big-endian if necessary
-	ad.data[0] = rev8_be32(v)
+	ad.data[0] = be32(v)
 }
 
 // Tree parts
@@ -155,7 +155,7 @@ fn (mut ad Address) set_tree_address(v u64) {
 // ADRS.setKeyPairAddress(𝑖) ADRS ← ADRS[0 ∶ 20] ∥ toByte(𝑖, 4) ∥ ADRS[24 ∶ 32]
 @[direct_array_access; inline]
 fn (mut ad Address) set_keypair_address(v u32) {
-	ad.data[5] = rev8_be32(v)
+	ad.data[5] = be32(v)
 }
 
 // 𝑖 ← ADRS.getKeyPairAddress() 𝑖 ← toInt(ADRS[20 ∶ 24], 4)
@@ -172,7 +172,7 @@ fn (mut ad Address) set_chain_address(v u32) {
 	// bytes := to_bytes(x, 4)
 	// at 24..28
 	// ad.data[24..28] = bytes
-	ad.data[6] = rev8_be32(v)
+	ad.data[6] = be32(v)
 }
 
 // ADRS.setTreeHeight(𝑖) ADRS ← ADRS[0 ∶ 24] ∥ toByte(𝑖, 4) ∥ ADRS[28 ∶ 32]
@@ -180,7 +180,7 @@ fn (mut ad Address) set_chain_address(v u32) {
 @[direct_array_access; inline]
 fn (mut ad Address) set_tree_height(v u32) {
 	// TODO: assert correct type, 𝑡𝑦𝑝𝑒 = 3 (FORS_TREE), 𝑡𝑦𝑝𝑒 = 6 (FORS_PRF), 𝑡𝑦𝑝𝑒 = 2 (TREE)
-	ad.data[6] = rev8_be32(v)
+	ad.data[6] = be32(v)
 }
 
 // ADRS.setTreeIndex(𝑖) ADRS ← ADRS[0 ∶ 28] ∥ toByte(𝑖, 4)
@@ -191,7 +191,7 @@ fn (mut ad Address) set_tree_index(v u32) {
 	// at 28..32
 	// bytes := to_bytes(x, 4)
 	// ad.data[28..32] = bytes
-	ad.data[7] = rev8_be32(v)
+	ad.data[7] = be32(v)
 }
 
 // 𝑖 ← ADRS.getTreeIndex() 𝑖 ← toInt(ADRS[28 ∶ 32], 4)
@@ -209,7 +209,7 @@ fn (mut ad Address) set_hash_address(v u32) {
 	// 𝑡𝑦𝑝𝑒 = 0 (WOTS_HASH), 𝑡𝑦𝑝𝑒 = 5 (WOTS_PRF)
 	// bytes := to_bytes(x, 4)
 	// ad.data[28..32] = bytes
-	ad.data[7] = rev8_be32(v)
+	ad.data[7] = be32(v)
 }
 
 fn (ad Address) get_type() !AddressType {

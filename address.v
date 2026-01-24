@@ -5,6 +5,8 @@
 // 4.2 Addresses
 module pslhdsa
 
+import encoding.binary
+
 // Address fundamentally 32 bytes long composed from:
 // -- layer address  4 bytes 	0	0..4
 // -- tree address  12 bytes 	1	4..8
@@ -24,45 +26,14 @@ mut:
 @[direct_array_access; inline]
 fn (ad Address) bytes() []u8 {
 	mut x := []u8{len: 32}
-	x[0] = u8((ad.data[0] >> 24) & 0xff)
-	x[1] = u8((ad.data[0] >> 16) & 0xff)
-	x[2] = u8((ad.data[0] >> 8) & 0xff)
-	x[3] = u8((ad.data[0] >> 0) & 0xff)
-
-	x[4] = u8((ad.data[1] >> 24) & 0xff)
-	x[5] = u8((ad.data[1] >> 16) & 0xff)
-	x[6] = u8((ad.data[1] >> 8) & 0xff)
-	x[7] = u8((ad.data[1] >> 0) & 0xff)
-
-	x[8] = u8((ad.data[2] >> 24) & 0xff)
-	x[9] = u8((ad.data[2] >> 16) & 0xff)
-	x[10] = u8((ad.data[2] >> 8) & 0xff)
-	x[11] = u8((ad.data[2] >> 0) & 0xff)
-
-	x[12] = u8((ad.data[3] >> 24) & 0xff)
-	x[13] = u8((ad.data[3] >> 16) & 0xff)
-	x[14] = u8((ad.data[3] >> 8) & 0xff)
-	x[15] = u8((ad.data[3] >> 0) & 0xff)
-
-	x[16] = u8((ad.data[4] >> 24) & 0xff)
-	x[17] = u8((ad.data[4] >> 16) & 0xff)
-	x[18] = u8((ad.data[4] >> 8) & 0xff)
-	x[19] = u8((ad.data[4] >> 0) & 0xff)
-
-	x[20] = u8((ad.data[5] >> 24) & 0xff)
-	x[21] = u8((ad.data[5] >> 16) & 0xff)
-	x[22] = u8((ad.data[5] >> 8) & 0xff)
-	x[23] = u8((ad.data[5] >> 0) & 0xff)
-
-	x[24] = u8((ad.data[6] >> 24) & 0xff)
-	x[25] = u8((ad.data[6] >> 16) & 0xff)
-	x[26] = u8((ad.data[6] >> 8) & 0xff)
-	x[27] = u8((ad.data[6] >> 0) & 0xff)
-
-	x[28] = u8((ad.data[7] >> 24) & 0xff)
-	x[29] = u8((ad.data[7] >> 16) & 0xff)
-	x[30] = u8((ad.data[7] >> 8) & 0xff)
-	x[31] = u8((ad.data[7] >> 0) & 0xff)
+	binary.big_endian_put_u32(mut x[0..4], ad.data[0])
+	binary.big_endian_put_u32(mut x[4..8], ad.data[1])
+	binary.big_endian_put_u32(mut x[8..12], ad.data[2])
+	binary.big_endian_put_u32(mut x[12..16], ad.data[3])
+	binary.big_endian_put_u32(mut x[16..20], ad.data[4])
+	binary.big_endian_put_u32(mut x[20..24], ad.data[5])
+	binary.big_endian_put_u32(mut x[24..28], ad.data[6])
+	binary.big_endian_put_u32(mut x[28..32], ad.data[7])
 
 	return x
 }
@@ -114,9 +85,8 @@ fn (ad Address) compress() []u8 {
 @[direct_array_access; inline]
 fn (ad Address) clone() Address {
 	mut out := [8]u32{}
-	for i, v in ad.data {
-		out[i] = v
-	}
+	// copy the address data into out
+	unsafe { vmemcpy(out, ad.data, sizeof(out)) }
 	return Address{
 		data: out
 	}
@@ -218,22 +188,22 @@ fn (ad Address) get_type() !AddressType {
 	return new_addrtype(val)!
 }
 
-fn (mut ad Address) set_type(new_type AddressType) {
-	ad.data[4] = be32(u32(new_type))
+fn (mut ad Address) set_type(t AddressType) {
+	ad.data[4] = be32(u32(t))
 }
 
 // ADRS.setTypeAndClear(𝑌) ADRS ← ADRS[0 ∶ 16] ∥ toByte(𝑌 , 4) ∥ toByte(0, 12)
 @[direct_array_access; inline]
-fn (mut ad Address) set_type_and_clear(new_type AddressType) {
-	ad.data[4] = be32(u32(new_type))
+fn (mut ad Address) set_type_and_clear(t AddressType) {
+	ad.data[4] = be32(u32(t))
 	ad.data[5] = 0
 	ad.data[6] = 0
 	ad.data[7] = 0
 }
 
 @[direct_array_access; inline]
-fn (mut ad Address) set_type_and_clear_not_kp(new_type AddressType) {
-	ad.data[4] = be32(u32(new_type))
+fn (mut ad Address) set_type_and_clear_not_kp(t AddressType) {
+	ad.data[4] = be32(u32(t))
 	ad.data[6] = 0
 	ad.data[7] = 0
 }

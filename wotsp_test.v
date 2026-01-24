@@ -54,6 +54,6 @@ fn test_wots_pkgen() {
 		expected_pk := hex.decode(item.expected_pk)!
 		// wots_pkgen(c &Context, skseed []u8, pkseed []u8, mut adr Address)
 		actual_pk := wots_pkgen(ctx, skseed, pkseed, mut adrs)!
-		assert actual_pk == expected_pk
+		assert actual_pk.hex() == expected_pk.hex()
 	}
 }

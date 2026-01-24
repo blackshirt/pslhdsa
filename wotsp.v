@@ -46,10 +46,10 @@ fn wots_pkgen(c &Context, skseed []u8, pkseed []u8, mut adr Address) ![]u8 {
 	sk_addr.set_keypair_address(adr.get_keypair_address())
 
 	// gets wotsp length from the current context
-	wots_len := c.wots_len()
+	length := c.wots_len()
 	// temporary buffer to store output
-	mut tmp := [][]u8{len: wots_len}
-	for i := 0; i < wots_len; i++ {
+	mut tmp := [][]u8{len: length}
+	for i := 0; i < length; i++ {
 		// skADRS.setChainAddress(𝑖)
 		sk_addr.set_chain_address(u32(i))
 		// compute secret value for chain i, 𝑠𝑘 ← PRF(PK.seed, SK.seed, skADRS)
@@ -57,7 +57,7 @@ fn wots_pkgen(c &Context, skseed []u8, pkseed []u8, mut adr Address) ![]u8 {
 		// ADRS.setChainAddress(𝑖)
 		adr.set_chain_address(u32(i))
 		// compute public value for chain 𝑖, 𝑡𝑚𝑝[𝑖] ← chain(𝑠𝑘, 0, 𝑤 − 1, PK.seed, ADRS)
-		tmp[i] = chain(c, skey, 0, w - 1, pkseed, mut adr)!
+		tmp[i] = chain(c, skey, 0, 15, pkseed, mut adr)!
 		// tmp << tmp_i
 	}
 	// copy address to create WOTS+public key address, wotspkADRS ← ADRS

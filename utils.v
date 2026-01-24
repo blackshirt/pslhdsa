@@ -9,16 +9,16 @@ module pslhdsa
 //
 @[inline]
 fn gen_len2(n int, lgw int) int {
-	w := 1 << lgw
+	ww := 1 << lgw
 	len1 := ((n << 3) + lgw - 1) / lgw
-	max_checksum := len1 * (w - 1)
-	mut len2 := 1
-	mut capacity := w
+	max_checksum := len1 * (ww - 1)
+	mut out := 1
+	mut capacity := ww
 	for capacity <= max_checksum {
-		len2 += 1
-		capacity *= w
+		out += 1
+		capacity *= ww
 	}
-	return len2
+	return out
 }
 
 // Algorithm 2 toInt(𝑋, 𝑛)

@@ -47,11 +47,12 @@ fn test_wots_pkgen() {
 	]
 	ctx := new_context(.shake_128f)
 	mut adrs := Address{}
-	for item in tests {
+	for i, item in tests {
+		dump(i)
 		skseed := hex.decode(item.skseed)!
 		pkseed := hex.decode(item.pkseed)!
 		expected_pk := hex.decode(item.expected_pk)!
-
+		// wots_pkgen(c &Context, skseed []u8, pkseed []u8, mut adr Address)
 		actual_pk := wots_pkgen(ctx, skseed, pkseed, mut adrs)!
 		assert actual_pk == expected_pk
 	}

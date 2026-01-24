@@ -538,10 +538,9 @@ fn (k Kind) str() string {
 }
 
 // When 𝑙𝑔𝑤 = 4, 𝑤 = 16, 𝑙𝑒𝑛1 = 2𝑛, 𝑙𝑒𝑛2 = 3, and 𝑙𝑒𝑛 = 2𝑛 + 3.
-// See FIPS 205 page17
+// See FIPS 205 page 17
 // w := uint32(1 << lgw)
 const w = 16
-// const len2 = 3
 
 @[inline]
 fn (c &Context) wots_len() int {

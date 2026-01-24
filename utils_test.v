@@ -50,7 +50,7 @@ fn test_toint_and_tobyte() {
 
 struct Base2expb {
 	x        []u8
-	b        u32
+	b        int
 	outlen   int
 	expected []u32
 }

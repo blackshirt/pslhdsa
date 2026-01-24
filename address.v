@@ -128,7 +128,7 @@ fn (ad Address) clone() Address {
 // Layer parts
 @[direct_array_access; inline]
 fn (ad Address) get_layer_address() u32 {
-	return ad.data[0]
+	return be32(ad.data[0])
 }
 
 // ADRS.setLayerAddress(𝑙) ADRS ← toByte(𝑙, 4) ∥ ADRS[4 ∶ 32]
@@ -146,9 +146,10 @@ fn (ad Address) get_tree_address() u64 {
 // ADRS.setTreeAddress(𝑡) ADRS ← ADRS[0 ∶ 4] ∥ toByte(𝑡, 12) ∥ ADRS[16 ∶ 32]
 @[direct_array_access; inline]
 fn (mut ad Address) set_tree_address(v u64) {
-	ad.data[1] = 0
-	ad.data[2] = u32((v >> 32) & 0xFFFF_FFFF)
-	ad.data[3] = u32(v & 0xFFFF_FFFF)
+	// bytes a[4:8] of tree address are always zero
+	// ad.data[1] = 0
+	ad.data[2] = be32(u32(v >> 32))
+	ad.data[3] = be32(u32(v & 0xFFFF_FFFF))
 }
 
 // KEYPAIR
@@ -161,7 +162,7 @@ fn (mut ad Address) set_keypair_address(v u32) {
 // 𝑖 ← ADRS.getKeyPairAddress() 𝑖 ← toInt(ADRS[20 ∶ 24], 4)
 @[direct_array_access; inline]
 fn (ad Address) get_keypair_address() u32 {
-	return ad.data[5]
+	return be32(ad.data[5])
 }
 
 // Set WOTS+ chain address.
@@ -200,7 +201,7 @@ fn (mut ad Address) set_tree_index(v u32) {
 fn (ad Address) get_tree_index() u32 {
 	// TODO: assert correct type, 𝑡𝑦𝑝𝑒 = 2 (TREE), 𝑡𝑦𝑝𝑒 = 6 (FORS_PRF)
 	// return u32(to_int(ad.data[28..32], 4))
-	return ad.data[7]
+	return be32(ad.data[7])
 }
 
 // ADRS.setHashAddress(𝑖), ADRS ← ADRS[0 ∶ 28] ∥ toByte(𝑖, 4)
@@ -213,14 +214,18 @@ fn (mut ad Address) set_hash_address(v u32) {
 }
 
 fn (ad Address) get_type() !AddressType {
-	val := ad.data[4]
+	val := be32(ad.data[4])
 	return new_addrtype(val)!
+}
+
+fn (mut ad Address) set_type(new_type AddressType) {
+	ad.data[4] = be32(u32(new_type))
 }
 
 // ADRS.setTypeAndClear(𝑌) ADRS ← ADRS[0 ∶ 16] ∥ toByte(𝑌 , 4) ∥ toByte(0, 12)
 @[direct_array_access; inline]
 fn (mut ad Address) set_type_and_clear(new_type AddressType) {
-	ad.data[4] = u32(new_type)
+	ad.data[4] = be32(u32(new_type))
 	ad.data[5] = 0
 	ad.data[6] = 0
 	ad.data[7] = 0
@@ -228,7 +233,7 @@ fn (mut ad Address) set_type_and_clear(new_type AddressType) {
 
 @[direct_array_access; inline]
 fn (mut ad Address) set_type_and_clear_not_kp(new_type AddressType) {
-	ad.data[4] = u32(new_type)
+	ad.data[4] = be32(u32(new_type))
 	ad.data[6] = 0
 	ad.data[7] = 0
 }

@@ -1,45 +1,21 @@
+// Copyright © 2024 blackshirt.
+// Use of this source code is governed by an MIT license
+// that can be found in the LICENSE file.
+//
+// Test file for WOTS+
 module pslhdsa
 
 import arrays
 import encoding.hex
 
-/*
-// shake256_128f
-// 71175c346898606073adc3c823742789a47f37a5d2cf066522be4f3dfcbc141044421141a7d1841cf92d787816b7d6c77d48e8f30587e04ff4050e7817f4830aaed14f80d5dacf63e81d9fdcbdbc48d27cb973222164bb46dd24fa468aeb8400c987a1712467be1c0197ae4ff94da5566c1bfc1c88675b2df323c773138b7e9352505293e1db544bb4c2405196d1aa82ac68db1ecb07b29124ced822080d215924389e5e8ec8b149cb441309546cf15f42833f3d586fded0674065744baaa9c1e6d0be228172ead974bc639faa6cc0298402287b027c579224702eb031d8ba98db4cbad6400a216aeeae2e4606c855b4e0891a3a4d18dafc7b7a4d65323cc4ac784b18013fef0c425f812d800b7b8bd5486144e02379ae0bad28151bed3ce2ed0b5512100a2615590906abcf406cadef668d6ca17c2826c19ddfd841ba960f2ed1011fa1d97aef566edfde9f6ae78f9707b5a84eff321a59ea6ffe06fc1f9ec1789c5ea31a1a400416623f5535ec7d409440231b4bbf5ce88980b0330bfe5b3963d502b453fd2ee9197d5124b2b803e8a702600339463ff94a91bcab26a2ee85dbcfd0acdd534a70d4dcb2912c21bf7295f22edc102e320fba36acd3350e05b2eaf063b5a005fb44cf4b0333a2df2530f9d886b2ade35b1c1b528f74bbd463ec5099308b95f3829bad398fd7aed0725620fc4a435bf956d89713a895b39c5a585cbcb63ad23761fdb46723620daf32cf95f149cc88f04383410dcce8f0571d23a1d3902d3364467829ee37f3e2d9b520
-fn test_wots_sign_sha2_128f() ! {
-	c := new_context(.sha2_128f)
-
-	m := 'YTwkwhkyJG3PMpDWlEvRuN0BppYASt3J'.bytes()
-	message := m[..c.prm.n]
-	mut pk_seed := []u8{len: c.prm.n}
-
-	for i := 0; i < c.prm.n; i++ {
-		pk_seed[i] = u8(i)
-	}
-	sk_seed := []u8{len: c.prm.n}
-	// SKseed := make([]byte, params.N)
-	mut adr := Address{}
-	// var adr address.ADRS
-
-	signature := wots_sign(c, message, sk_seed, pk_seed, mut adr)!
-	// SignatureAsString := hex.EncodeToString(signature)
-	expected := hex.decode('5d6b15ca78bdd156fbb972c2207016e1c829d861558fbc1daab4f3eaa7eac28e89b9248f6ace1025d8dbebd436672ee7cd354903450675ceffbc6be1fca0a58232543ca4b81c6e75c87b26d97e1752468b7454de2df0468818fb379ce91a44517402c3824450e7e10b00675a38bff69202640fa4a7b31af12bb4bc995f532c722bef7b4fe4cb814047a07ccbaec93fdd02bec3f9940ff6930e6d629a5af971685189c0d89ec78cfcb8ea439905bc466a0a2ee3788a8916f6647c0ef3f70d835ef7f5daf2c50a739ef03ee7f582a7dae4628e0fc1c9e037a34ac864b665246afedc70c79a1af132f29c9d15a322e43596d2011d34e267ae7ca853e6dafa25717b251f035ac80a74b614ff748c1791c8c360118f7616cadaf7d590de0aff01dac70d7e72b5e7a47126c8b3d524eb711a8c1964350027a8081ee99a89de7ca7a5d16360936eab5210c1672b53fd52cea6fc6286a7cb75105d56a744cf903902004ff413146132768b5f004c7264b1d69cf6fe3d5fe4ce9e7c18931bec44f714a7028bbbdaafe3b74b72ab82cac084c8a7020a947a540eca3f4e2de3d6640b249aeafc178a3e7726bf13b4934d26e08d12fe017f2f75ab010da1fba6abd2266297585d342d9d99da7eb8465535072647e237e2cb69532352cfa6b1ac442d57e408f14c38f5a94cdc46b5efc88785348846e754652f13b214a17a41a7c5fca0e61dcbc24101fea1b393cfe055e74215b0f043a1620dbfeeaf88d7d0a5f6b797e9bffaac949b574bcec9552bfbcc9b1a377299')!
-
-	// flatten signature
-	flatten_signature := arrays.flatten[u8](signature) // []T
-	assert flatten_signature.hex() == expected.hex()
-}
-*/
-
-// sha2_128f
-// 5d6b15ca78bdd156fbb972c2207016e1c829d861558fbc1daab4f3eaa7eac28e89b9248f6ace1025d8dbebd436672ee7cd354903450675ceffbc6be1fca0a58232543ca4b81c6e75c87b26d97e1752468b7454de2df0468818fb379ce91a44517402c3824450e7e10b00675a38bff69202640fa4a7b31af12bb4bc995f532c722bef7b4fe4cb814047a07ccbaec93fdd02bec3f9940ff6930e6d629a5af971685189c0d89ec78cfcb8ea439905bc466a0a2ee3788a8916f6647c0ef3f70d835ef7f5daf2c50a739ef03ee7f582a7dae4628e0fc1c9e037a34ac864b665246afedc70c79a1af132f29c9d15a322e43596d2011d34e267ae7ca853e6dafa25717b251f035ac80a74b614ff748c1791c8c360118f7616cadaf7d590de0aff01dac70d7e72b5e7a47126c8b3d524eb711a8c1964350027a8081ee99a89de7ca7a5d16360936eab5210c1672b53fd52cea6fc6286a7cb75105d56a744cf903902004ff413146132768b5f004c7264b1d69cf6fe3d5fe4ce9e7c18931bec44f714a7028bbbdaafe3b74b72ab82cac084c8a7020a947a540eca3f4e2de3d6640b249aeafc178a3e7726bf13b4934d26e08d12fe017f2f75ab010da1fba6abd2266297585d342d9d99da7eb8465535072647e237e2cb69532352cfa6b1ac442d57e408f14c38f5a94cdc46b5efc88785348846e754652f13b214a17a41a7c5fca0e61dcbc24101fea1b393cfe055e74215b0f043a1620dbfeeaf88d7d0a5f6b797e9bffaac949b574bcec9552bfbcc9b1a377299
-
+// Test 1
 struct WotsPKGenTest {
 	skseed      string
 	pkseed      string
 	expected_pk string
 }
 
+// The test material was adapted from the Golang version of go-slh-dsa
 fn test_wots_pkgen() {
 	tests := [
 		WotsPKGenTest{'00000000000000000000000000000000', 'ffffffffffffffffffffffffffffffff', 'eacc640342e9455da67b7498b9dbc180'},
@@ -48,12 +24,45 @@ fn test_wots_pkgen() {
 	ctx := new_context(.shake_128f)
 	mut adrs := Address{}
 	for i, item in tests {
-		dump(i)
 		skseed := hex.decode(item.skseed)!
 		pkseed := hex.decode(item.pkseed)!
 		expected_pk := hex.decode(item.expected_pk)!
 		// wots_pkgen(c &Context, skseed []u8, pkseed []u8, mut adr Address)
 		actual_pk := wots_pkgen(ctx, skseed, pkseed, mut adrs)!
-		assert actual_pk.hex() == expected_pk.hex()
+		assert actual_pk == expected_pk
+	}
+}
+
+// Test 2
+//
+struct WotsSignVerifyTest {
+	skseed       string
+	pkseed       string
+	message      string
+	expected_sig string
+}
+
+fn test_wotsp_sign_verify() ! {
+	tests := [
+		WotsSignVerifyTest{'00000000000000000000000000000000', 'ffffffffffffffffffffffffffffffff', '9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08', '1d8cff94837952216aca752fad2bae148bd351bf7f72e44ebf88a54ba30621392af92b1d6ac4d8a7425c2685ea6c47c1eb7077ef9817fff78dded68815f36dfb9fb132d18bd833ccfd093d6bc79c9c9a7b0b1af2b88be036734af0b2d4a64ac216e64cb68f0fa075e12b08f1370d5b2a5fd923e2ac43d78eeb82430cea93ae398802b955817e67dea5119b9e27b7eb30c863a644371fa98c275220b16958a671cd362216622b840c2821fe0000f99670d6579c2a604d85d5a4db21bb10784c6359dbc5bc3ef3511e90b46c5bec9c8045e52d6dd25c7b04f0231288db99ce04adacaa3cb1a61523d3ac147a6563169f822409ff673401710ee8250c073a0656e0a35ec35c6dd953e52141fc704dee97d3bd04e9855d04bc37d792bb8b1e60093c802c2a08722d9f9f90e5eda00448c7fa82141adba465b955fd971183dd008d26ec4efb8235ddff418832e073effcb50502d7862df634c05aa74ca40e854e4bb5060de58d0e479b941dba4452eba052f88846494e2a6a1cc1046ae2e26e9bc36a438fee4f15a285d09bb7f17080a9e62ab6dc4d6120f014bda703779f957de6f46675c1f11920cfbd0a9b2b817d84181a78f59d3d78d6b78598c11667edc5e667762d092a1a6ebd24b1b34fd37c7487fe879e2e0a1e66ee99d9e3644432824649a0cc4cf668b30232dc02167e6d74e0cb5800178438bfdde4238a05a44f9031551efac16d2824eca3294ad3e5468612993d58cad4a272b401de6764dbd06f09bb80b62585d5e1944fba4919bf697a0f92'},
+		WotsSignVerifyTest{'ffffffffffffffffffffffffffffffff', '00000000000000000000000000000000', '9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08', 'bdb07bb7c73d3641b3add3843dd34b6ee2f740ffb715414b308aad09c7dfbe01c4c98fc7deef92ce0827b0df3ae490c8454b6eaef357a1016e09cb8112d9e221f6b5cb271fb9060629653c0057233edd059d0b9035697aa4e2abc08c5c3001529d2cf39965d7ccffde2b174059659ee2c025ffe931e4842753f47db60ab6f377c072ae6f6859bf39f1408623609ee848b15cbb6ddb66a3576770f23ec7793e140361166a848cb3acde88aa22968db631229ac7e807c641e6241c121da0373abe5dc6116d71632b2f82ac238eeab0c4c3162ce502a62dbd7c0147e81523af3376cce3890a075918a2d8996ca7cc5cf8a3f5d0793b3e47f7395abfba7552dcbf66697127ba45b9ee9cc0d652d719d615ac699aef2127dbc0cd464590120f4e1d01db5bb640dd8a7f63e1d700342d103a3e54d84abc28ba43a082818ff0623acc05d0299c37b6bacfe1f613f94d596abbce4342ec2c5be0802bd556e9718503a1cfb8f4f602757852369dcdc00cc3394f09b4e23d9a371f63c16d0e7f8dd84d970dfdd2d27163259c9d6b9464a13abb5ee73ef1e1e17959d566f1d98121774318bfa40b8c035ab7a0aa2f6136a5c99236e479cb9fcc1cfe2335ea1cc322dfdacad2446770d211856ba293b78cd707aaad890f53dda6c1ffcfab64eedc4ab1746afc6a74fa0f45e9a9600dcf703ec974804c24a677baeaf7772c704e755c48223f7c942a9d677cf56fc6fb9017743a87aaafdca15eb1d78114ff8c2329dd67d6ac0e3d7bf5ffff45910a1fa4831522d18a79'},
+	]
+	ctx := new_context(.shake_128f)
+	mut adrs := Address{}
+	for i, item in tests {
+		skseed := hex.decode(item.skseed)!
+		pkseed := hex.decode(item.pkseed)!
+		message := hex.decode(item.message)!
+		expected_sig := hex.decode(item.expected_sig)!
+		// wots_sign(c &Context, m []u8, skseed []u8, pkseed []u8, mut adr Address) ![][]u8
+		actual_sig := wots_sign(ctx, message, skseed, pkseed, mut adrs)!
+		// flatten sig
+		flatten_sig := arrays.flatten[u8](actual_sig)
+		assert flatten_sig == expected_sig
+
+		public_key := wots_pkgen(ctx, skseed, pkseed, mut adrs)!
+		// wots_pkfromsig(c &Context, sig []u8, m []u8, pkseed []u8, mut adr Address)
+		recovered_pk := wots_pkfromsig(ctx, flatten_sig, message, pkseed, mut adrs)!
+		assert public_key == recovered_pk
 	}
 }

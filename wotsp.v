@@ -53,11 +53,11 @@ fn wots_pkgen(c &Context, skseed []u8, pkseed []u8, mut adr Address) ![]u8 {
 		// skADRS.setChainAddress(𝑖)
 		sk_addr.set_chain_address(u32(i))
 		// compute secret value for chain i, 𝑠𝑘 ← PRF(PK.seed, SK.seed, skADRS)
-		skey := c.prf(pkseed, skseed, sk_addr, c.prm.n)!
+		sk := c.prf(pkseed, skseed, sk_addr, c.prm.n)!
 		// ADRS.setChainAddress(𝑖)
 		adr.set_chain_address(u32(i))
 		// compute public value for chain 𝑖, 𝑡𝑚𝑝[𝑖] ← chain(𝑠𝑘, 0, 𝑤 − 1, PK.seed, ADRS)
-		tmp[i] = chain(c, skey, 0, 15, pkseed, mut adr)!
+		tmp[i] = chain(c, sk, 0, 15, pkseed, mut adr)!
 		// tmp << tmp_i
 	}
 	// copy address to create WOTS+public key address, wotspkADRS ← ADRS
@@ -82,11 +82,11 @@ fn wots_pkgen(c &Context, skseed []u8, pkseed []u8, mut adr Address) ![]u8 {
 // Output: WOTS+ signature 𝑠𝑖𝑔.
 @[direct_array_access]
 fn wots_sign(c &Context, m []u8, skseed []u8, pkseed []u8, mut adr Address) ![][]u8 {
-	// convert message to base w, ie, 𝑚𝑠𝑔 ← base_2b(𝑀, 𝑙𝑔𝑤, 𝑙𝑒𝑛1)
+	// get some vars
 	length := c.wots_len()
 	len1 := c.wots_len1()
 	len2 := c.wots_len2()
-
+	// convert message to base w, ie, 𝑚𝑠𝑔 ← base_2b(𝑀, 𝑙𝑔𝑤, 𝑙𝑒𝑛1)
 	mut msg := base_2b(m, c.prm.lgw, len1)
 	mut csum := u64(0)
 	// compute checksum
@@ -100,7 +100,8 @@ fn wots_sign(c &Context, m []u8, skseed []u8, pkseed []u8, mut adr Address) ![][
 
 	// convert to base w, 𝑚𝑠𝑔 ← 𝑚𝑠𝑔 ∥ base_2b (toByte (𝑐𝑠𝑢𝑚, ⌈(𝑙𝑒𝑛2*𝑙𝑔𝑤)/8⌉) , 𝑙𝑔𝑤, 𝑙𝑒𝑛2)
 	// mlen := 2 // cdiv(len2 * c.prm.lgw, 8)
-	mlen := (((len2 * c.prm.lgw) + 7) >> 3)
+	mlen := ((len2 * c.prm.lgw) + 7) >> 3
+	// mlen := 2
 	bytes := to_byte(csum, mlen)
 	msg << base_2b(bytes, c.prm.lgw, len2)
 
@@ -110,17 +111,18 @@ fn wots_sign(c &Context, m []u8, skseed []u8, pkseed []u8, mut adr Address) ![][
 	sk_addr.set_type_and_clear(.wots_prf)
 	// skADRS.setKeyPairAddress(ADRS.getKeyPairAddress())
 	// TODO: handle int > larger than max_int
-	sk_addr.set_keypair_address(u32(adr.get_keypair_address()))
+	sk_addr.set_keypair_address(adr.get_keypair_address())
 
 	mut sig := [][]u8{len: length}
 	for i := 0; i < length; i++ {
 		// skADRS.setChainAddress(𝑖)
 		sk_addr.set_chain_address(u32(i))
 		// compute chain 𝑖 secret value, 𝑠𝑘 ← PRF(PK.seed, SK.seed, skADRS)
-		skey := c.prf(pkseed, skseed, sk_addr, c.prm.n)!
+		sk := c.prf(pkseed, skseed, sk_addr, c.prm.n)!
+		// ADRS.setChainAddress(𝑖)
 		adr.set_chain_address(u32(i))
 		// compute chain 𝑖 signature value, 𝑠𝑖𝑔[𝑖] ← chain(𝑠𝑘, 0, 𝑚𝑠𝑔[𝑖], PK.seed, ADRS)
-		sig[i] = chain(c, skey, 0, int(msg[i]), pkseed, mut adr)!
+		sig[i] = chain(c, sk, 0, int(msg[i]), pkseed, mut adr)!
 		// sig << sig_i
 	}
 	return sig
@@ -133,9 +135,8 @@ fn wots_sign(c &Context, m []u8, skseed []u8, pkseed []u8, mut adr Address) ![][
 // Input: WOTS+ signature 𝑠𝑖𝑔, message 𝑀, public seed
 // Output: WOTS+ public key 𝑝𝑘𝑠𝑖𝑔 derived from 𝑠𝑖𝑔.
 @[direct_array_access; inline]
-fn wots_pkfromsig(c &Context, sig []u8, m []u8, pkseed []u8, adr_awal Address) ![]u8 {
+fn wots_pkfromsig(c &Context, sig []u8, m []u8, pkseed []u8, mut adr Address) ![]u8 {
 	mut csum := u64(0)
-	mut adr := adr_awal.clone()
 	// convert message to base w, ie, 𝑚𝑠𝑔 ← base_2b(𝑀, 𝑙𝑔𝑤, 𝑙𝑒𝑛1)
 	length := c.wots_len()
 	len1 := c.wots_len1()
@@ -177,8 +178,7 @@ fn wots_pkfromsig(c &Context, sig []u8, m []u8, pkseed []u8, adr_awal Address) !
 	// TODO: remove int casts ??
 	wots_pkadr.set_keypair_address(adr.get_keypair_address())
 	// 𝑝𝑘𝑠𝑖𝑔 ← T𝑙𝑒𝑛(PK.seed, wotspkADRS,𝑡𝑚𝑝)
-	bytelen := c.prm.n
-	pk_sig := c.tl(pkseed, wots_pkadr, tmp, bytelen)!
+	pk_sig := c.tl(pkseed, wots_pkadr, tmp, c.prm.n)!
 
 	return pk_sig
 }

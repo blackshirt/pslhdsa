@@ -6,6 +6,7 @@
 module pslhdsa
 
 import hash
+import arrays
 import crypto.hmac
 import crypto.sha3
 import crypto.sha256
@@ -179,16 +180,15 @@ fn (c &Context) tl(pkseed []u8, adr Address, msgsln [][]u8, outlen int) ![]u8 {
 	// Tℓ(PK.seed, ADRS, 𝑀ℓ) = SHAKE256(PK.seed ∥ ADRS ∥ 𝑀ℓ, 8𝑛)
 	if c.is_shake_family() {
 		mut mlsize := 0
-		for o in msgsln {
-			mlsize += o.len
+		for obj in msgsln {
+			mlsize += obj.len
 		}
 		size := pkseed.len + 32 + mlsize
 		mut data := []u8{cap: size}
 		data << pkseed
 		data << adr.bytes()
-		for item in msgsln {
-			data << item
-		}
+		// flatten the msg
+		data << arrays.flatten[u8](msgsln)
 
 		return sha3.shake256(data, outlen)
 	}
@@ -310,14 +310,14 @@ fn sha512_caddr_generic(n int, pkseed []u8, adr Address, msg []u8, outlen int) !
 @[direct_array_access; inline]
 fn hmac_sha256(seed []u8, data []u8) []u8 {
 	// fn new(key []u8, data []u8, hash_func fn ([]u8) []u8, blocksize int) []u8
-	return hmac.new(seed, data, sha256.sum256, sha256.block_size)
+	return hmac.new(seed, data, sha256.sum256, sha256.size)
 }
 
 // hmac_sha512 creates new HMAC bytes with SHA512 hash
 @[directly; inline]
 fn hmac_sha512(seed []u8, data []u8) []u8 {
 	// fn new(key []u8, data []u8, hash_func fn ([]u8) []u8, blocksize int) []u8
-	return hmac.new(seed, data, sha512.sum512, sha512.block_size)
+	return hmac.new(seed, data, sha512.sum512, sha512.size)
 }
 
 // for other need, SHA2-based Security category 1 was return SHA256

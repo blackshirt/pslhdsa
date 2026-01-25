@@ -5,30 +5,6 @@
 // WOTS+ module
 module pslhdsa
 
-// WOTS+ chaining function
-//
-// Algorithm 5 chain(𝑋, 𝑖, 𝑠, PK.seed, ADRS)
-//
-// Chaining function used in WOTS+.
-// Input: Input string 𝑋, start index 𝑖, number of steps 𝑠, public seed PK.seed, address ADRS.
-// Output: Value of F iterated 𝑠 times on 𝑋.
-// (where 𝑖 + 𝑠 < w
-@[direct_array_access; inline]
-fn chain(c &Context, x []u8, i int, s int, pkseed []u8, mut adr Address) ![]u8 {
-	assert x.len == c.prm.n
-	if i + s >= w {
-		return error('Invalid wots+ params')
-	}
-	mut tmp := x.clone()
-	for j := i; j < i + s; j++ {
-		// ADRS.setHashAddress(𝑗)
-		adr.set_hash_address(u32(j))
-		// 𝑡𝑚𝑝 ← F(PK.seed, ADRS,𝑡𝑚𝑝)
-		tmp = c.f(pkseed, adr, tmp, c.prm.n)!
-	}
-	return tmp
-}
-
 // 5.1 WOTS+ Public-Key Generation
 //
 // Algorithm 6 wots_pkGen(SK.seed, PK.seed, ADRS)
@@ -82,7 +58,7 @@ fn wots_pkgen(c &Context, skseed []u8, pkseed []u8, mut adr Address) ![]u8 {
 // Output: WOTS+ signature 𝑠𝑖𝑔.
 @[direct_array_access]
 fn wots_sign(c &Context, m []u8, skseed []u8, pkseed []u8, mut adr Address) ![][]u8 {
-	// get some vars
+	// get some context vars
 	length := c.wots_len()
 	len1 := c.wots_len1()
 	len2 := c.wots_len2()
@@ -101,7 +77,6 @@ fn wots_sign(c &Context, m []u8, skseed []u8, pkseed []u8, mut adr Address) ![][
 	// convert to base w, 𝑚𝑠𝑔 ← 𝑚𝑠𝑔 ∥ base_2b (toByte (𝑐𝑠𝑢𝑚, ⌈(𝑙𝑒𝑛2*𝑙𝑔𝑤)/8⌉) , 𝑙𝑔𝑤, 𝑙𝑒𝑛2)
 	// mlen := 2 // cdiv(len2 * c.prm.lgw, 8)
 	mlen := ((len2 * c.prm.lgw) + 7) >> 3
-	// mlen := 2
 	bytes := to_byte(csum, mlen)
 	msg << base_2b(bytes, c.prm.lgw, len2)
 
@@ -135,40 +110,32 @@ fn wots_sign(c &Context, m []u8, skseed []u8, pkseed []u8, mut adr Address) ![][
 // Input: WOTS+ signature 𝑠𝑖𝑔, message 𝑀, public seed
 // Output: WOTS+ public key 𝑝𝑘𝑠𝑖𝑔 derived from 𝑠𝑖𝑔.
 @[direct_array_access; inline]
-fn wots_pkfromsig(c &Context, sig []u8, m []u8, pkseed []u8, mut adr Address) ![]u8 {
-	mut csum := u64(0)
-	// convert message to base w, ie, 𝑚𝑠𝑔 ← base_2b(𝑀, 𝑙𝑔𝑤, 𝑙𝑒𝑛1)
+fn wots_pkfromsig(c &Context, sig [][]u8, m []u8, pkseed []u8, mut adr Address) ![]u8 {
+	// get some context variables
 	length := c.wots_len()
 	len1 := c.wots_len1()
 	len2 := c.wots_len2()
 
+	// convert message to base w, ie, 𝑚𝑠𝑔 ← base_2b(𝑀, 𝑙𝑔𝑤, 𝑙𝑒𝑛1)
 	mut msg := base_2b(m, c.prm.lgw, len1)
 
-	// compute checksum
-	// for 𝑖 from 0 to 𝑙𝑒𝑛1 − 1 do
-	for i := 0; i < len1; i++ {
-		// 𝑐𝑠𝑢𝑚 ← 𝑐𝑠𝑢𝑚 + 𝑤 − 1 − 𝑚𝑠𝑔[𝑖]
-		csum += (w - 1 - msg[i])
-	}
-	// for 𝑙𝑔𝑤 = 4, left shift by 4, its only values supported in this module
-	// 𝑐𝑠𝑢𝑚 ← 𝑐𝑠𝑢𝑚 ≪ ((8 − ((𝑙𝑒𝑛2 ⋅ 𝑙𝑔𝑤) mod 8)) mod 8)
-	csum <<= 4 // u64((8 - ((len2 * c.prm.lgw) % 8)) % 8)
+	// compute checksum of msg of []u32
+	mut csum := wots_csum(c, msg)
 
 	// convert to base w, 𝑚𝑠𝑔 ← 𝑚𝑠𝑔 ∥ base_2b (toByte (𝑐𝑠𝑢𝑚, ⌈(𝑙𝑒𝑛2*𝑙𝑔𝑤)/8⌉) , 𝑙𝑔𝑤, 𝑙𝑒𝑛2)
-	// mlen := 2 // cdiv(len2 * c.prm.lgw, 8)
-	// bytes := to_byte(csum, mlen)
-	msg << base_2b(to_byte(csum, 2), c.prm.lgw, len2)
+	// by lgw == 4 defined in standard, normally its has value 2
+	mlen := ((len2 * c.prm.lgw) + 7) >> 3
+	msg << base_2b(to_byte(csum, mlen), c.prm.lgw, len2)
 
+	// setup temporary buffers with appropriate length
 	mut tmp := [][]u8{len: length}
-	for i := 0; i < c.wots_len(); i++ {
+
+	for i := 0; i < length; i++ {
 		// ADRS.setChainAddress(𝑖)
 		adr.set_chain_address(u32(i))
 		// 𝑡𝑚𝑝[𝑖] ← chain(𝑠𝑖𝑔[𝑖], 𝑚𝑠𝑔[𝑖], 𝑤 − 1 − 𝑚𝑠𝑔[𝑖], PK.seed, ADRS)
-		x := sig[i * c.prm.n..(i + 1) * c.prm.n]
-		next_chain := chain(c, x, int(msg[i]), int(w - 1 - msg[i]), pkseed, mut adr)!
-		assert next_chain.len != 0
-
-		tmp << next_chain
+		// x := sig[i * c.prm.n..(i + 1) * c.prm.n]
+		tmp[i] = chain(c, sig[i], int(msg[i]), int(w - 1 - msg[i]), pkseed, mut adr)!
 	}
 	// copy address to create WOTS+ public key address, wotspkADRS ← ADRS
 	mut wots_pkadr := adr.clone()
@@ -183,21 +150,44 @@ fn wots_pkfromsig(c &Context, sig []u8, m []u8, pkseed []u8, mut adr Address) ![
 	return pk_sig
 }
 
-fn wots_csum(c &Context, m []u8) u64 {
+// WOTS+ chaining function
+//
+// Algorithm 5 chain(𝑋, 𝑖, 𝑠, PK.seed, ADRS)
+//
+// Chaining function used in WOTS+.
+// Input: Input string 𝑋, start index 𝑖, number of steps 𝑠, public seed PK.seed, address ADRS.
+// Output: Value of F iterated 𝑠 times on 𝑋.
+// (where 𝑖 + 𝑠 < w
+@[direct_array_access; inline]
+fn chain(c &Context, x []u8, i int, s int, pkseed []u8, mut adr Address) ![]u8 {
+	assert x.len == c.prm.n
+	if i + s >= w {
+		return error('Invalid wots+ params')
+	}
+	mut tmp := x.clone()
+	for j := i; j < i + s; j++ {
+		// ADRS.setHashAddress(𝑗)
+		adr.set_hash_address(u32(j))
+		// 𝑡𝑚𝑝 ← F(PK.seed, ADRS,𝑡𝑚𝑝)
+		tmp = c.f(pkseed, adr, tmp, c.prm.n)!
+	}
+	return tmp
+}
+
+@[direct_array_access; inline]
+fn wots_csum(c &Context, m []u32) u64 {
 	mut csum := u64(0)
 	t := u32((1 << c.prm.lgw) - 1)
 
 	len1 := c.wots_len1()
 	len2 := c.wots_len2()
 
-	mut msg := base_2b(m, c.prm.lgw, len1)
-
 	// for 𝑖 from 0 to 𝑙𝑒𝑛1 − 1 do
 	for i := 0; i < len1; i++ {
 		// 𝑐𝑠𝑢𝑚 ← 𝑐𝑠𝑢𝑚 + 𝑤 − 1 − 𝑚𝑠𝑔[𝑖]
-		csum += t - msg[i]
+		csum += t - m[i]
 	}
-
+	// csum <<= 4
 	csum <<= u64((8 - ((len2 * c.prm.lgw) & 7)) & 7)
 
 	return csum

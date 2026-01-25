@@ -56,13 +56,13 @@ fn test_wotsp_sign_verify() ! {
 		expected_sig := hex.decode(item.expected_sig)!
 		// wots_sign(c &Context, m []u8, skseed []u8, pkseed []u8, mut adr Address) ![][]u8
 		actual_sig := wots_sign(ctx, message, skseed, pkseed, mut adrs)!
-		// flatten sig
+		// flattened actual_sig
 		flatten_sig := arrays.flatten[u8](actual_sig)
 		assert flatten_sig == expected_sig
 
 		public_key := wots_pkgen(ctx, skseed, pkseed, mut adrs)!
 		// wots_pkfromsig(c &Context, sig []u8, m []u8, pkseed []u8, mut adr Address)
-		recovered_pk := wots_pkfromsig(ctx, flatten_sig, message, pkseed, mut adrs)!
+		recovered_pk := wots_pkfromsig(ctx, actual_sig, message, pkseed, mut adrs)!
 		assert public_key == recovered_pk
 	}
 }

@@ -15,11 +15,12 @@ fn test_xmms_node() ! {
 	]
 	c := new_context(.shake_128f)
 	for val in tests {
-		skseed := hex.decode(val.skseed)
-		pkseed := hex.decode(val.pkseed)
+		skseed := hex.decode(val.skseed)!
+		pkseed := hex.decode(val.pkseed)!
+		expected := hex.decode(val.expected)!
 		mut adrs := new_address()
 		// xmss_node(c &Context, sk_seed []u8, i u32, z u32, pk_seed []u8, mut addr Address) ![]u8
 		node := xmss_node(c, skseed, 0, 3, pkseed, mut adrs)!
-		assert val.expected == node
+		assert expected == node
 	}
 }

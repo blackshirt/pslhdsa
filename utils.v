@@ -95,25 +95,3 @@ fn base_2b(x []u8, b int, outlen int) []u32 {
 	}
 	return out
 }
-
-// be32 is a portable big-endian u32 helper
-@[inline]
-fn be32(x u32) u32 {
-	$if big_endian {
-		// already big-endian, do nothing and return it
-		return x
-	}
-	// revert bits into big-endian
-	return ((x & 0xFF000000) >> 24) | ((x & 0x00FF0000) >> 8) | ((x & 0x0000FF00) << 8) | ((x & 0x000000FF) << 24)
-}
-
-// be64 is a portable big-endian u64 helper
-@[inline]
-fn be64(x u64) u64 {
-	$if big_endian {
-		// already big-endian, do nothing and return it
-		return x
-	}
-	// revert bits into big-endian
-	return (x << 56) | ((x & 0x0000_0000_0000_FF00) << 40) | ((x & 0x0000_0000_00FF_0000) << 24) | ((x & 0x0000_0000_FF00_0000) << 8) | ((x & 0x0000_00FF_0000_0000) >> 8) | ((x & 0x0000_FF00_0000_0000) >> 24) | ((x & 0x00FF_0000_0000_0000) >> 40) | (x >> 56)
-}

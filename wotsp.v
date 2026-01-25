@@ -5,6 +5,8 @@
 // WOTS+ module
 module pslhdsa
 
+import arrays
+
 // 5.1 WOTS+ Public-Key Generation
 //
 // Algorithm 6 wots_pkGen(SK.seed, PK.seed, ADRS)
@@ -58,21 +60,16 @@ fn wots_pkgen(c &Context, skseed []u8, pkseed []u8, mut adr Address) ![]u8 {
 // Output: WOTS+ signature 𝑠𝑖𝑔.
 @[direct_array_access]
 fn wots_sign(c &Context, m []u8, skseed []u8, pkseed []u8, mut adr Address) ![][]u8 {
-	// get some context vars
+	// get some context variables
 	length := c.wots_len()
 	len1 := c.wots_len1()
 	len2 := c.wots_len2()
+
 	// convert message to base w, ie, 𝑚𝑠𝑔 ← base_2b(𝑀, 𝑙𝑔𝑤, 𝑙𝑒𝑛1)
 	mut msg := base_2b(m, c.prm.lgw, len1)
-	mut csum := u64(0)
-	// compute checksum
-	for i := 0; i < len1; i++ {
-		// 𝑐𝑠𝑢𝑚 ← 𝑐𝑠𝑢𝑚 + 𝑤 − 1 − 𝑚𝑠𝑔[𝑖]
-		csum += w - 1 - msg[i]
-	}
-	// for 𝑙𝑔𝑤 = 4, left shift by 4, its only values supported in this module
-	// 𝑐𝑠𝑢𝑚 ← 𝑐𝑠𝑢𝑚 ≪ ((8 − ((𝑙𝑒𝑛2 ⋅ 𝑙𝑔𝑤) mod 8)) mod 8)
-	csum <<= 4 // u64((8 - ((len2 * c.prm.lgw) % 8)) % 8)
+
+	// compute checksum of msg of []u32
+	mut csum := wots_csum(c, msg)
 
 	// convert to base w, 𝑚𝑠𝑔 ← 𝑚𝑠𝑔 ∥ base_2b (toByte (𝑐𝑠𝑢𝑚, ⌈(𝑙𝑒𝑛2*𝑙𝑔𝑤)/8⌉) , 𝑙𝑔𝑤, 𝑙𝑒𝑛2)
 	// mlen := 2 // cdiv(len2 * c.prm.lgw, 8)

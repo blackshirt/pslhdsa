@@ -129,16 +129,16 @@ fn (c &Context) hmsg(r []u8, pkseed []u8, pkroot []u8, msg []u8, outlen int) ![]
 // prf is a pseudorandom function  (PRF) that is used to generate the secret values
 // in WOTS+ and FORS private keys.
 @[direct_array_access]
-fn (c &Context) prf(pkseed []u8, skseed []u8, adr Address, outlen int) ![]u8 {
+fn (c &Context) prf(pkseed []u8, skseed []u8, addr Address, outlen int) ![]u8 {
 	// SHAKE-based PRF
 	//
 	// PRF(PK.seed, SK.seed, ADRS) = SHAKE256(PK.seed ∥ ADRS ∥ SK.seed, 8𝑛)
-	// adr.bytes() == 32
+	// addr.bytes() == 32
 	if c.is_shake_family() {
 		size := pkseed.len + skseed.len + 32
 		mut data := []u8{cap: size}
 		data << pkseed
-		data << adr.bytes()
+		data << addr.bytes()
 		data << skseed
 		return sha3.shake256(data, outlen)
 	}
@@ -151,7 +151,7 @@ fn (c &Context) prf(pkseed []u8, skseed []u8, adr Address, outlen int) ![]u8 {
 	// PRF(PK.seed, SK.seed, ADRS) = Trunc𝑛(SHA-256(PK.seed ∥ toByte(0, 64 − 𝑛) ∥ ADRS𝑐 ∥ SK.seed))
 	//
 	// start by compressing the address
-	cadrs := adr.compress()
+	cadrs := addr.compress()
 
 	// setup SHA256 hash
 	mut h := sha256.new()
@@ -174,7 +174,7 @@ fn (c &Context) prf(pkseed []u8, skseed []u8, adr Address, outlen int) ![]u8 {
 
 // tl is a hash function that maps an ℓ𝑛-byte message to an 𝑛-byte message.
 @[direct_array_access]
-fn (c &Context) tl(pkseed []u8, adr Address, msgsln [][]u8, outlen int) ![]u8 {
+fn (c &Context) tl(pkseed []u8, addr Address, msgsln [][]u8, outlen int) ![]u8 {
 	// SHAKE-based PRF
 	//
 	// Tℓ(PK.seed, ADRS, 𝑀ℓ) = SHAKE256(PK.seed ∥ ADRS ∥ 𝑀ℓ, 8𝑛)
@@ -186,7 +186,7 @@ fn (c &Context) tl(pkseed []u8, adr Address, msgsln [][]u8, outlen int) ![]u8 {
 		size := pkseed.len + 32 + mlsize
 		mut data := []u8{cap: size}
 		data << pkseed
-		data << adr.bytes()
+		data << addr.bytes()
 		// flatten the msg
 		data << arrays.flatten[u8](msgsln)
 
@@ -203,7 +203,7 @@ fn (c &Context) tl(pkseed []u8, adr Address, msgsln [][]u8, outlen int) ![]u8 {
 	mut h := c.sha2_prf()!
 
 	// Start by compressing the address
-	cadrs := adr.compress()
+	cadrs := addr.compress()
 	// write PK.seed
 	h.write(pkseed)!
 
@@ -229,14 +229,14 @@ fn (c &Context) tl(pkseed []u8, adr Address, msgsln [][]u8, outlen int) ![]u8 {
 
 // h is a special case of Tℓ that takes a 2𝑛-byte message as input.
 @[direct_array_access]
-fn (c &Context) h(pkseed []u8, adr Address, m2 []u8, outlen int) ![]u8 {
+fn (c &Context) h(pkseed []u8, addr Address, m2 []u8, outlen int) ![]u8 {
 	// SHAKE-based PRF
 	//
 	// H(PK.seed, ADRS, 𝑀2) = SHAKE256(PK.seed ∥ ADRS ∥ 𝑀2, 8𝑛)
 	if c.is_shake_family() {
 		mut data := []u8{cap: pkseed.len + 32 + m2.len}
 		data << pkseed
-		data << adr.bytes()
+		data << addr.bytes()
 		data << m2
 
 		return sha3.shake256(data, outlen)
@@ -246,24 +246,24 @@ fn (c &Context) h(pkseed []u8, adr Address, m2 []u8, outlen int) ![]u8 {
 	// For Security category 1 use SHA-256 PRF
 	// H(PK.seed, ADRS, 𝑀2) = Trunc𝑛(SHA-256(PK.seed ∥ toByte(0, 64 − 𝑛) ∥ ADRS𝑐 ∥ 𝑀2))
 	if c.is_sha2family_cat1() {
-		return sha256_caddr_generic(c.prm.n, pkseed, adr, m2, outlen)
+		return sha256_caddr_generic(c.prm.n, pkseed, addr, m2, outlen)
 	}
 	// Other else should have a security category 3 or 5 using SHA-512 PRF
 	//
 	// H(PK.seed, ADRS, 𝑀2) = Trunc𝑛(SHA-512(PK.seed ∥ toByte(0, 128 − 𝑛) ∥ ADRS𝑐 ∥ 𝑀2))
-	return sha512_caddr_generic(c.prm.n, pkseed, adr, m2, outlen)
+	return sha512_caddr_generic(c.prm.n, pkseed, addr, m2, outlen)
 }
 
 // f is a hash function that takes an 𝑛-byte message as input and produces an 𝑛-byte output.
 @[direct_array_access]
-fn (c &Context) f(pkseed []u8, adr Address, m1 []u8, outlen int) ![]u8 {
+fn (c &Context) f(pkseed []u8, addr Address, m1 []u8, outlen int) ![]u8 {
 	// SHAKE-based PRF
 	//
 	// F(PK.seed, ADRS, 𝑀1) = SHAKE256(PK.seed ∥ ADRS ∥ 𝑀1, 8𝑛)
 	if c.is_shake_family() {
 		mut data := []u8{cap: pkseed.len + 32 + m1.len}
 		data << pkseed
-		data << adr.bytes()
+		data << addr.bytes()
 		data << m1
 
 		return sha3.shake256(data, outlen)
@@ -276,14 +276,14 @@ fn (c &Context) f(pkseed []u8, adr Address, m1 []u8, outlen int) ![]u8 {
 	// 3 and 5: F(PK.seed, ADRS, 𝑀1) = Trunc𝑛(SHA-256(PK.seed ∥ toByte(0, 64 − 𝑛) ∥ ADRS𝑐 ∥ 𝑀1))
 	// NOTE: use context prm.n number directly
 	//
-	return sha256_caddr_generic(c.prm.n, pkseed, adr, m1, outlen)
+	return sha256_caddr_generic(c.prm.n, pkseed, addr, m1, outlen)
 }
 
 // Helpers for pseudorandom function
 //
 @[direct_array_access; inline]
-fn sha256_caddr_generic(n int, pkseed []u8, adr Address, msg []u8, outlen int) ![]u8 {
-	cadr := adr.compress()
+fn sha256_caddr_generic(n int, pkseed []u8, addr Address, msg []u8, outlen int) ![]u8 {
+	cadr := addr.compress()
 	mut h := sha256.new()
 	h.write(pkseed)!
 	h.write(to_byte(0, 64 - n))!
@@ -295,8 +295,8 @@ fn sha256_caddr_generic(n int, pkseed []u8, adr Address, msg []u8, outlen int) !
 }
 
 @[direct_array_access; inline]
-fn sha512_caddr_generic(n int, pkseed []u8, adr Address, msg []u8, outlen int) ![]u8 {
-	cadr := adr.compress()
+fn sha512_caddr_generic(n int, pkseed []u8, addr Address, msg []u8, outlen int) ![]u8 {
+	cadr := addr.compress()
 	mut h := sha512.new()
 	h.write(pkseed)!
 	h.write(to_byte(0, 128 - n))!

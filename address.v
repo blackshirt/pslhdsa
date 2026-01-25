@@ -2,7 +2,7 @@
 // Use of this source code is governed by an MIT license
 // that can be found in the LICENSE file.
 //
-// 4.2 Addresses
+// SLH-DSA Addresses handling module
 module pslhdsa
 
 import encoding.binary
@@ -22,13 +22,13 @@ mut:
 	data [8]u32
 }
 
-// return empty address
+// new_address creates an empty address
 @[inline]
 fn new_address() Address {
 	return Address{}
 }
 
-// bytes returns bytes representation of Addres ad in big-endian form
+// bytes returns the bytes representation of Addres ad in big-endian form
 @[direct_array_access; inline]
 fn (ad Address) bytes() []u8 {
 	mut x := []u8{len: 32}
@@ -45,63 +45,31 @@ fn (ad Address) bytes() []u8 {
 
 // 18. Compressed address (ADRS ) 22 bytes
 //
-// layer address 1 byte
-// tree address 8 bytes
-// 𝑡𝑦𝑝𝑒 1 byte
-// final 12 bytes
+// layer address   1 byte
+// tree address    8 bytes
+// 𝑡𝑦𝑝𝑒             1 byte
+// final          12 bytes
 //
-// compress compress the Address ad into 22-bytes output
+// compress compressing the Address ad into 22-bytes compressed address
 // ie, ADRS𝑐 = ADRS[3] ∥ ADRS[8 ∶ 16] ∥ ADRS[19] ∥ ADRS[20 ∶ 32]).
 @[direct_array_access; inline]
 fn (ad Address) compress() []u8 {
 	mut x := []u8{len: 22}
-	// TODO: using binary.big_endian variant
 	// 1 byte at 3..4
 	x[0] = u8(ad.data[0] & 0xff)
 
 	// 8 bytes at 8..16
 	binary.big_endian_put_u32(mut x[1..5], ad.data[2])
-	/*
-	x[1] = u8((ad.data[2] >> 24) & 0xff)
-	x[2] = u8((ad.data[2] >> 16) & 0xff)
-	x[3] = u8((ad.data[2] >> 8) & 0xff)
-	x[4] = u8((ad.data[2] >> 0) & 0xff)
-	*/
 	binary.big_endian_put_u32(mut x[5..9], ad.data[3])
-	/*
-	x[5] = u8((ad.data[3] >> 24) & 0xff)
-	x[6] = u8((ad.data[3] >> 16) & 0xff)
-	x[7] = u8((ad.data[3] >> 8) & 0xff)
-	x[8] = u8((ad.data[3] >> 0) & 0xff)
-	*/
 
 	// 1 byte at 19..20
 	x[9] = u8(ad.data[4] & 0xff)
 
 	// 12 bytes at 20..32,
 	binary.big_endian_put_u32(mut x[10..14], ad.data[5])
-	/*
-	x[10] = u8((ad.data[5] >> 24) & 0xff)
-	x[11] = u8((ad.data[5] >> 16) & 0xff)
-	x[12] = u8((ad.data[5] >> 8) & 0xff)
-	x[13] = u8((ad.data[5] >> 0) & 0xff)
-	*/
-
 	binary.big_endian_put_u32(mut x[14..18], ad.data[6])
-	/*
-	x[14] = u8((ad.data[6] >> 24) & 0xff)
-	x[15] = u8((ad.data[6] >> 16) & 0xff)
-	x[16] = u8((ad.data[6] >> 8) & 0xff)
-	x[17] = u8((ad.data[6] >> 0) & 0xff)
-	*/
-
 	binary.big_endian_put_u32(mut x[18..22], ad.data[7])
-	/*
-	x[18] = u8((ad.data[7] >> 24) & 0xff)
-	x[19] = u8((ad.data[7] >> 16) & 0xff)
-	x[20] = u8((ad.data[7] >> 8) & 0xff)
-	x[21] = u8((ad.data[7] >> 0) & 0xff)
-	*/
+
 	return x
 }
 
@@ -109,7 +77,7 @@ fn (ad Address) compress() []u8 {
 @[direct_array_access; inline]
 fn (ad Address) clone() Address {
 	mut out := [8]u32{}
-	// copy the address data into out
+	// directly, copy the address data into out
 	unsafe { vmemcpy(out, ad.data, sizeof(out)) }
 
 	return Address{
@@ -129,13 +97,13 @@ fn (ad Address) get_layer_address() u32 {
 // ADRS.setLayerAddress(𝑙) ADRS ← toByte(𝑙, 4) ∥ ADRS[4 ∶ 32]
 @[inline]
 fn (mut ad Address) set_layer_address(v u32) {
-	// reverts bits into big-endian if necessary
 	ad.data[0] = v
 }
 
 // Tree parts
 @[inline]
 fn (ad Address) get_tree_address() u64 {
+	// TODO: tree address was 12-bytes in size, its currently only handle low 64-bits
 	return u64(ad.data[2]) << 32 | u64(ad.data[3])
 }
 

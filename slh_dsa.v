@@ -6,6 +6,7 @@
 module pslhdsa
 
 import crypto.rand
+import crypto.internal.subtle
 
 const default_context = new_context(.sha2_128f)
 
@@ -91,7 +92,8 @@ struct SignerOpts {
 // Algorithm 21 slh_keygen()
 // Generates an SLH-DSA key pair.
 // Input: (none)
-// Output: SLH-DSA key pair (SK, PK)
+// Output: SLH-DSA secret key
+// slh_keygen generates a SLH-DSA key with the given kind.
 @[inline]
 fn slh_keygen(k Kind) !&SecretKey {
 	// create a new context for the key generation
@@ -162,6 +164,46 @@ fn new_seckey_with_seed(ctx &Context, seed []u8, prf []u8, pk &PubKey) !&SecretK
 	}
 }
 
+// new_seckey_with_key returns a new secret key with the given key.
+// The key must be 4 * n bytes long.
+@[direct_array_access; inline]
+fn new_seckey_with_key(c &Context, key []u8) !&SecretKey {
+	// check if the key is 4 * n bytes long
+	if key.len != c.prm.n * 4 {
+		return error('invalid secret key length')
+	}
+	// extract the secret key components from the key
+	skseed := key[0..c.prm.n]
+	skprf := key[c.prm.n..c.prm.n * 2]
+	pkseed := key[c.prm.n * 2..c.prm.n * 3]
+	// pkroot := key[c.prm.n*3..c.prm.n*4]
+
+	// Generates step from keygen internal
+	// generate the public key for the top-level XMSS tree
+	// 1: ADRS ← toByte(0, 32) ▷ set layer and tree address to bottom layer	
+	mut addr := new_address()
+	// 2: ADRS.setLayerAddress(𝑑 − 1)
+	addr.set_layer_address(u32(c.prm.d - 1))
+	// 3: PK.root ← xmss_node(SK.seed, 0, ℎ′ , PK.seed, ADRS)
+	pkroot := xmss_node(c, skseed, 0, u32(c.prm.hp), pkseed, mut addr)!
+	// Check if the xmss_node function call was successful
+	if pkroot.len != c.prm.n {
+		return error('xmss_node failed')
+	}
+
+	// Check matching pk.root and provided part
+	if subtle.constant_time_compare(pkroot, key[c.prm.n * 3..c.prm.n * 4]) != 1 {
+		return error('mismatched public key root')
+	}
+	// 4: return ( (SK.seed, SK.prf, PK.seed, PK.root), (PK.seed, PK.root) )
+	pk := &PubKey{
+		ctx:  unsafe { c }
+		seed: pkseed
+		root: pkroot
+	}
+	return new_seckey_with_seed(c, skseed, skprf, pk)!
+}
+
 // SLH-DSA signature data format
 @[noinit]
 struct SLHSignature {
@@ -170,11 +212,13 @@ mut:
 	r []u8
 	// 𝑘(1 + 𝑎) ⋅ 𝑛 bytes of FORS signature SIGFORS
 	sigfors []u8
-	// (ℎ + 𝑑 ⋅ 𝑙𝑒𝑛) ⋅ 𝑛 bytes of HT signature SIGHT
+	// (ℎ + 𝑑 ⋅ 𝑙𝑒𝑛) ⋅ 𝑛 bytes of HT signature SIGHT,
 	sight []u8
 }
 
-// bytes returns the signature bytes. The signature has a size of n + 𝑘(1 + 𝑎) ⋅ 𝑛 + (ℎ + 𝑑 ⋅ 𝑙𝑒𝑛) ⋅ 𝑛 bytes.
+// bytes returns the signature bytes.
+// The signature has a size of n + 𝑘(1 + 𝑎) ⋅ 𝑛 + (ℎ + 𝑑 ⋅ 𝑙𝑒𝑛) ⋅ 𝑛 bytes.
+@[inline]
 fn (s &SLHSignature) bytes() []u8 {
 	mut out := []u8{cap: s.r.len + s.sigfors.len + s.sight.len}
 	out << s.r
@@ -184,7 +228,6 @@ fn (s &SLHSignature) bytes() []u8 {
 	return out
 }
 
-/*
 // 9.2 SLH-DSA Signature Generation
 //
 // Algorithm 19 slh_sign_internal(𝑀, SK, 𝑎𝑑𝑑𝑟𝑛𝑑)
@@ -193,42 +236,55 @@ fn (s &SLHSignature) bytes() []u8 {
 // (optional) additional random 𝑎𝑑𝑑𝑟𝑛𝑑
 // Output: SLH-DSA signature SIG.
 @[direct_array_access; inline]
-fn slh_sign_internal(c &Context, m []u8, sk &SecretKey, addrnd []u8, opt SignerOpts) !&SLHSignature {
+fn slh_sign_internal(sk &SecretKey, msg []u8, addrnd []u8) !&SLHSignature {
+	// localizes some context variables for the signature generation
+	outlen := sk.ctx.prm.n
+	m8 := sk.ctx.prm.m
+	d := sk.ctx.prm.d
+	k := sk.ctx.prm.k
+	a := sk.ctx.prm.a
+	h := sk.ctx.prm.h
+	hp := sk.ctx.prm.hp
+
 	// ADRS ← toByte(0, 32) ▷ set layer and tree address to bottom layer	
 	mut addr := new_address()
-	// substitute 𝑜𝑝𝑡_𝑟𝑎𝑛𝑑 ← PK.seed for the deterministic variant, 𝑜𝑝𝑡_𝑟𝑎𝑛𝑑 ← 𝑎𝑑𝑑𝑟𝑛
+	// 𝑜𝑝𝑡_𝑟𝑎𝑛𝑑 ← 𝑎𝑑𝑑𝑟𝑛, substitute 𝑜𝑝𝑡_𝑟𝑎𝑛𝑑 ← PK.seed for the deterministic variant,
 	mut opt_rand := addrnd.clone()
-	// if opt.deterministic {
-	//	opt_rand = unsafe { sk.pk.seed }
-	//}
-	// if opt.randomize {
-	//	opt_rand = unsafe { rand.read(c.prm.n)! }
-	//}
+
 	// generate randomizer, 𝑅 ← PRF𝑚𝑠𝑔(SK.prf, 𝑜𝑝𝑡_𝑟𝑎𝑛𝑑, 𝑀 )
-	r := c.prm.prf_msg(sk.prf, opt_rand, m)!
+	r := sk.ctx.prf_msg(sk.prf, opt_rand, msg, outlen)!
 	// SIG ← r
-	mut sig := SLHSignature{
-		r: r.clone()
+	mut sig := &SLHSignature{
+		r: r
 	}
-	// compute message digest, 	𝑑𝑖𝑔𝑒𝑠𝑡 ← H𝑚𝑠𝑔(𝑅, PK.seed, PK.root, 𝑀 )
-	digest := c.prm.h_msg(r, sk.pk.seed, sk.pk.root, m)!
-	// 𝑚𝑑 ← 𝑑𝑖𝑔𝑒𝑠𝑡 [0 ∶ (𝑘⋅𝑎 ⌉ 8 )]
-	md := digest[0..cdiv(c.prm.k * c.prm.a, 8)]
+	// compute message digest, ie, 𝑑𝑖𝑔𝑒𝑠𝑡 ← H𝑚𝑠𝑔(𝑅, PK.seed, PK.root, 𝑀 )
+	digest := sk.ctx.hmsg(r, sk.pk.seed, sk.pk.root, msg, m8)!
+
+	// Intermediate values derived from the parameter sets
+	// ceil [0 ∶ (𝑘⋅𝑎 ⌉ 8 )]
+	ka8 := ((k * a) + 7) >> 3
+	// ceil((h - (h/d))/8)
+	hhd := ((h - hp) + 7) >> 3
+	// ceil(h / 8d)
+	h8d := (hp + 7) >> 3
+
+	// mut tmp_idxtree := []u8{len: 12}
+	// mut tmp_idxleaf := []u8{len: 4}
+
+	// first (𝑘⋅𝑎 ⌉ 8 ) bytes, 𝑚𝑑 ← 𝑑𝑖𝑔𝑒𝑠𝑡 [0 ∶ (𝑘⋅𝑎 ⌉ 8 )]
+	md := digest[0..ka8]
 
 	// ∶ ⌈(k*a)/8⌉ .. ∶ ⌈(k*a)/8⌉ + ∶ ⌈(h-h/d)/8⌉
-	tmp_idxtree := digest[cdiv(c.prm.k * c.prm.a, 8)..cdiv(c.prm.k * c.prm.a, 8) +
-		cdiv(c.prm.h - c.prm.h / c.prm.d, 8)]
+	tmp_idxtree := digest[ka8..ka8 + hhd]
 
 	// ⌈(k*a)/8⌉ + ⌈(h-h/d)/8⌉ .. ⌈(k*a)/8⌉ + ⌈(h-h/d)/8⌉ + ⌈h/8d⌉
-	tmp_idxleaf := digest[cdiv(c.prm.k * c.prm.a, 8) + cdiv(c.prm.h - c.prm.h / c.prm.d, 8)..
-		cdiv(c.prm.k * c.prm.a, 8) + cdiv(c.prm.h - c.prm.h / c.prm.d, 8) +
-		cdiv(c.prm.h, 8 * c.prm.d)]
+	tmp_idxleaf := digest[ka8 + hhd..ka8 + hhd + h8d]
 
-	idxtree_mask := u64(1 << (c.prm.h - c.prm.h / c.prm.d)) - 1 // mod 2^(ℎ−ℎ/d)
-	idxtree := to_int(tmp_idxtree, cdiv(c.prm.h - c.prm.h / c.prm.d, 8)) & idxtree_mask
+	idxtree_mask := u64(1 << (h - hp / d)) - 1 // mod 2^(ℎ−ℎ/d)
+	idxtree := to_int(tmp_idxtree, hhd) & idxtree_mask
 
-	idxleaf_mask := u64(1 << (c.prm.h / c.prm.d)) - 1 // mod 2^ℎ/d
-	idxleaf := to_int(tmp_idxleaf, cdiv(c.prm.h, 8 * c.prm.d)) & idxleaf_mask
+	idxleaf_mask := u64(1 << (h / d)) - 1 // mod 2^ℎ/d
+	idxleaf := to_int(tmp_idxleaf, h8d) & idxleaf_mask
 
 	// ADRS.setTreeAddress(𝑖𝑑𝑥𝑡𝑟𝑒𝑒)
 	addr.set_tree_address(idxtree)
@@ -238,21 +294,22 @@ fn slh_sign_internal(c &Context, m []u8, sk &SecretKey, addrnd []u8, opt SignerO
 	addr.set_keypair_address(u32(idxleaf))
 
 	// SIG𝐹𝑂𝑅𝑆 ← fors_sign(𝑚𝑑, SK.seed, PK.seed, ADRS)
-	sig_fors := fors_sign(c, md, sk.seed, sk.pk.seed, addr)!
+	sig_fors := fors_sign(sk.ctx, md, sk.seed, sk.pk.seed, mut addr)!
 	// SIG ← SIG ∥ SIG𝐹𝑂𝑅s
-	sig << sig_fors
+	sig.sigfors = sig_fors
 
 	// get FORS key, PK𝐹𝑂𝑅𝑆 ← fors_pkFromSig(SIG𝐹𝑂𝑅𝑆, 𝑚𝑑, PK.seed, ADRS)
-	pk_fors := fors_pkfromsig(c, sig_fors, md, sk.pk.seed, addr)!
+	pk_fors := fors_pkfromsig(sk.ctx, sig_fors, md, sk.pk.seed, mut addr)!
 	// 17: SIG𝐻𝑇 ← ht_sign(PK𝐹𝑂𝑅𝑆, SK.seed, PK.seed,𝑖𝑑𝑥𝑡𝑟𝑒𝑒,𝑖𝑑𝑥𝑙𝑒𝑎𝑓)
-	sig_ht := ht_sign(c, pk_fors, sk.seed, sk.pk.seed, idxtree, idxleaf)!
+	sig_ht := ht_sign(sk.ctx, pk_fors, sk.seed, sk.pk.seed, idxtree, u32(idxleaf))!
 
 	// : SIG ← SIG ∥ SIG𝐻t
-	sig << sig_ht
+	sig.sight = sig_ht.bytes()
 	// : return SIG
 	return sig
 }
 
+/*
 // 9.3 SLH-DSA Signature Verification
 //
 // Algorithm 20 slh_verify_internal(𝑀, SIG, PK)
@@ -277,22 +334,21 @@ fn slh_verify_internal(c &Context, m []u8, sig &SLHSignature, pk &PubKey) !bool 
 	sig_ht := sig[(1 + c.k * (1 + c.a)) * c.prm.n..(1 + c.k * (1 + c.a) + c.h + c.prm.d * c.wots_len()) * c.prm.n]	
 
 	// compute message digest, 𝑑𝑖𝑔𝑒𝑠𝑡 ← H𝑚𝑠𝑔(𝑅, PK.seed, PK.root, 𝑀 )
-	digest := c.prm.h_msg(r, pk.seed, pk.root, m)!
+	digest := c.hmsg(r, pk.seed, pk.root, msg, c.prm.m)!
 
 	// first (k.a)/8 bytes, 𝑚𝑑 ← 𝑑𝑖𝑔𝑒𝑠𝑡 [0 ∶ ⌈𝑘⋅𝑎)/8]
-	md := digest[0..cdiv(c.k * c.a, 8)]
+	md := digest[0..ka8]
 
 	// next ⌈ℎ−ℎ/𝑑]/8 ⌉ bytes
-	tmp_idxtree := digest[cdiv(c.prm.k * c.prm.a, 8)..cdiv(c.prm.k * c.prm.a, 8) + cdiv(c.prm.h - c.prm.h / c.prm.d, 8)]
+	tmp_idxtree := digest[ka8..ka8 + hhd]
 
 	// next [h/8𝑑] bytes
-	tmp_idxleaf := digest[cdiv(c.prm.k * c.prm.a, 8) + cdiv(c.prm.h - c.prm.h / c.prm.d, 8)..cdiv(c.prm.k * c.prm.a, 8) +
-		cdiv(c.prm.h - c.prm.h / c.prm.d, 8) + cdiv(c.prm.h, 8 * c.prm.d)]
+	tmp_idxleaf := digest[ka8 + hhd..ka8 + hhd + h8d]
 
-	idxtree_mask := u64(1 << (c.prm.h - c.prm.h / c.prm.d)) - 1 // mod 2^(ℎ−ℎ/d)
-	idxleaf_mask := u64(1 << (c.prm.h / c.prm.d)) - 1 // mod 2^(ℎ/d)
-	idxtree := to_int(tmp_idxtree, cdiv(c.prm.h - c.prm.h / c.prm.d, 8)) & idxtree_mask // mod 2^(ℎ−ℎ/d)
-	idxleaf := to_int(tmp_idxleaf, cdiv(c.prm.h, 8 * c.prm.d)) & idxleaf_mask // mod 2^(ℎ/d)
+	idxtree_mask := u64(1 << (h - h / d)) - 1 // mod 2^(ℎ−ℎ/d)
+	idxleaf_mask := u64(1 << (h / d)) - 1 // mod 2^(ℎ/d)
+	idxtree := to_int(tmp_idxtree, hhd) & idxtree_mask // mod 2^(ℎ−ℎ/d)
+	idxleaf := to_int(tmp_idxleaf, h8d) & idxleaf_mask // mod 2^(ℎ/d)
 
 	// compute FORS public key
 	// ADRS.setTreeAddress(𝑖𝑑𝑥𝑡𝑟𝑒𝑒)
@@ -303,10 +359,10 @@ fn slh_verify_internal(c &Context, m []u8, sig &SLHSignature, pk &PubKey) !bool 
 	addr.set_keypair_address(u32(idxleaf))
 
 	// PK𝐹𝑂𝑅𝑆 ← fors_pkFromSig(SIG𝐹𝑂𝑅𝑆, 𝑚𝑑, PK.seed, ADRS)
-	pk_fors := fors_pkfromsig(c, sig_fors, md, pk.seed, addr)!
+	pk_fors := fors_pkfromsig(sk.ctx, sig_fors, md, pk.seed, mut addr)!
 
 	// return ht_verify(c, pk_fors, sig_ht, pk.seed, idxtree, idxleaf, pk.root)!
-	return ht_verify(c, pk_fors, sig_ht, pk.seed, idxtree, idxleaf, pk.root)!	
+	return ht_verify(sk.ctx, pk_fors, sig_ht, pk.seed, idxtree, idxleaf, pk.root)!		
 }
 
 
@@ -334,8 +390,8 @@ fn slh_sign(c &Context, m []u8, cx []u8, sk &SecretKey, opt SignerOpts) ![]u8 {
 	msg << cx
 	msg << m
 
-	// SIG ← slh_sign_internal(𝑀′, SK, 𝑎𝑑𝑑𝑟𝑛𝑑) ▷ omit 𝑎𝑑𝑑𝑟𝑛𝑑 for the deterministic variant
-	sig := slh_sign_internal(c, msg, sk, addrnd, opt)!
+	// SIG ← slh_sign_internal(𝑀′, 𝑎𝑑𝑑𝑟𝑛𝑑) ▷ omit 𝑎𝑑𝑑𝑟𝑛𝑑 for the deterministic variant
+	sig := slh_sign_internal(sk, msg, addrnd)!
 
 	return sig
 }
@@ -401,7 +457,9 @@ fn hash_slh_sign(c &Context, m []u8, cx []u8, ph crypto.Hash, sk &SecretKey, opt
 	msg << phm
 
 	// SIG ← slh_sign_internal(𝑀′, SK, 𝑎𝑑𝑑𝑟𝑛𝑑) ▷ omit 𝑎𝑑𝑑𝑟𝑛𝑑 for the deterministic variant
-	sig := slh_sign_internal(c, msg, sk, addrnd, opt)!
+	sig := slh_sign_internal(sk.ctx, msg, sk, addrnd)!
+
+
 
 	return sig
 }

@@ -32,6 +32,12 @@ fn new_context(k Kind) &Context {
 	}
 }
 
+// name returns the name of this context
+@[inline]
+fn (c &Context) name() string {
+	return c.kind.name()
+}
+
 // clone returns a clone of this context
 @[inline]
 fn (c &Context) clone() &Context {

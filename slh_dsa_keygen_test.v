@@ -1,3 +1,8 @@
+// Copyright © 2024 blackshirt.
+// Use of this source code is governed by an MIT license
+// that can be found in the LICENSE file.
+//
+// The main SLH-DSA Signature keygen testing module
 module pslhdsa
 
 import encoding.hex

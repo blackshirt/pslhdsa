@@ -29,6 +29,12 @@ fn new_xmss_signature(wots [][]u8, auth [][]u8) &XmssSignature {
 	}
 }
 
+// clone returns a deep copy of XmssSignature x
+@[inline]
+fn (x &XmssSignature) clone() &XmssSignature {
+	return new_xmss_signature(x.get_wots_sig(), x.get_xmss_auth())
+}
+
 // parse_xmss_signature parses bytes into XmssSignature
 @[direct_array_access; inline]
 fn parse_xmss_signature(c &Context, bytes []u8) !&XmssSignature {

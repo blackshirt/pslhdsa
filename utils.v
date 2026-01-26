@@ -95,3 +95,13 @@ fn base_2b(x []u8, b int, outlen int) []u32 {
 	}
 	return out
 }
+
+// is_zero tells whether seed is all zeroes in constant time.
+@[direct_array_access; inline]
+fn is_zero(seed []u8) bool {
+	mut acc := u8(0)
+	for b in seed {
+		acc |= b
+	}
+	return acc == 0
+}

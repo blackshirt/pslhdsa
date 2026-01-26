@@ -32,6 +32,13 @@ fn new_context(k Kind) &Context {
 	}
 }
 
+// equal returns true if this context is equal to the other context
+@[inline]
+fn (c &Context) equal(o &Context) bool {
+	// for sake of simplicity, only check for kind equality, not the parameter set
+	return c.kind == o.kind
+}
+
 // Hash Addressing and Pseudorandom Functions for SLH-DSA context
 //
 

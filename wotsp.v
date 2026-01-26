@@ -5,8 +5,6 @@
 // WOTS+ module
 module pslhdsa
 
-import arrays
-
 // 5.1 WOTS+ Public-Key Generation
 //
 // Algorithm 6 wots_pkGen(SK.seed, PK.seed, ADRS)

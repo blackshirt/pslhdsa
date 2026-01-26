@@ -9,8 +9,8 @@ module pslhdsa
 //
 @[inline]
 fn gen_len2(n int, lgw int) int {
-	ww := 1 << lgw
-	len1 := ((n << 3) + lgw - 1) / lgw
+	ww := u32(1) << u32(lgw)
+	len1 := ((u32(n) << 3) + u32(lgw) - 1) / u32(lgw)
 	max_checksum := len1 * (ww - 1)
 	mut out := 1
 	mut capacity := ww

@@ -32,6 +32,15 @@ fn new_context(k Kind) &Context {
 	}
 }
 
+// clone returns a clone of this context
+@[inline]
+fn (c &Context) clone() &Context {
+	return &Context{
+		kind: c.kind
+		prm:  c.prm.clone()
+	}
+}
+
 // equal returns true if this context is equal to the other context
 @[inline]
 fn (c &Context) equal(o &Context) bool {
@@ -418,6 +427,25 @@ fn new_param(k Kind) Param {
 	return paramset[k.str()]
 }
 
+// clone returns a deep copy of Param p
+@[inline]
+fn (p &Param) clone() &Param {
+	return &Param{
+		name:    p.name
+		n:       p.n
+		h:       p.h
+		d:       p.d
+		hp:      p.hp
+		a:       p.a
+		k:       p.k
+		lgw:     p.lgw
+		m:       p.m
+		sc:      p.sc
+		pksize:  p.pksize
+		sigsize: p.sigsize
+	}
+}
+
 // Table 2. SLH-DSA parameter sets
 //
 // name					𝑛 	ℎ  𝑑 ℎ′ 𝑎 𝑘 𝑙𝑔𝑤 𝑚 securitycategory pkbytes sigbytes
@@ -500,6 +528,12 @@ fn kind_from_name(name string) !Kind {
 		'SLH-DSA-SHAKE-256f' { return .shake_256f }
 		else { return error('Invalid SLH-DSA name string') }
 	}
+}
+
+// clone returns a deep copy of Kind k
+@[inline]
+fn (k Kind) clone() Kind {
+	return k
 }
 
 // name returns the famous name of this Kind

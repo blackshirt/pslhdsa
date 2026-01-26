@@ -7,6 +7,8 @@ module pslhdsa
 
 import crypto.rand
 
+const default_context = new_context(.sha2_128f)
+
 // The SLH-DSA Private Key
 //
 // The private key contains two random, secret 𝑛-byte values (see Figure 15). SK.seed is
@@ -40,30 +42,6 @@ fn (s &SecretKey) bytes() []u8 {
 	out << s.pk.root
 
 	return out
-}
-
-// new_seckey_with_seed returns a new secret key.
-@[inline]
-fn new_seckey_with_seed(ctx &Context, seed []u8, prf []u8, pk &PubKey) !&SecretKey {
-	// check if the context of the secret key and the given public key are equal
-	if !ctx.equal(pk.ctx) {
-		return error('context of the secret key and the public key are not equal')
-	}
-	// check if the seed or PRF values are all zeroes, which could indicate a weak key
-	if is_zero(seed) || is_zero(prf) {
-		return error('weak secret key')
-	}
-	// check the length of the secret key components
-	if seed.len != ctx.prm.n || prf.len != ctx.prm.n || pk.seed.len != ctx.prm.n
-		|| pk.root.len != ctx.prm.n {
-		return error('invalid secret key length')
-	}
-	return &SecretKey{
-		ctx:  ctx
-		seed: seed
-		prf:  prf
-		pk:   pk
-	}
 }
 
 // pubkey returns the public key.
@@ -117,26 +95,23 @@ struct SignerOpts {
 @[inline]
 fn slh_keygen(k Kind) !&SecretKey {
 	// create a new context for the key generation
-	c := new_context(k)!
+	c := new_context(k)
 	// set SK.seed, SK.prf, and PK.seed to random 𝑛-byte
 	skseed := rand.read(c.prm.n)!
 	skprf := rand.read(c.prm.n)!
 	pkseed := rand.read(c.prm.n)!
 
-	return slh_keygen_internal(c, skseed, skprf, pkseed)!
+	return slh_keygen_with_seed(c, skseed, skprf, pkseed)!
 }
 
 // slh_keygen_with_seed generates a SLH-DSA key pair with the given seed values.
 // The seed values must be non-zero to avoid weak keys.
 @[direct_array_access; inline]
-fn slh_keygen_with_seed(k Kind, skseed []u8, skprf []u8, pkseed []u8) !&SecretKey {
+fn slh_keygen_with_seed(c &Context, skseed []u8, skprf []u8, pkseed []u8) !&SecretKey {
 	// check if the seed is all zeroes
 	if is_zero(skseed) || is_zero(skprf) || is_zero(pkseed) {
 		return error('seed is all zeroes')
 	}
-	// create a new context for the key generation
-	c := new_context(k)!
-
 	return slh_keygen_internal(c, skseed, skprf, pkseed)!
 }
 
@@ -153,16 +128,63 @@ fn slh_keygen_internal(c &Context, skseed []u8, skprf []u8, pkseed []u8) !&Secre
 	// 2: ADRS.setLayerAddress(𝑑 − 1)
 	addr.set_layer_address(u32(c.prm.d - 1))
 	// 3: PK.root ← xmss_node(SK.seed, 0, ℎ′ , PK.seed, ADRS)
-	pkroot := xmss_node(c.prm, skseed, 0, c.prm.hp, pkseed, addr)!
+	pkroot := xmss_node(c, skseed, 0, u32(c.prm.hp), pkseed, mut addr)!
 	// 4: return ( (SK.seed, SK.prf, PK.seed, PK.root), (PK.seed, PK.root) )
 	pk := &PubKey{
-		ctx:  c
+		ctx:  unsafe { c }
 		seed: pkseed
 		root: pkroot
 	}
 	return new_seckey_with_seed(c, skseed, skprf, pk)!
 }
 
+// new_seckey_with_seed returns a new secret key.
+@[inline]
+fn new_seckey_with_seed(ctx &Context, seed []u8, prf []u8, pk &PubKey) !&SecretKey {
+	// check if the context of the secret key and the given public key are equal
+	if !ctx.equal(pk.ctx) {
+		return error('context of the secret key and the public key are not equal')
+	}
+	// check if the seed or PRF values are all zeroes, which could indicate a weak key
+	if is_zero(seed) || is_zero(prf) {
+		return error('weak secret key')
+	}
+	// check the length of the secret key components
+	if seed.len != ctx.prm.n || prf.len != ctx.prm.n || pk.seed.len != ctx.prm.n
+		|| pk.root.len != ctx.prm.n {
+		return error('invalid secret key length')
+	}
+	return &SecretKey{
+		ctx:  unsafe { ctx }
+		seed: seed
+		prf:  prf
+		pk:   unsafe { pk }
+	}
+}
+
+// SLH-DSA signature data format
+@[noinit]
+struct SLHSignature {
+mut:
+	// n-bytes of randomness
+	r []u8
+	// 𝑘(1 + 𝑎) ⋅ 𝑛 bytes of FORS signature SIGFORS
+	sigfors []u8
+	// (ℎ + 𝑑 ⋅ 𝑙𝑒𝑛) ⋅ 𝑛 bytes of HT signature SIGHT
+	sight []u8
+}
+
+// bytes returns the signature bytes. The signature has a size of n + 𝑘(1 + 𝑎) ⋅ 𝑛 + (ℎ + 𝑑 ⋅ 𝑙𝑒𝑛) ⋅ 𝑛 bytes.
+fn (s &SLHSignature) bytes() []u8 {
+	mut out := []u8{cap: s.r.len + s.sigfors.len + s.sight.len}
+	out << s.r
+	out << s.sigfors
+	out << s.sight
+
+	return out
+}
+
+/*
 // 9.2 SLH-DSA Signature Generation
 //
 // Algorithm 19 slh_sign_internal(𝑀, SK, 𝑎𝑑𝑑𝑟𝑛𝑑)
@@ -171,7 +193,7 @@ fn slh_keygen_internal(c &Context, skseed []u8, skprf []u8, pkseed []u8) !&Secre
 // (optional) additional random 𝑎𝑑𝑑𝑟𝑛𝑑
 // Output: SLH-DSA signature SIG.
 @[direct_array_access; inline]
-fn slh_sign_internal(c &Context, m []u8, sk &SecretKey, addrnd []u8, opt SignerOpts) ![]u8 {
+fn slh_sign_internal(c &Context, m []u8, sk &SecretKey, addrnd []u8, opt SignerOpts) !&SLHSignature {
 	// ADRS ← toByte(0, 32) ▷ set layer and tree address to bottom layer	
 	mut addr := new_address()
 	// substitute 𝑜𝑝𝑡_𝑟𝑎𝑛𝑑 ← PK.seed for the deterministic variant, 𝑜𝑝𝑡_𝑟𝑎𝑛𝑑 ← 𝑎𝑑𝑑𝑟𝑛
@@ -185,7 +207,9 @@ fn slh_sign_internal(c &Context, m []u8, sk &SecretKey, addrnd []u8, opt SignerO
 	// generate randomizer, 𝑅 ← PRF𝑚𝑠𝑔(SK.prf, 𝑜𝑝𝑡_𝑟𝑎𝑛𝑑, 𝑀 )
 	r := c.prm.prf_msg(sk.prf, opt_rand, m)!
 	// SIG ← r
-	mut sig := r.clone()
+	mut sig := SLHSignature{
+		r: r.clone()
+	}
 	// compute message digest, 	𝑑𝑖𝑔𝑒𝑠𝑡 ← H𝑚𝑠𝑔(𝑅, PK.seed, PK.root, 𝑀 )
 	digest := c.prm.h_msg(r, sk.pk.seed, sk.pk.root, m)!
 	// 𝑚𝑑 ← 𝑑𝑖𝑔𝑒𝑠𝑡 [0 ∶ (𝑘⋅𝑎 ⌉ 8 )]
@@ -229,7 +253,6 @@ fn slh_sign_internal(c &Context, m []u8, sk &SecretKey, addrnd []u8, opt SignerO
 	return sig
 }
 
-/*
 // 9.3 SLH-DSA Signature Verification
 //
 // Algorithm 20 slh_verify_internal(𝑀, SIG, PK)
@@ -237,10 +260,10 @@ fn slh_sign_internal(c &Context, m []u8, sk &SecretKey, addrnd []u8, opt SignerO
 // Input: Message 𝑀, signature SIG, public key PK = (PK.seed, PK.root).
 // Output: Boolean.
 @[inline]
-fn slh_verify_internal(c &Context, m []u8, sig []u8, pk &PubKey) !bool {
+fn slh_verify_internal(c &Context, m []u8, sig &SLHSignature, pk &PubKey) !bool {
 	// if |SIG| ≠ (1 + 𝑘(1 + 𝑎) + ℎ + 𝑑 ⋅ 𝑙𝑒𝑛) ⋅ 𝑛 { return false }
 	exp_length := (1 + c.k * (1 + c.a) + c.h + c.prm.d * c.wots_len()) * c.prm.n
-	if sig.len != exp_length {
+	if sig.bytes().len != exp_length {
 		return false
 	}
 
@@ -285,7 +308,7 @@ fn slh_verify_internal(c &Context, m []u8, sig []u8, pk &PubKey) !bool {
 	// return ht_verify(c, pk_fors, sig_ht, pk.seed, idxtree, idxleaf, pk.root)!
 	return ht_verify(c, pk_fors, sig_ht, pk.seed, idxtree, idxleaf, pk.root)!	
 }
-*/
+
 
 const max_allowed_context_string = 255
 // 10.2.1 Pure SLH-DSA Signature Generation
@@ -317,7 +340,7 @@ fn slh_sign(c &Context, m []u8, cx []u8, sk &SecretKey, opt SignerOpts) ![]u8 {
 	return sig
 }
 
-/*
+
 // 10.2.2 HashSLH-DSA Signature Generation
 //
 // Algorithm 23 hash_slh_sign(𝑀, 𝑐𝑡𝑥, PH, SK)
@@ -382,7 +405,7 @@ fn hash_slh_sign(c &Context, m []u8, cx []u8, ph crypto.Hash, sk &SecretKey, opt
 
 	return sig
 }
-*/
+
 
 // 10.3 SLH-DSA Signature Verification
 //
@@ -406,7 +429,7 @@ fn slh_verify(c &Context, m []u8, sig []u8, cx []u8, p &PubKey) !bool {
 	return slh_verify_internal(c, msg, sig, p)!
 }
 
-/*
+
 // Algorithm 25 hash_slh_verify(𝑀, SIG, 𝑐𝑡𝑥, PH, PK)
 // Verifies a pre-hash SLH-DSA signature.
 // Input: Message 𝑀, signature SIG, context string 𝑐𝑡𝑥, pre-hash function PH, public key PK.

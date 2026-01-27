@@ -32,14 +32,14 @@ fn new_address() Address {
 @[direct_array_access; inline]
 fn (ad Address) bytes() []u8 {
 	mut x := []u8{len: 32}
-	binary.big_endian_put_u32(mut x[0..4], ad.data[0])
-	binary.big_endian_put_u32(mut x[4..8], ad.data[1])
-	binary.big_endian_put_u32(mut x[8..12], ad.data[2])
-	binary.big_endian_put_u32(mut x[12..16], ad.data[3])
-	binary.big_endian_put_u32(mut x[16..20], ad.data[4])
-	binary.big_endian_put_u32(mut x[20..24], ad.data[5])
-	binary.big_endian_put_u32(mut x[24..28], ad.data[6])
-	binary.big_endian_put_u32(mut x[28..32], ad.data[7])
+	binary.big_endian_put_u32(mut x[0..4], u32(ad.data[0]))
+	binary.big_endian_put_u32(mut x[4..8], u32(ad.data[1]))
+	binary.big_endian_put_u32(mut x[8..12], u32(ad.data[2]))
+	binary.big_endian_put_u32(mut x[12..16], u32(ad.data[3]))
+	binary.big_endian_put_u32(mut x[16..20], u32(ad.data[4]))
+	binary.big_endian_put_u32(mut x[20..24], u32(ad.data[5]))
+	binary.big_endian_put_u32(mut x[24..28], u32(ad.data[6]))
+	binary.big_endian_put_u32(mut x[28..32], u32(ad.data[7]))
 	return x
 }
 
@@ -102,19 +102,27 @@ fn (mut ad Address) set_layer_address(v u32) {
 
 // Tree parts
 @[inline]
-fn (ad Address) get_tree_address() u64 {
+fn (ad Address) get_tree_address() TreeIndex {
 	// TODO: tree address was 12-bytes in size, its currently only handle low 64-bits
-	return u64(ad.data[2]) << 32 | u64(ad.data[3])
+	// return u64(ad.data[2]) << 32 | u64(ad.data[3])
+	return TreeIndex{
+		hi: ad.data[1]
+		mi: ad.data[2]
+		lo: ad.data[3]
+	}
 }
 
 // ADRS.setTreeAddress(𝑡) ADRS ← ADRS[0 ∶ 4] ∥ toByte(𝑡, 12) ∥ ADRS[16 ∶ 32]
 @[inline]
-fn (mut ad Address) set_tree_address(v u64) {
+fn (mut ad Address) set_tree_address(v TreeIndex) {
 	// TODO: tree address is 12-bytes in size, its currently only handle 64-bits
 	// bytes a[4:8] of tree address are always zero
 	// ad.data[1] = 0
-	ad.data[2] = u32(v >> 32)
-	ad.data[3] = u32(v & 0xFFFF_FFFF)
+	// ad.data[2] = u32(v >> 32)
+	// ad.data[3] = u32(v & 0xFFFF_FFFF)
+	ad.data[1] = v.hi
+	ad.data[2] = v.mi
+	ad.data[3] = v.lo
 }
 
 // KEYPAIR
@@ -240,4 +248,104 @@ mut:
 
 fn (c CompressedAddress) bytes() []u8 {
 	return c.data[..]
+}
+
+// Port of TreeIndex from golang implementation of SL-HDSA.
+// 12-bytes of tree index
+@[noinit]
+struct TreeIndex {
+	hi u32
+	mi u32
+	lo u32
+}
+
+// new_treeindex creates a new TreeIndex from u32 values hi, mi, lo.
+@[inline]
+fn new_treeindex(hi u32, mi u32, lo u32) TreeIndex {
+	return TreeIndex{hi, mi, lo}
+}
+
+// make_treeindex_from64 creates a new TreeIndex from u64 value v.
+@[inline]
+fn make_treeindex_from64(v u64) TreeIndex {
+	// u32(v >> 32)
+	// ad.data[3] = u32(v & 0xFFFF_FFFF)
+	return TreeIndex{
+		hi: u32(0)
+		mi: u32(v >> 32)
+		lo: u32(v & 0xFFFF_FFFF)
+	}
+}
+
+// make_treeindex creates a new TreeIndex from 12-bytes of data.
+@[direct_array_access; inline]
+fn make_treeindex(x []u8, b int) TreeIndex {
+	mut hi, mut mi, mut lo := u32(0), u32(0), u32(0)
+	if b >= 8 {
+		hi = u32(to_int(x[0..4], 4))
+	}
+	if b >= 4 {
+		mi = u32(to_int(x[4..8], 4))
+	}
+	lo = u32(to_int(x[8..12], 4))
+	return TreeIndex{hi, mi, lo}
+}
+
+// Returns a clone of the tree index.
+@[inline]
+fn (t TreeIndex) clone() TreeIndex {
+	return TreeIndex{
+		hi: t.hi
+		mi: t.mi
+		lo: t.lo
+	}
+}
+
+// Returns the 12-bytes representation of the tree index.
+@[inline]
+fn (t TreeIndex) bytes() []u8 {
+	mut out := []u8{len: 12}
+	binary.big_endian_put_u32(mut out[0..4], t.hi)
+	binary.big_endian_put_u32(mut out[4..8], t.mi)
+	binary.big_endian_put_u32(mut out[8..12], t.lo)
+	return out
+}
+
+// residue Returns the residue of the tree index modulo 2^h.
+@[inline]
+fn (t TreeIndex) residue(h int) u32 {
+	m := u32(1 << h) - 1
+	return t.lo & m
+}
+
+// remove_bits Returns the tree index with the least significant h bits removed.
+@[inline]
+fn (t TreeIndex) remove_bits(h int) TreeIndex {
+	m := u32(1 << h) - 1
+	hi := t.hi >> h
+	mi := (t.mi >> h) | ((t.hi & m) << (32 - h))
+	lo := (t.lo >> h) | ((t.mi & m) << (32 - h))
+	return TreeIndex{hi, mi, lo}
+}
+
+// mod_2b returns the tree index with the least significant b bits removed.
+@[inline]
+fn (t TreeIndex) mod_2b(b int) TreeIndex {
+	mut hi := t.hi
+	if b < 64 {
+		hi = 0
+	} else {
+		hi &= (1 << (b - 64) - 1)
+	}
+	mut mi := t.mi
+	if b < 32 {
+		mi = 0
+	} else if b < 64 {
+		mi &= (1 << (b - 32) - 1)
+	}
+	mut lo := t.lo
+	if b < 32 {
+		lo &= (1 << b - 1)
+	}
+	return TreeIndex{hi, mi, lo}
 }

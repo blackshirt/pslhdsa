@@ -33,15 +33,17 @@ fn test_hypertree_sig() ! {
 		expect_sig := hex.decode(item.expect_sig)!
 
 		// we dont support for 4-bytes of idxtreehigh, so we discard it
-		idxtree := u64(item.idxtreemid) << 32 | u32(item.idxtreelow)
-
-		// ht_sign(c &Context, m []u8, skseed []u8, pkseed []u8, idxtree_ u64, idxleaf_ u32) !&HypertreeSignature
-		htsig := ht_sign(c, m, skseed, pkseed, idxtree, item.idxleaf)!
-
-		// check sig
+		// idxtree := u64(item.idxtreemid) << 32 | u32(item.idxtreelow)
+		mut idxtree := TreeIndex{
+			hi: item.idxtreehigh
+			mi: item.idxtreemid
+			lo: item.idxtreelow
+		}
+		// ht_sign(c &Context, m []u8, skseed []u8, pkseed []u8, idxtree_ TreeIndex, idxleaf_ u32) !&HypertreeSignature
+		htsig := ht_sign(c, m, skseed, pkseed, mut idxtree, item.idxleaf)!
 		assert htsig.bytes() == expect_sig
 
-		// ht_verify(c &Context, m []u8, sight &HypertreeSignature, pkseed []u8, idxtree_ u64, idxleaf_ u32, pkroot []u8) !bool
-		assert ht_verify(c, m, htsig, pkseed, idxtree, item.idxleaf, pkroot)!
+		// ht_verify(c &Context, m []u8, sight &HypertreeSignature, pkseed []u8, idxtree_ TreeIndex, idxleaf_ u32, pkroot []u8) !bool
+		assert ht_verify(c, m, htsig, pkseed, mut idxtree, item.idxleaf, pkroot)!
 	}
 }

@@ -43,7 +43,7 @@ fn (c &Context) name() string {
 fn (c &Context) clone() &Context {
 	return &Context{
 		kind: c.kind
-		prm:  c.prm.clone()
+		prm:  c.prm
 	}
 }
 
@@ -431,25 +431,6 @@ mut:
 @[inline]
 fn new_param(k Kind) Param {
 	return paramset[k.str()]
-}
-
-// clone returns a deep copy of Param p
-@[inline]
-fn (p &Param) clone() &Param {
-	return &Param{
-		name:    p.name
-		n:       p.n
-		h:       p.h
-		d:       p.d
-		hp:      p.hp
-		a:       p.a
-		k:       p.k
-		lgw:     p.lgw
-		m:       p.m
-		sc:      p.sc
-		pksize:  p.pksize
-		sigsize: p.sigsize
-	}
 }
 
 // Table 2. SLH-DSA parameter sets

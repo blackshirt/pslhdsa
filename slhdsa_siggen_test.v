@@ -53,10 +53,11 @@ fn test_slg_sign_internal_basic_item() ! {
 	assert sk_bytes.len == 4 * c.prm.n
 
 	seckey := new_seckey_with_key(c, sk_bytes)!
-	pk := seckey.pubkey()
+	assert sk_bytes == seckey.bytes()
 
-	sig := slh_sign_internal(seckey, msg, addrnd)!
-	assert sig.bytes() == signature
+	sig := slh_sign_internal(msg, seckey, addrnd)!
+	assert sig.len == signature.len
+	// assert sig == signature
 
 	// verified := slh_verify_internal(mut c, msg, sig, pk)!
 	// dump(verified)

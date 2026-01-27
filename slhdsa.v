@@ -236,15 +236,19 @@ fn (s &SLHSignature) bytes() []u8 {
 // (optional) additional random 𝑎𝑑𝑑𝑟𝑛𝑑
 // Output: SLH-DSA signature SIG.
 @[direct_array_access; inline]
-fn slh_sign_internal(sk &SecretKey, msg []u8, addrnd []u8) !&SLHSignature {
+fn slh_sign_internal(msg []u8, sk &SecretKey, addrnd []u8) ![]u8 {
 	// localizes some context variables for the signature generation
 	outlen := sk.ctx.prm.n
-	m8 := sk.ctx.prm.m
+	msize := sk.ctx.prm.m
 	d := sk.ctx.prm.d
 	k := sk.ctx.prm.k
 	a := sk.ctx.prm.a
 	h := sk.ctx.prm.h
+	// Note: hp = h/d
 	hp := sk.ctx.prm.hp
+
+	// signature
+	mut sig := []u8{cap: sk.ctx.prm.sigsize}
 
 	// ADRS ← toByte(0, 32) ▷ set layer and tree address to bottom layer	
 	mut addr := new_address()
@@ -254,49 +258,54 @@ fn slh_sign_internal(sk &SecretKey, msg []u8, addrnd []u8) !&SLHSignature {
 	// generate randomizer, 𝑅 ← PRF𝑚𝑠𝑔(SK.prf, 𝑜𝑝𝑡_𝑟𝑎𝑛𝑑, 𝑀 )
 	r := sk.ctx.prf_msg(sk.prf, opt_rand, msg, outlen)!
 	// SIG ← r
-	mut sig := &SLHSignature{
-		r: r
-	}
+	sig << r
+
 	// compute message digest, ie, 𝑑𝑖𝑔𝑒𝑠𝑡 ← H𝑚𝑠𝑔(𝑅, PK.seed, PK.root, 𝑀 )
-	digest := sk.ctx.hmsg(r, sk.pk.seed, sk.pk.root, msg, m8)!
+	digest := sk.ctx.hmsg(r, sk.pk.seed, sk.pk.root, msg, msize)!
 
 	// Intermediate values derived from the parameter sets
-	// ceil [0 ∶ (𝑘⋅𝑎 ⌉ 8 )]
+	// ceil [0 ∶ ⌈𝑘*𝑎⌉/8]
 	ka8 := ((k * a) + 7) >> 3
-	// ceil((h - (h/d))/8)
+	// ceil((h - (h/d))/8) ,  ⌈ℎ−ℎ/𝑑⌉ / 8, note hp = h/d
 	hhd := ((h - hp) + 7) >> 3
-	// ceil(h / 8d)
+	// ceil(h / 8d),   ⌈ℎ ⌈ 8𝑑 ⌉
 	h8d := (hp + 7) >> 3
 
 	// mut tmp_idxtree := []u8{len: 12}
 	// mut tmp_idxleaf := []u8{len: 4}
 
-	// first (𝑘⋅𝑎 ⌉ 8 ) bytes, 𝑚𝑑 ← 𝑑𝑖𝑔𝑒𝑠𝑡 [0 ∶ (𝑘⋅𝑎 ⌉ 8 )]
+	// first (𝑘⋅𝑎 ⌉ 8 ) bytes, 𝑚𝑑 ← 𝑑𝑖𝑔𝑒𝑠𝑡 [0 ∶ (𝑘⋅𝑎 ⌉ 8 )] [0 ∶ ⌈𝑘⋅𝑎8 ⌉ bytes 8 ⌉]
 	md := digest[0..ka8]
+	// mut start := ka8
+	// mut innerstart := 12 - ka8
 
+	// next, hhd bytes, 𝑖𝑑𝑥𝑡𝑟𝑒𝑒 ← 𝑑𝑖𝑔𝑒𝑠𝑡 [⌈(k*a)/8⌉ .. ⌈(k*a)/8⌉ + ∶ ⌈(h-h/d)/8⌉]
 	// ∶ ⌈(k*a)/8⌉ .. ∶ ⌈(k*a)/8⌉ + ∶ ⌈(h-h/d)/8⌉
 	tmp_idxtree := digest[ka8..ka8 + hhd]
 
-	// ⌈(k*a)/8⌉ + ⌈(h-h/d)/8⌉ .. ⌈(k*a)/8⌉ + ⌈(h-h/d)/8⌉ + ⌈h/8d⌉
+	// next h8d bytes, 𝑖𝑑𝑥𝑙𝑒𝑎𝑓 ← 𝑑𝑖𝑔𝑒𝑠𝑡 [⌈(k*a)/8⌉ + ⌈(h-h/d)/8⌉ .. ⌈(k*a)/8⌉ + ⌈(h-h/d)/8⌉ + ⌈h/8d⌉]
+	// ∶ ⌈(k*a)/8⌉ + ⌈(h-h/d)/8⌉ .. ∶ ⌈(k*a)/8⌉ + ⌈(h-h/d)/8⌉ + ⌈h/8d⌉
 	tmp_idxleaf := digest[ka8 + hhd..ka8 + hhd + h8d]
 
-	idxtree_mask := u64(1 << (h - hp / d)) - 1 // mod 2^(ℎ−ℎ/d)
-	idxtree := to_int(tmp_idxtree, hhd) & idxtree_mask
+	// ceil((h - (h/d))/8) ,  ⌈ℎ−ℎ/𝑑⌉ / 8, note hp = h/d
+	idxtree_mask := (u64(1) << (h - hp)) - 1 // mod 2^(ℎ−ℎ/d)
+	idxtree := to_int(tmp_idxtree, hhd) // & idxtree_mask
 
-	idxleaf_mask := u64(1 << (h / d)) - 1 // mod 2^ℎ/d
+	// ceil(h / 8d),   ⌈ℎ ⌈ 8𝑑 ⌉
+	idxleaf_mask := (u64(1) << hp) - 1 // mod 2^ℎ/d
 	idxleaf := to_int(tmp_idxleaf, h8d) & idxleaf_mask
 
 	// ADRS.setTreeAddress(𝑖𝑑𝑥𝑡𝑟𝑒𝑒)
 	addr.set_tree_address(idxtree)
 	// ADRS.setTypeAndClear(FORS_TREE)
-	addr.set_type_and_clear_not_kp(.fors_tree)
+	addr.set_type_and_clear(.fors_tree)
 	// ADRS.setKeyPairAddress(𝑖𝑑𝑥𝑙𝑒𝑎𝑓)
 	addr.set_keypair_address(u32(idxleaf))
 
 	// SIG𝐹𝑂𝑅𝑆 ← fors_sign(𝑚𝑑, SK.seed, PK.seed, ADRS)
 	sig_fors := fors_sign(sk.ctx, md, sk.seed, sk.pk.seed, mut addr)!
 	// SIG ← SIG ∥ SIG𝐹𝑂𝑅s
-	sig.sigfors = sig_fors
+	sig << sig_fors
 
 	// get FORS key, PK𝐹𝑂𝑅𝑆 ← fors_pkFromSig(SIG𝐹𝑂𝑅𝑆, 𝑚𝑑, PK.seed, ADRS)
 	pk_fors := fors_pkfromsig(sk.ctx, sig_fors, md, sk.pk.seed, mut addr)!
@@ -304,7 +313,7 @@ fn slh_sign_internal(sk &SecretKey, msg []u8, addrnd []u8) !&SLHSignature {
 	sig_ht := ht_sign(sk.ctx, pk_fors, sk.seed, sk.pk.seed, idxtree, u32(idxleaf))!
 
 	// : SIG ← SIG ∥ SIG𝐻t
-	sig.sight = sig_ht.bytes()
+	sig << sig_ht.bytes()
 	// : return SIG
 	return sig
 }
@@ -345,8 +354,9 @@ fn slh_verify_internal(c &Context, m []u8, sig &SLHSignature, pk &PubKey) !bool 
 	// next [h/8𝑑] bytes
 	tmp_idxleaf := digest[ka8 + hhd..ka8 + hhd + h8d]
 
-	idxtree_mask := u64(1 << (h - h / d)) - 1 // mod 2^(ℎ−ℎ/d)
-	idxleaf_mask := u64(1 << (h / d)) - 1 // mod 2^(ℎ/d)
+	// ceil((h - (h/d))/8) ,  ⌈ℎ−ℎ/𝑑⌉ / 8, note hp = h/d
+	idxtree_mask := u64(1 << (h - hp)) - 1 // mod 2^(ℎ−ℎ/d)
+	idxleaf_mask := u64(1 << hp) - 1 // mod 2^(ℎ/d)	
 	idxtree := to_int(tmp_idxtree, hhd) & idxtree_mask // mod 2^(ℎ−ℎ/d)
 	idxleaf := to_int(tmp_idxleaf, h8d) & idxleaf_mask // mod 2^(ℎ/d)
 

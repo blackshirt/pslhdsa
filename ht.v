@@ -93,8 +93,7 @@ fn ht_sign(c &Context, m []u8, skseed []u8, pkseed []u8, mut idxtree TreeIndex, 
 	sight[0] = sigtmp.clone()
 	// 𝑟𝑜𝑜𝑡 ← xmss_pkFromSig(𝑖𝑑𝑥𝑙𝑒𝑎𝑓, SIG𝑡𝑚𝑝, 𝑀, PK.seed, ADRS)
 	mut root := xmms_pkfromsig(c, idxleaf, sigtmp, m, pkseed, mut adrs)!
-	mask1 := u32(1) << c.prm.hp - 1
-	mask2 := u32(1) << (64 - c.prm.hp) - 1
+
 	// for 𝑗 from 1 to 𝑑 − 1
 	for j := u32(1); j < c.prm.d; j++ {
 		idxleaf = idxtree.residue(c.prm.hp)
@@ -141,8 +140,6 @@ fn ht_verify(c &Context, m []u8, sight &HypertreeSignature, pkseed []u8, mut idx
 	// 𝑛𝑜𝑑𝑒 ← xmss_pkFromSig(𝑖𝑑𝑥𝑙𝑒𝑎𝑓, SIG𝑡𝑚𝑝, 𝑀, PK.seed, ADRS)
 	mut node := xmms_pkfromsig(c, idxleaf, sigtmp, m, pkseed, mut adrs)!
 
-	mask1 := u32(1) << c.prm.hp - 1
-	// mask2 := u32(1) << (64 - c.prm.hp) - 1
 	// for 𝑗 from 1 to 𝑑 − 1 do
 	for j := u32(1); j < c.prm.d; j++ {
 		// 𝑖𝑑𝑥𝑙𝑒𝑎𝑓 ← 𝑖𝑑𝑥𝑡𝑟𝑒𝑒 mod 2^ℎ′, ℎ′ least significant bits of 𝑖𝑑𝑥𝑡𝑟𝑒e

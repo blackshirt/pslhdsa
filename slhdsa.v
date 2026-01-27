@@ -5,7 +5,11 @@
 // The main SLH-DSA Signature module
 module pslhdsa
 
+import crypto
 import crypto.rand
+import crypto.sha3
+import crypto.sha256
+import crypto.sha512
 import crypto.internal.subtle
 
 const default_context = new_context(.sha2_128f)
@@ -83,8 +87,13 @@ fn (p &PubKey) bytes() []u8 {
 
 @[params]
 struct SignerOpts {
-	randomize     bool
+mut:
+	// deterministic signature generation
 	deterministic bool
+	// use random seed for signature generation
+	randomize bool
+	// use this random seed for signature generation
+	addrnd []u8 // ctx.prm.n length	
 }
 
 // 10.1 SLH-DSA Key Generation
@@ -232,6 +241,14 @@ fn (s &SLHSignature) bytes() []u8 {
 	out << ht
 
 	return out
+}
+
+// slh_sign_internal_deterministic generates a deterministic SLH-DSA signature.
+@[direct_array_access; inline]
+fn slh_sign_internal_deterministic(msg []u8, sk &SecretKey) !&SLHSignature {
+	// use the public key seed as the random seed for deterministic signature generation
+	addrnd := sk.pk.seed.clone()
+	return slh_sign_internal(msg, sk, addrnd)!
 }
 
 // 9.2 SLH-DSA Signature Generation
@@ -387,7 +404,7 @@ fn slh_verify_internal(msg []u8, sig &SLHSignature, pk &PubKey) !bool {
 	idxleaf := u32(to_int(tmp_idxleaf, 4)) & ((1 << hp) - 1)
 
 	// compute FORS public key
-	// ADRS.setTreeAddress(𝑖𝑑𝑥𝑡𝑟
+	// ADRS.setTreeAddress(𝑖𝑑𝑥𝑡𝑟ee)
 	// ADRS.setTypeAndClear(FORS_TREE)
 	// ADRS.setKeyPairAddress(𝑖𝑑𝑥𝑙𝑒𝑎𝑓)
 	addr.set_tree_address(idxtree)
@@ -401,83 +418,96 @@ fn slh_verify_internal(msg []u8, sig &SLHSignature, pk &PubKey) !bool {
 	return ht_verify(pk.ctx, pkfors, sig.ht, pk.seed, mut idxtree, idxleaf, pk.root)!
 }
 
-/*
-const max_allowed_context_string = 255
+const max_context_string_size = 255
 // 10.2.1 Pure SLH-DSA Signature Generation
 //
 // Algorithm 22 slh_sign(𝑀, 𝑐𝑡𝑥, SK)
 // Generates a pure SLH-DSA signature.
-// Input: Message 𝑀, context string 𝑐𝑥, private key SK.
+// Input: Message 𝑀, context string cs, private key SK.
 // Output: SLH-DSA signature SIG.
 @[direct_array_access; inline]
-fn slh_sign(ctx &Context, m []u8, cx []u8, sk &SecretKey, opt SignerOpts) ![]u8 {
-	if cx.len > max_allowed_context_string {
+fn slh_sign(msg []u8, cs []u8, sk &SecretKey, opt SignerOpts) !&SLHSignature {
+	// Check context string size, should not exceed max_context_string_size
+	if cs.len > max_context_string_size {
 		return error('pure SLH-DSA signature failed: exceed context-string')
 	}
-	mut addrnd := []u8{}
-	if opt.randomize {
-		addrnd = rand.read(ctx.n)!
+	// randomized random for the randomized variant or
+	// 𝑜𝑝𝑡_𝑟𝑎𝑛𝑑 ← 𝑎𝑑𝑑𝑟𝑛, substitute 𝑜𝑝𝑡_𝑟𝑎𝑛𝑑 ← PK.seed for the deterministic variant,
+	opt_rand := if opt.deterministic {
+		sk.pk.seed
+	} else {
+		// TODO: handle with crypto.rand
+		rand.read(sk.ctx.prm.n)!
 	}
 
 	// 𝑀′ ← toByte(0, 1) ∥ toByte(|𝑐𝑡𝑥|, 1) ∥ 𝑐𝑡𝑥 ∥ m
-	mut msg := []u8{}
-	msg << to_bytes(0, 1)
-	msg << to_bytes(u64(cx.len), 1)
-	msg << cx
-	msg << m
+	mut msgout := []u8{cap: 1 + 1 + cs.len + msg.len}
+	// to_byte(0, 1)(0, 1)
+	msgout << u8(0)
+	// to_byte(|𝑐𝑡𝑥|, 1), |𝑐𝑡𝑥| should fit in 1-byte
+	msgout << u8(cs.len)
+	msgout << cs
+	msgout << msg
 
-	// SIG ← slh_sign_internal(ctx, 𝑀′, 𝑎𝑑𝑑𝑟𝑛𝑑) ▷ omit 𝑎𝑑𝑑𝑟𝑛𝑑 for the deterministic variant
-	sig := slh_sign_internal(ctx, msg, addrnd)!
+	// SIG ← slh_sign_internal(msg []u8, sk &SecretKey, addrnd []u8) !&SLHSignature
+	// ▷ omit 𝑎𝑑𝑑𝑟𝑛𝑑 for the deterministic variant
+	sig := slh_sign_internal(msgout, sk, opt_rand)!
 
 	return sig
 }
-
 
 // 10.2.2 HashSLH-DSA Signature Generation
 //
 // Algorithm 23 hash_slh_sign(𝑀, 𝑐𝑡𝑥, PH, SK)
 // Generates a pre-hash SLH-DSA signature.
-// Input: Message 𝑀, context string 𝑐𝑡𝑥, pre-hash function PH, private key SK.
+// Input: Message 𝑀, context string cs, pre-hash function PH, private key SK.
 // Output: SLH-DSA signature SIG.
 @[direct_array_access; inline]
-fn hash_slh_sign(ctx &Context, m []u8, cx []u8, ph crypto.Hash, sk &SecretKey, opt SignerOpts) ![]u8 {
-	if cx.len > max_allowed_context_string {
+fn hash_slh_sign(msg []u8, cs []u8, ph crypto.Hash, sk &SecretKey, opt SignerOpts) !&SLHSignature {
+	if cs.len > max_context_string_size {
 		return error('pure SLH-DSA signature failed: exceed context-string')
 	}
-	mut addrnd := []u8{}
-	if opt.randomize {
-		addrnd = rand.read(ctx.n)!
+	// randomized random for the randomized variant or
+	// substitute 𝑜𝑝𝑡_𝑟𝑎𝑛𝑑 ← PK.seed for the deterministic variant,
+	addrnd := if opt.deterministic {
+		sk.pk.seed
+	} else {
+		rrbytes := rand.read(sk.ctx.prm.n)!
+		rrbytes
 	}
-
-	// default to sha256
-	// OID ← toByte(0x0609608648016503040201, 11)
-	mut oid := to_bytes(u64(0x0609608648016503040201), 11)
-	// PH𝑀 ← SHA-256(𝑀 )
-	mut phm := sha256.sum256(m)
+	// the biggest 64-bytes
+	mut phm := []u8{cap: 64}
+	mut oid := []u8{cap: 11}
 
 	match ph {
 		.sha256 {
-			// do nothing
+			// OID ← toByte(0x0609608648016503040201, 11)
+			oid = [u8(0x06), 0x09, 0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x02, 0x01]
+			// PH𝑀 ← SHA-256(𝑀)
+			phm = sha256.sum256(msg)
 		}
 		.sha512 {
 			// OID ← toByte(0x0609608648016503040203, 11) ▷ 2.16.840.1.101.3.4.2.3
-			oid = to_bytes(u64(0x0609608648016503040203), 11)
-			// PH𝑀 ← SHA-512(𝑀 )
-			phm = sha512.sum512(m)
+			oid = [u8(0x06), 0x09, u8(0x60), u8(0x86), u8(0x48), u8(0x01), u8(0x65), u8(0x03),
+				u8(0x04), u8(0x02), u8(0x03)]
+			// PH𝑀 ← SHA-512(𝑀)
+			phm = sha512.sum512(msg)
 		}
 		// need to be patched into .shake128
 		.sha3_224 {
 			// OID ← toByte(0x060960864801650304020B, 11) ▷ 2.16.840.1.101.3.4.2.11
-			oid = to_bytes(u64(0x060960864801650304020B), 11)
-			// 17: PH𝑀 ← SHAKE128(𝑀, 256)
-			phm = sha3.shake128(m, 256)
+			oid = [u8(0x06), 0x09, u8(0x60), u8(0x86), u8(0x48), u8(0x01), u8(0x65), u8(0x03),
+				u8(0x04), u8(0x02), u8(0x0B)]
+			// 17: PH𝑀 ← SHAKE128(𝑀, 256), 32-bytes
+			phm = sha3.shake128(msg, 32)
 		}
-		// // need to be patched into .shake256
+		// need to be patched into .shake256
 		.sha3_256 {
 			// OID ← toByte(0x060960864801650304020C, 11) ▷ 2.16.840.1.101.3.4.2.12
-			oid = to_bytes(u64(0x060960864801650304020C), 11)
-			// PH𝑀 ← SHAKE256(𝑀, 512)
-			phm = sha3.shake256(m, 512)
+			oid = [u8(0x06), (0x09), u8(0x60), u8(0x86), u8(0x48), u8(0x01), u8(0x65), u8(0x03),
+				u8(0x04), u8(0x02), u8(0x0C)]
+			// PH𝑀 ← SHAKE256(𝑀, 512), 64-bytes
+			phm = sha3.shake256(msg, 64)
 		}
 		else {
 			return error('Unsupported hash')
@@ -485,21 +515,18 @@ fn hash_slh_sign(ctx &Context, m []u8, cx []u8, ph crypto.Hash, sk &SecretKey, o
 	}
 
 	// 𝑀′ ← toByte(1, 1) ∥ toByte(|𝑐𝑡𝑥|, 1) ∥ 𝑐𝑡𝑥 ∥ OID ∥ PHm
-	mut msg := []u8{}
-	msg << to_bytes(1, 1)
-	msg << to_bytes(cx.len, 1)
-	msg << cx
-	msg << oid
-	msg << phm
+	mut msgout := []u8{cap: 1 + 1 + cs.len + oid.len + phm.len}
+	msgout << u8(0x01) // to_byte(0, 1)(1, 1)
+	msgout << u8(cs.len) // to_byte(|𝑐𝑡𝑥|, 1), |𝑐𝑡𝑥| should fit in 1-byte
+	msgout << cs
+	msgout << oid
+	msgout << phm
 
 	// SIG ← slh_sign_internal(𝑀′, SK, 𝑎𝑑𝑑𝑟𝑛𝑑) ▷ omit 𝑎𝑑𝑑𝑟𝑛𝑑 for the deterministic variant
-	sig := slh_sign_internal(sk.ctx, msg, sk, addrnd)!
-
-
+	sig := slh_sign_internal(msgout, sk, addrnd)!
 
 	return sig
 }
-
 
 // 10.3 SLH-DSA Signature Verification
 //
@@ -507,35 +534,35 @@ fn hash_slh_sign(ctx &Context, m []u8, cx []u8, ph crypto.Hash, sk &SecretKey, o
 // Verifies a pure SLH-DSA signature.
 // Input: Message 𝑀, signature sig , context string 𝑐𝑡𝑥, public key PK.
 // Output: Boolean.
-@[inline; direct_array_access]
-fn slh_verify(ctx &Context, m []u8, sig []u8, cx []u8, p &PubKey) !bool {
-	if cx.len > max_allowed_context_string {
+@[direct_array_access; inline]
+fn slh_verify(msg []u8, sig &SLHSignature, cs []u8, pk &PubKey, opt SignerOpts) !bool {
+	if cs.len > max_context_string_size {
 		return error('pure SLH-DSA signature failed: exceed context-string')
 	}
 	// 𝑀′ ← toByte(0, 1) ∥ toByte(|𝑐𝑡𝑥|, 1) ∥ 𝑐𝑡𝑥 ∥ m
-	mut msg := []u8{}
-	msg << u8(0x00)
-	msg << u8(cx.len)
-	msg << cx
-	msg << m
+	mut msgout := []u8{cap: 1 + 1 + cs.len + msg.len}
+	msgout << u8(0)
+	msgout << u8(cs.len)
+	msgout << cs
+	msgout << msg
 
-	// return slh_verify_internal(ctx, 𝑀′, SIG, PK)
-	return slh_verify_internal(ctx, msg, sig, p)!
+	// return slh_verify_internal(msg []u8, sig &SLHSignature, pk &PubKey) !bool
+	return slh_verify_internal(msgout, sig, pk)!
 }
 
-
+/*
 // Algorithm 25 hash_slh_verify(𝑀, SIG, 𝑐𝑡𝑥, PH, PK)
 // Verifies a pre-hash SLH-DSA signature.
 // Input: Message 𝑀, signature SIG, context string 𝑐𝑡𝑥, pre-hash function PH, public key PK.
 // Output: Boolean.
 @[inline]
 fn hash_slh_verify(c &Context, m []u8, sig []u8, cx []u8, ph crypto.Hash, p &PubKey) !bool {
-	if cx.len > max_allowed_context_string {
+	if cx.len > max_context_string_size {
 		return error('pure SLH-DSA signature failed: exceed context-string')
 	}
 	// default to sha256
 	// OID ← toByte(0x0609608648016503040201, 11)
-	mut oid := to_bytes(u64(0x0609608648016503040201), 11)
+	mut oid := to_byte(0, 1)(u64(0x0609608648016503040201), 11)
 	// PH𝑀 ← SHA-256(𝑀 )
 	mut phm := sha256.sum256(m)
 
@@ -545,21 +572,21 @@ fn hash_slh_verify(c &Context, m []u8, sig []u8, cx []u8, ph crypto.Hash, p &Pub
 		}
 		.sha512 {
 			// OID ← toByte(0x0609608648016503040203, 11) ▷ 2.16.840.1.101.3.4.2.3
-			oid = to_bytes(u64(0x0609608648016503040203), 11)
+			oid = to_byte(0, 1)(u64(0x0609608648016503040203), 11)
 			// PH𝑀 ← SHA-512(𝑀 )
 			phm = sha512.sum512(m)
 		}
 		// need to be patched into .shake128
 		.sha3_224 {
 			// OID ← toByte(0x060960864801650304020B, 11) ▷ 2.16.840.1.101.3.4.2.11
-			oid = to_bytes(u64(0x060960864801650304020B), 11)
+			oid = to_byte(0, 1)(u64(0x060960864801650304020B), 11)
 			// 17: PH𝑀 ← SHAKE128(𝑀, 256)
 			phm = sha3.shake128(m, 256)
 		}
 		// // need to be patched into .shake256
 		.sha3_256 {
 			// OID ← toByte(0x060960864801650304020C, 11) ▷ 2.16.840.1.101.3.4.2.12
-			oid = to_bytes(u64(0x060960864801650304020C), 11)
+			oid = to_byte(0, 1)(u64(0x060960864801650304020C), 11)
 			// PH𝑀 ← SHAKE256(𝑀, 512)
 			phm = sha3.shake256(m, 512)
 		}

@@ -17,37 +17,34 @@ const max_context_string_size = 255
 //
 // Algorithm 22 slh_sign(𝑀, 𝑐𝑡𝑥, SK)
 // Generates a pure SLH-DSA signature.
-// Input: Message 𝑀, context string cs, private key SK.
+// Input: Message 𝑀, context string cx, private key SK.
 // Output: SLH-DSA signature SIG.
 @[direct_array_access; inline]
-fn slh_sign(msg []u8, cs []u8, sk &SigningKey, opt SignerOpts) !&SLHSignature {
+fn slh_sign_random(msg []u8, cx []u8, sk &SigningKey) !&SLHSignature {
 	// Check context string size, should not exceed max_context_string_size
-	if cs.len > max_context_string_size {
+	if cx.len > max_context_string_size {
 		return error('pure SLH-DSA signature failed: exceed context-string')
 	}
 	// randomized random for the randomized variant or
 	// 𝑜𝑝𝑡_𝑟𝑎𝑛𝑑 ← 𝑎𝑑𝑑𝑟𝑛, substitute 𝑜𝑝𝑡_𝑟𝑎𝑛𝑑 ← PK.seed for the deterministic variant,
-	opt_rand := if opt.deterministic {
-		sk.pkseed
-	} else {
-		// TODO: handle with crypto.rand
-		rand.read(sk.ctx.prm.n)!
-	}
+	opt_rand := rand.bytes(sk.ctx.prm.n)!
 
 	// 𝑀′ ← toByte(0, 1) ∥ toByte(|𝑐𝑡𝑥|, 1) ∥ 𝑐𝑡𝑥 ∥ m
-	mut msgout := []u8{cap: 1 + 1 + cs.len + msg.len}
-	// to_byte(0, 1)(0, 1)
-	msgout << u8(0)
-	// to_byte(|𝑐𝑡𝑥|, 1), |𝑐𝑡𝑥| should fit in 1-byte
-	msgout << u8(cs.len)
-	msgout << cs
-	msgout << msg
+	msgout := compose_msg(u8(0), cx, msg)
 
 	// SIG ← slh_sign_internal(msg []u8, sk &SigningKey, addrnd []u8) !&SLHSignature
 	// ▷ omit 𝑎𝑑𝑑𝑟𝑛𝑑 for the deterministic variant
 	sig := slh_sign_internal(msgout, sk, opt_rand)!
 
 	return sig
+}
+
+// slh_sign_deterministic generates a deterministic SLH-DSA signature.
+@[direct_array_access; inline]
+fn slh_sign_deterministic(msg []u8, cx []u8, sk &SigningKey) !&SLHSignature {
+	// use the public key seed as the random seed for deterministic signature generation
+	msgout := compose_msg(u8(0), cx, msg)
+	return slh_sign_internal(msgout, sk, sk.pkseed)!
 }
 
 // 9.2 SLH-DSA Signature Generation
@@ -143,11 +140,11 @@ fn slh_sign_internal(msg []u8, sk &SigningKey, addrnd []u8) !&SLHSignature {
 //
 // Algorithm 23 hash_slh_sign(𝑀, 𝑐𝑡𝑥, PH, SK)
 // Generates a pre-hash SLH-DSA signature.
-// Input: Message 𝑀, context string cs, pre-hash function PH, private key SK.
+// Input: Message 𝑀, context string cx, pre-hash function PH, private key SK.
 // Output: SLH-DSA signature SIG.
 @[direct_array_access; inline]
-fn hash_slh_sign(msg []u8, cs []u8, ph crypto.Hash, sk &SigningKey, opt SignerOpts) !&SLHSignature {
-	if cs.len > max_context_string_size {
+fn hash_slh_sign(msg []u8, cx []u8, ph crypto.Hash, sk &SigningKey, opt SignerOpts) !&SLHSignature {
+	if cx.len > max_context_string_size {
 		return error('pure SLH-DSA signature failed: exceed context-string')
 	}
 	// randomized random for the randomized variant or
@@ -198,10 +195,10 @@ fn hash_slh_sign(msg []u8, cs []u8, ph crypto.Hash, sk &SigningKey, opt SignerOp
 	}
 
 	// 𝑀′ ← toByte(1, 1) ∥ toByte(|𝑐𝑡𝑥|, 1) ∥ 𝑐𝑡𝑥 ∥ OID ∥ PHm
-	mut msgout := []u8{cap: 1 + 1 + cs.len + oid.len + phm.len}
+	mut msgout := []u8{cap: 1 + 1 + cx.len + oid.len + phm.len}
 	msgout << u8(0x01) // to_byte(0, 1)(1, 1)
-	msgout << u8(cs.len) // to_byte(|𝑐𝑡𝑥|, 1), |𝑐𝑡𝑥| should fit in 1-byte
-	msgout << cs
+	msgout << u8(cx.len) // to_byte(|𝑐𝑡𝑥|, 1), |𝑐𝑡𝑥| should fit in 1-byte
+	msgout << cx
 	msgout << oid
 	msgout << phm
 
@@ -211,10 +208,19 @@ fn hash_slh_sign(msg []u8, cs []u8, ph crypto.Hash, sk &SigningKey, opt SignerOp
 	return sig
 }
 
-// slh_sign_internal_deterministic generates a deterministic SLH-DSA signature.
+// Helpers for message combination
+
+// compose_msg combines the message components into a single message.
 @[direct_array_access; inline]
-fn slh_sign_internal_deterministic(msg []u8, sk &SigningKey) !&SLHSignature {
-	// use the public key seed as the random seed for deterministic signature generation
-	addrnd := sk.pkseed.clone()
-	return slh_sign_internal(msg, sk, addrnd)!
+fn compose_msg(me u8, cx []u8, msg []u8) []u8 {
+	// 𝑀′ ← toByte(me, 1) ∥ toByte(|𝑐𝑡𝑥|, 1) ∥ 𝑐𝑡𝑥 ∥ m
+	mut msgout := []u8{cap: 2 + cx.len + msg.len}
+	// to_byte(me, 1)
+	msgout << me
+	// to_byte(|𝑐𝑡𝑥|, 1), |𝑐𝑡𝑥| should fit in 1-byte
+	msgout << u8(cx.len)
+	msgout << cx
+	msgout << msg
+
+	return msgout
 }

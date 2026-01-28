@@ -6,10 +6,6 @@
 module pslhdsa
 
 import crypto
-import crypto.rand
-import crypto.sha3
-import crypto.sha256
-import crypto.sha512
 
 // 9.3 SLH-DSA Signature Verification
 //
@@ -25,13 +21,6 @@ fn slh_verify_internal(msg []u8, sig &SLHSignature, pk &PubKey) !bool {
 	m := pk.ctx.prm.m
 	h := pk.ctx.prm.h
 	hp := pk.ctx.prm.hp
-	length := pk.ctx.wots_len()
-
-	// if |SIG| ≠ (1 + 𝑘(1 + 𝑎) + ℎ + 𝑑 ⋅ length) ⋅ 𝑛 { return false }
-	exp_length := (1 + k * (1 + a) + h + hp * length) * n
-	if sig.bytes().len != exp_length {
-		return false
-	}
 
 	// Intermediate values derived from the parameter sets
 	// ceil [0 ∶ ⌈𝑘*𝑎⌉/8]
@@ -51,6 +40,7 @@ fn slh_verify_internal(msg []u8, sig &SLHSignature, pk &PubKey) !bool {
 	// ht := sig[(1 + k * (1 + a)) * n..(1 + k * (1 + a) + h + hp * length) * n]			
 
 	// compute message digest, 𝑑𝑖𝑔𝑒𝑠𝑡 ← H𝑚𝑠𝑔(𝑅, PK.seed, PK.root, 𝑀 )
+	// hmsg(r []u8, pkseed []u8, pkroot []u8, msg []u8, outlen int)
 	digest := pk.ctx.hmsg(sig.r, pk.seed, pk.root, msg, m)!
 
 	// first (k.a)/8 bytes, 𝑚𝑑 ← 𝑑𝑖𝑔𝑒𝑠𝑡 [0 ∶ ⌈𝑘⋅𝑎)/8]
@@ -79,12 +69,14 @@ fn slh_verify_internal(msg []u8, sig &SLHSignature, pk &PubKey) !bool {
 	// ADRS.setTypeAndClear(FORS_TREE)
 	// ADRS.setKeyPairAddress(𝑖𝑑𝑥𝑙𝑒𝑎𝑓)
 	addr.set_tree_address(idxtree)
-	addr.set_type_and_clear(.fors_tree)
+	addr.set_type_and_clear_not_kp(.fors_tree)
 	addr.set_keypair_address(idxleaf)
 
 	// PK𝐹𝑂𝑅𝑆 ← fors_pkFromSig(SIG𝐹𝑂𝑅𝑆, 𝑚𝑑, PK.seed, ADRS)
 	pkfors := fors_pkfromsig(pk.ctx, sig.fors, md, pk.seed, mut addr)!
 
+	//
+	// mut idxtree_cloned := idxtree.clone()
 	// return ht_verify(pk.ctx, pkfors, ht, pk.seed, idxtree, idxleaf, pk.root)!
 	return ht_verify(pk.ctx, pkfors, sig.ht, pk.seed, mut idxtree, idxleaf, pk.root)!
 }
@@ -96,16 +88,12 @@ fn slh_verify_internal(msg []u8, sig &SLHSignature, pk &PubKey) !bool {
 // Input: Message 𝑀, signature sig , context string 𝑐𝑡𝑥, public key PK.
 // Output: Boolean.
 @[direct_array_access; inline]
-fn slh_verify(msg []u8, sig &SLHSignature, cs []u8, pk &PubKey) !bool {
-	if cs.len > max_context_string_size {
+fn slh_verify(msg []u8, sig &SLHSignature, cx []u8, pk &PubKey) !bool {
+	if cx.len > max_context_string_size {
 		return error('pure SLH-DSA signature failed: exceed context-string')
 	}
 	// 𝑀′ ← toByte(0, 1) ∥ toByte(|𝑐𝑡𝑥|, 1) ∥ 𝑐𝑡𝑥 ∥ m
-	mut msgout := []u8{cap: 1 + 1 + cs.len + msg.len}
-	msgout << u8(0)
-	msgout << u8(cs.len)
-	msgout << cs
-	msgout << msg
+	msgout := compose_msg(u8(0), cx, msg)
 
 	// return slh_verify_internal(msg []u8, sig &SLHSignature, pk &PubKey) !bool
 	return slh_verify_internal(msgout, sig, pk)!

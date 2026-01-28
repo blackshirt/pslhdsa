@@ -218,8 +218,12 @@ fn compose_msg(me u8, cx []u8, msg []u8) []u8 {
 	// to_byte(me, 1)
 	msgout << me
 	// to_byte(|𝑐𝑡𝑥|, 1), |𝑐𝑡𝑥| should fit in 1-byte
-	msgout << u8(cx.len)
-	msgout << cx
+	if cx.len == 0 {
+		msgout << cx
+	} else {
+		msgout << u8(cx.len)
+		msgout << cx
+	}
 	msgout << msg
 
 	return msgout

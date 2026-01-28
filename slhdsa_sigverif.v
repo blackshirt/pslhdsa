@@ -69,7 +69,7 @@ fn slh_verify_internal(msg []u8, sig &SLHSignature, pk &PubKey) !bool {
 	// ADRS.setTypeAndClear(FORS_TREE)
 	// ADRS.setKeyPairAddress(𝑖𝑑𝑥𝑙𝑒𝑎𝑓)
 	addr.set_tree_address(idxtree)
-	addr.set_type_and_clear_not_kp(.fors_tree)
+	addr.set_type_and_clear(.fors_tree)
 	addr.set_keypair_address(idxleaf)
 
 	// PK𝐹𝑂𝑅𝑆 ← fors_pkFromSig(SIG𝐹𝑂𝑅𝑆, 𝑚𝑑, PK.seed, ADRS)

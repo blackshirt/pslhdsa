@@ -96,7 +96,7 @@ fn slh_verify_internal(msg []u8, sig &SLHSignature, pk &PubKey) !bool {
 // Input: Message 𝑀, signature sig , context string 𝑐𝑡𝑥, public key PK.
 // Output: Boolean.
 @[direct_array_access; inline]
-fn slh_verify(msg []u8, sig &SLHSignature, cs []u8, pk &PubKey, opt SignerOpts) !bool {
+fn slh_verify(msg []u8, sig &SLHSignature, cs []u8, pk &PubKey) !bool {
 	if cs.len > max_context_string_size {
 		return error('pure SLH-DSA signature failed: exceed context-string')
 	}

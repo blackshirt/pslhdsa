@@ -58,16 +58,18 @@ fn test_slg_sign_internal_basic_item() ! {
 	sk_bytes := hex.decode(item.sk)!
 	assert sk_bytes.len == 4 * c.prm.n
 
-	seckey := new_seckey_with_key(c, sk_bytes)!
+	seckey := new_signing_key(c, sk_bytes)!
+	pk := seckey.pubkey()
+
 	assert sk_bytes == seckey.bytes()
-	// sig -> slh_sign(msg []u8, cs []u8, sk &SecretKey, opt SignerOpts) !&SLHSignature
+	// sig -> slh_sign(msg []u8, cs []u8, sk &SigningKey, opt SignerOpts) !&SLHSignature
 	// Pass deterministic for testing
 	sig := slh_sign(msg, cs, seckey, deterministic: true)!
 	assert sig.bytes().len == signature.len
 	assert sig.bytes() == signature // Pass
 
 	// verified := slh_verify(msg []u8, sig &SLHSignature, cs []u8, pk &PubKey, opt SignerOpts) !bool
-	verified := slh_verify(msg, sig, cs, seckey.pk, SignerOpts{ deterministic: true })!
+	verified := slh_verify(msg, sig, cs, pk)!
 	dump(verified) // NEED TO BE FIXED
 }
 
@@ -95,7 +97,7 @@ fn test_slh_sign_internal() ! {
 		assert skey.pk.root == sk_bytes[3 * c.prm.n..4 * c.prm.n] // PASS	
 
 	
-		// slh_sign(msg []u8, cs []u8, sk &SecretKey, addrnd []u8, opt SignerOpts) !&SLHSignature
+		// slh_sign(msg []u8, cs []u8, sk &SigningKey, addrnd []u8, opt SignerOpts) !&SLHSignature
 		sig := slh_sign(msg, cs, skey, addrnd)!	
 		assert sig.len == signature.len
 		// NEED TO BE FIXED

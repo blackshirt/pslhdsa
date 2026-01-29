@@ -7,20 +7,6 @@ module pslhdsa
 
 import crypto.rand
 
-// slh_keygen_with_seed generates a SLH-DSA key with the given seed.
-@[direct_array_access; inline]
-fn slh_keygen_with_seed(ctx &Context, skseed []u8, skprf []u8, pkseed []u8) !&SigningKey {
-	// check if the seed is all zeroes
-	if is_zero(skseed) || is_zero(skprf) || is_zero(pkseed) {
-		return error('seed is all zeroes')
-	}
-	if skseed.len != ctx.prm.n || skprf.len != ctx.prm.n || pkseed.len != ctx.prm.n {
-		return error('seed length must be equal to n')
-	}
-
-	return slh_keygen_internal(ctx, skseed, skprf, pkseed)!
-}
-
 // 10.1 SLH-DSA Key Generation
 //
 // Algorithm 21 slh_keygen()
@@ -40,6 +26,20 @@ fn slh_keygen(k Kind) !&SigningKey {
 	// check if the seed is all zeroes
 	if is_zero(skseed) || is_zero(skprf) || is_zero(pkseed) {
 		return error('seed is all zeroes')
+	}
+
+	return slh_keygen_internal(ctx, skseed, skprf, pkseed)!
+}
+
+// slh_keygen_with_seed generates a SLH-DSA key with the given seed.
+@[direct_array_access; inline]
+fn slh_keygen_with_seed(ctx &Context, skseed []u8, skprf []u8, pkseed []u8) !&SigningKey {
+	// check if the seed is all zeroes
+	if is_zero(skseed) || is_zero(skprf) || is_zero(pkseed) {
+		return error('seed is all zeroes')
+	}
+	if skseed.len != ctx.prm.n || skprf.len != ctx.prm.n || pkseed.len != ctx.prm.n {
+		return error('seed length must be equal to n')
 	}
 
 	return slh_keygen_internal(ctx, skseed, skprf, pkseed)!

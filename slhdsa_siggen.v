@@ -12,12 +12,21 @@ import crypto.sha256
 import crypto.sha512
 
 const max_context_string_size = 255
+
 // 10.2.1 Pure SLH-DSA Signature Generation
 //
 // Algorithm 22 slh_sign(𝑀, 𝑐𝑡𝑥, SK)
 // Generates a pure SLH-DSA signature.
 // Input: Message 𝑀, context string cx, private key SK.
 // Output: SLH-DSA signature SIG.
+pub fn slh_sign(msg []u8, cx []u8, sk &SigningKey, opt SignerOpts) !&SLHSignature {
+	if opt.deterministic {
+		return slh_sign_deterministic(msg, cx, sk)!
+	}
+	// otherwise, the random one
+	return slh_sign_random(msg, cx, sk)!
+}
+
 @[direct_array_access; inline]
 fn slh_sign_random(msg []u8, cx []u8, sk &SigningKey) !&SLHSignature {
 	// Check context string size, should not exceed max_context_string_size

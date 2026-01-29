@@ -39,17 +39,17 @@ struct KeygenTest {
 	mode       string
 	revision   string
 	issample   bool
-	testgroups []TestGroupsItem
+	testgroups []KeygenGroupItem
 }
 
-struct TestGroupsItem {
+struct KeygenGroupItem {
 	tgid         int
 	testtype     string
 	parameterset string
-	tests        []TestCaseItem
+	tests        []KeygenCaseItem
 }
 
-struct TestCaseItem {
+struct KeygenCaseItem {
 	tcid     int
 	deferred bool
 	skseed   string

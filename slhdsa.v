@@ -154,10 +154,6 @@ struct SignerOpts {
 mut:
 	// deterministic signature generation
 	deterministic bool
-	// use random seed for signature generation
-	randomize bool
-	// use this random seed for signature generation
-	addrnd []u8 // ctx.prm.n length	
 }
 
 // SLH-DSA signature data format

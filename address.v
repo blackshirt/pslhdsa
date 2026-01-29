@@ -7,7 +7,36 @@ module pslhdsa
 
 import encoding.binary
 
-// Address fundamentally 32 bytes long composed from:
+// The Address type word will have a value of 0, 1, 2, 3, 4, 5, or 6.
+// In order to improve readability, these values will be
+// referred to in this standard by the constants WOTS_HASH, WOTS_PK, TREE,
+// FORS_TREE, FORS_ROOTS, WOTS_PRF, and FORS_PRF, respectively
+enum AddressType as u32 {
+	wots_hash  = 0
+	wots_pk    = 1
+	tree       = 2
+	fors_tree  = 3
+	fors_roots = 4
+	wots_prf   = 5
+	fors_prf   = 6
+}
+
+// new_addrtype creates a new AddressType from u32 value v.
+@[inline]
+fn new_addrtype(v u32) !AddressType {
+	match v {
+		0 { return .wots_hash }
+		1 { return .wots_pk }
+		2 { return .tree }
+		3 { return .fors_tree }
+		4 { return .fors_roots }
+		5 { return .wots_prf }
+		6 { return .fors_prf }
+		else { return error('Bad address type value') }
+	}
+}
+
+// Address fundamentally is an 32 bytes opaque composed from:
 // -- layer address  4 bytes 	0	0..4
 // -- tree address  12 bytes 	1	4..8
 // -- tree address  			2	8..12
@@ -125,6 +154,20 @@ fn (mut ad Address) set_tree_address(v TreeIndex) {
 	ad.data[3] = v.lo
 }
 
+// Address type
+// ADRS.getType() 𝑡𝑦𝑝𝑒 ← toInt(ADRS[16 ∶ 20], 4)
+@[inline]
+fn (ad Address) get_type() !AddressType {
+	val := ad.data[4]
+	return new_addrtype(val)!
+}
+
+// set_type only sets the address type
+@[inline]
+fn (mut ad Address) set_type(t AddressType) {
+	ad.data[4] = u32(t)
+}
+
 // KEYPAIR
 // ADRS.setKeyPairAddress(𝑖) ADRS ← ADRS[0 ∶ 20] ∥ toByte(𝑖, 4) ∥ ADRS[24 ∶ 32]
 @[inline]
@@ -132,7 +175,8 @@ fn (mut ad Address) set_keypair_address(v u32) {
 	ad.data[5] = v
 }
 
-// 𝑖 ← ADRS.getKeyPairAddress() 𝑖 ← toInt(ADRS[20 ∶ 24], 4)
+// get_keypair_address returns the key pair address
+// ADRS.getKeyPairAddress() 𝑖 ← toInt(ADRS[20 ∶ 24], 4)
 @[inline]
 fn (ad Address) get_keypair_address() u32 {
 	return ad.data[5]
@@ -186,15 +230,6 @@ fn (mut ad Address) set_hash_address(v u32) {
 	ad.data[7] = v
 }
 
-fn (ad Address) get_type() !AddressType {
-	val := ad.data[4]
-	return new_addrtype(val)!
-}
-
-fn (mut ad Address) set_type(t AddressType) {
-	ad.data[4] = u32(t)
-}
-
 // ADRS.setTypeAndClear(𝑌) ADRS ← ADRS[0 ∶ 16] ∥ toByte(𝑌 , 4) ∥ toByte(0, 12)
 @[inline]
 fn (mut ad Address) set_type_and_clear(t AddressType) {
@@ -204,50 +239,12 @@ fn (mut ad Address) set_type_and_clear(t AddressType) {
 	ad.data[7] = 0
 }
 
+// set_type_and_clear_not_kp only sets the address type and clears the key pair address
 @[inline]
 fn (mut ad Address) set_type_and_clear_not_kp(t AddressType) {
 	ad.data[4] = u32(t)
 	ad.data[6] = 0
 	ad.data[7] = 0
-}
-
-// The Address type word will have a value of 0, 1, 2, 3, 4, 5, or 6.
-// In order to improve readability, these values will be
-// referred to in this standard by the constants WOTS_HASH, WOTS_PK, TREE,
-// FORS_TREE, FORS_ROOTS, WOTS_PRF, and FORS_PRF, respectively
-enum AddressType as u32 {
-	wots_hash  = 0
-	wots_pk    = 1
-	tree       = 2
-	fors_tree  = 3
-	fors_roots = 4
-	wots_prf   = 5
-	fors_prf   = 6
-}
-
-// new_addrtype creates a new AddressType from u32 value v.
-@[inline]
-fn new_addrtype(v u32) !AddressType {
-	match v {
-		0 { return .wots_hash }
-		1 { return .wots_pk }
-		2 { return .tree }
-		3 { return .fors_tree }
-		4 { return .fors_roots }
-		5 { return .wots_prf }
-		6 { return .fors_prf }
-		else { return error('Bad address type value') }
-	}
-}
-
-@[noinit]
-struct CompressedAddress {
-mut:
-	data [22]u8
-}
-
-fn (c CompressedAddress) bytes() []u8 {
-	return c.data[..]
 }
 
 // Port of TreeIndex from golang implementation of SL-HDSA.

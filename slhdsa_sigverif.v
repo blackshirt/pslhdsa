@@ -5,8 +5,6 @@
 // The main SLH-DSA Signature verification module
 module pslhdsa
 
-import crypto
-
 // 9.3 SLH-DSA Signature Verification
 //
 // Algorithm 20 slh_verify_internal(𝑀, SIG, PK)
@@ -15,7 +13,7 @@ import crypto
 // Output: Boolean.
 @[direct_array_access; inline]
 fn slh_verify_internal(msg []u8, sig &SLHSignature, pk &PubKey) !bool {
-	n := pk.ctx.prm.n
+	// n := pk.ctx.prm.n
 	a := pk.ctx.prm.a
 	k := pk.ctx.prm.k
 	m := pk.ctx.prm.m

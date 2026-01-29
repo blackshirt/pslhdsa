@@ -5,7 +5,6 @@
 // The main SLH-DSA Signature module
 module pslhdsa
 
-import crypto.rand
 import crypto.internal.subtle
 
 const default_context = new_context(.sha2_128f)
@@ -23,13 +22,13 @@ struct SigningKey {
 mut:
 	// associated context of the signing key
 	ctx &Context
-	// secret seed of the signing key
+	// private seed value
 	seed []u8
-	// secret PRF of the signing key
+	// PRF key value
 	prf []u8
-	// public seed of the signing key
+	// public seed value
 	pkseed []u8
-	// public root of the signing key
+	// public root value
 	pkroot []u8
 }
 
@@ -63,7 +62,7 @@ fn new_signing_key(c &Context, seed []u8) !&SigningKey {
 // The signing key has a size of 4 * n bytes, which includes the public key components.
 // i.e. It consists of the concatenation of SK.seed, SK.prf, PK.seed and PF.root
 @[inline]
-fn (s &SigningKey) bytes() []u8 {
+pub fn (s &SigningKey) bytes() []u8 {
 	mut out := []u8{cap: s.ctx.prm.n * 4}
 	out << s.seed
 	out << s.prf
@@ -75,7 +74,7 @@ fn (s &SigningKey) bytes() []u8 {
 
 // pubkey returns the public key.
 @[inline]
-fn (s &SigningKey) pubkey() &PubKey {
+pub fn (s &SigningKey) pubkey() &PubKey {
 	return &PubKey{
 		ctx:  unsafe { s.ctx }
 		seed: s.pkseed
@@ -85,7 +84,7 @@ fn (s &SigningKey) pubkey() &PubKey {
 
 // equal returns true if the signing key is equal to the other signing key.
 @[inline]
-fn (s &SigningKey) equal(o &SigningKey) bool {
+pub fn (s &SigningKey) equal(o &SigningKey) bool {
 	return s.ctx.equal(o.ctx) && subtle.constant_time_compare(s.seed, o.seed) == 1
 		&& subtle.constant_time_compare(s.prf, o.prf) == 1
 		&& subtle.constant_time_compare(s.pkseed, o.pkseed) == 1
@@ -135,7 +134,7 @@ fn new_pubkey(ctx &Context, bytes []u8) !&PubKey {
 // bytes returns the public key bytes. The public key has a size of 2 * n bytes.
 // i.e. It consists of the concatenation of PK.seed and PK.root
 @[inline]
-fn (p &PubKey) bytes() []u8 {
+pub fn (p &PubKey) bytes() []u8 {
 	mut out := []u8{cap: p.ctx.prm.n * 2}
 	out << p.seed
 	out << p.root
@@ -145,7 +144,7 @@ fn (p &PubKey) bytes() []u8 {
 
 // equal returns true if the public key is equal to the other public key.
 @[inline]
-fn (p &PubKey) equal(o &PubKey) bool {
+pub fn (p &PubKey) equal(o &PubKey) bool {
 	return p.ctx.equal(o.ctx) && subtle.constant_time_compare(p.seed, o.seed) == 1
 		&& subtle.constant_time_compare(p.root, o.root) == 1
 }
@@ -159,58 +158,6 @@ mut:
 	randomize bool
 	// use this random seed for signature generation
 	addrnd []u8 // ctx.prm.n length	
-}
-
-// 10.1 SLH-DSA Key Generation
-//
-// Algorithm 21 slh_keygen()
-// Generates an SLH-DSA key pair.
-// Input: (none)
-// Output: SLH-DSA secret key
-// slh_keygen generates a SLH-DSA key with the given kind.
-@[inline]
-fn slh_keygen(k Kind) !&SigningKey {
-	// create a new context for the key generation
-	ctx := new_context(k)
-	// set SK.seed, SK.prf, and PK.seed to random 𝑛-byte
-	skseed := rand.read(ctx.prm.n)!
-	skprf := rand.read(ctx.prm.n)!
-	pkseed := rand.read(ctx.prm.n)!
-
-	// check if the seed is all zeroes
-	if is_zero(skseed) || is_zero(skprf) || is_zero(pkseed) {
-		return error('seed is all zeroes')
-	}
-
-	return slh_keygen_internal(ctx, skseed, skprf, pkseed)!
-}
-
-// Algorithm 18 slh_keygen_internal(SK.seed, SK.prf, PK.seed)
-//
-// Generates an SLH-DSA key pair.
-// Input: Secret seed SK.seed, PRF key SK.prf, public seed PK.seed
-// Output: SLH-DSA key pair (SK, PK).
-@[direct_array_access; inline]
-fn slh_keygen_internal(ctx &Context, skseed []u8, skprf []u8, pkseed []u8) !&SigningKey {
-	// generate the public key for the top-level XMSS tree
-	// 1: ADRS ← toByte(0, 32) ▷ set layer and tree address to bottom layer	
-	mut addr := new_address()
-	// 2: ADRS.setLayerAddress(𝑑 − 1)
-	addr.set_layer_address(u32(ctx.prm.d - 1))
-	// 3: PK.root ← xmss_node(SK.seed, 0, ℎ′ , PK.seed, ADRS)
-	pkroot_node := xmss_node(ctx, skseed, 0, u32(ctx.prm.hp), pkseed, mut addr)!
-	// Check if the xmss_node function call was successful
-	if pkroot_node.len != ctx.prm.n {
-		return error('xmss_node failed')
-	}
-	// 4: return ( (SK.seed, SK.prf, PK.seed, PK.root), (PK.seed, PK.root) )
-	return &SigningKey{
-		ctx:    unsafe { ctx }
-		seed:   skseed
-		prf:    skprf
-		pkseed: pkseed
-		pkroot: pkroot_node
-	}
 }
 
 // SLH-DSA signature data format

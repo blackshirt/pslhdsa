@@ -15,7 +15,7 @@ import crypto.sha512
 // SLH-DSA Context
 //
 @[noinit]
-struct Context {
+pub struct Context {
 mut:
 	// The kind (type) of this SLH-DSA context, set on context creation
 	kind Kind
@@ -25,11 +25,17 @@ mut:
 
 // new_context creates a new SLH-DSA Context to operate on
 @[inline]
-fn new_context(k Kind) &Context {
+pub fn new_context(k Kind) &Context {
 	return &Context{
 		kind: k
 		prm:  new_param(k)
 	}
+}
+
+// new_context_from_name creates a new SLH-DSA Context from name string
+@[inline]
+pub fn new_context_from_name(name string) !&Context {
+	return new_context(kind_from_name(name)!)
 }
 
 // name returns the name of this context
@@ -497,7 +503,7 @@ pub enum Kind {
 
 // kind_from_name make a Kind from name string
 @[inline]
-fn kind_from_name(name string) !Kind {
+pub fn kind_from_name(name string) !Kind {
 	match name {
 		// SHA2-based family
 		'SLH-DSA-SHA2-128s' { return .sha2_128s }

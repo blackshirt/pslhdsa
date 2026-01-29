@@ -1,0 +1,60 @@
+import pslhdsa
+import os
+import encoding.hex
+import x.json2
+
+fn test_keygen_fips205() {
+	// read the keygen_fips205.json file
+	// The test material was taken from SLH-DSA keyGen-FIPS205 test vectors for key generation
+	// See https://github.com/usnistgov/ACVP-Server/blob/master/gen-val/json-files/SLH-DSA-keyGen-FIPS205/internalProjection.json
+	json_str := os.read_file('./kat/keygen_fips205.json')!
+	// parse the json string into a KeygenTest struct
+	keygen_test := json2.decode[KeygenTest](json_str)!
+	// Test for every test group
+	for tg in keygen_test.testgroups {
+		ctx := pslhdsa.new_context_from_name(tg.parameterset)!
+		for t in tg.tests {
+			dump(t.tcid)
+			// check if the test case is valid
+			if t.deferred {
+				continue
+			}
+			skseed := hex.decode(t.skseed)!
+			skprf := hex.decode(t.skprf)!
+			pkseed := hex.decode(t.pkseed)!
+
+			skb := hex.decode(t.sk)!
+			pkb := hex.decode(t.pk)!
+			// check if the generated key is valid
+			sk := pslhdsa.slh_keygen_with_seed(ctx, skseed, skprf, pkseed)!
+			assert sk.bytes() == skb
+			assert sk.pubkey().bytes() == pkb
+		}
+	}
+}
+
+struct KeygenTest {
+	vsid       int
+	algorithm  string
+	mode       string
+	revision   string
+	issample   bool
+	testgroups []TestGroupsItem
+}
+
+struct TestGroupsItem {
+	tgid         int
+	testtype     string
+	parameterset string
+	tests        []TestCaseItem
+}
+
+struct TestCaseItem {
+	tcid     int
+	deferred bool
+	skseed   string
+	skprf    string
+	pkseed   string
+	sk       string
+	pk       string
+}

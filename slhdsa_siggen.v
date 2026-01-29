@@ -10,7 +10,6 @@ import crypto.rand
 import crypto.sha3
 import crypto.sha256
 import crypto.sha512
-import crypto.internal.subtle
 
 const max_context_string_size = 255
 // 10.2.1 Pure SLH-DSA Signature Generation

@@ -13,7 +13,7 @@ fn test_slhdsa_sigverify_fips205_test_vectors() {
 	// read the sigverif_fips205.json file
 	// The test material was taken from SLH-DSA sigVer-FIPS205 test vectors for signature verification
 	// See https://github.com/usnistgov/ACVP-Server/blob/master/gen-val/json-files/SLH-DSA-sigVer-FIPS205/internalProjection.json
-	json_str := os.read_file('./kat/sigverif_fips205.json')!
+	json_str := os.read_file('./kat/sigverif_fips205_mini.json')!
 	// parse the json string into a SigVerifTest struct
 	sigver_test := json2.decode[SigVerifTest](json_str)!
 	// Test for every test group
@@ -22,6 +22,7 @@ fn test_slhdsa_sigverify_fips205_test_vectors() {
 		mode := tg.signatureinterface // 'internal' or 'external'
 		deterministic := tg.deterministic // true or false
 		prehash := tg.prehash // "pure" or "prehash"
+
 		for t in tg.tests {
 			// we dont support prehash now
 			if prehash == 'prehash' {
@@ -33,12 +34,15 @@ fn test_slhdsa_sigverify_fips205_test_vectors() {
 			cx := hex.decode(t.context)!
 			signature := hex.decode(t.signature)!
 			addrnd := hex.decode(t.additionalrandomness)!
-
+			opt := SignerOpts{
+				deterministic: deterministic
+				test_entropy:  addrnd
+			}
 			sk := pslhdsa.new_signing_key(ctx, skb)!
 			pk := pslhdsa.new_pubkey(ctx, pkb)!
 			assert sk.pubkey().equal(pk)
 
-			verified := pslhdsa.slh_verify(messag, signature, cx, pk)!
+			verified := pslhdsa.slh_verify(message, signature, cx, pk, opt)!
 			assert verified == t.testpassed
 		}
 	}

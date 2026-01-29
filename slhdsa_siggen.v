@@ -25,16 +25,28 @@ pub fn slh_sign(msg []u8, cx []u8, sk &SigningKey, opt SignerOpts) ![]u8 {
 	if cx.len > max_context_string_size {
 		return error('pure SLH-DSA signature failed: exceed context-string')
 	}
-	mut out := []u8{}
 	// use deterministic variant
 	if opt.deterministic {
 		sig := slh_sign_deterministic(msg, cx, sk)!
-		out = sig.bytes()
+		return sig.bytes()
 	}
-	// otherwise, the random one is used
-	sig := slh_sign_random(msg, cx, sk)!
-	out = sig.bytes()
-	return out
+	// otherwise, the sytem random one is used
+	sigrandom := slh_sign_random(msg, cx, sk)!
+
+	return sigrandom.bytes()
+}
+
+// using test entropy as additional randomness
+// TODO: limiting test entropy size
+@[direct_array_access; inline]
+fn slh_sign_internal_testentropy(msg []u8, sk &SigningKey, entropy []u8) !&SLHSignature {
+	// 𝑀′ ← toByte(0, 1) ∥ toByte(|𝑐𝑡𝑥|, 1) ∥ 𝑐𝑡𝑥 ∥ m
+	// msgout := compose_msg(msg_encoding_nul, cx, msg)
+
+	// SIG ← slh_sign_internal(msg []u8, sk &SigningKey, addrnd []u8) !&SLHSignature
+	// ▷ omit 𝑎𝑑𝑑𝑟𝑛𝑑 for the deterministic variant
+	sig := slh_sign_internal(msg, sk, entropy)!
+	return sig
 }
 
 // slh_sign_random generates a random SLH-DSA signature.

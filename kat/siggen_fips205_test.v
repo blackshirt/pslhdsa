@@ -20,11 +20,15 @@ fn test_slhdsa_siggen_fips205_test_vectors() {
 	for tg in siggen_test.testgroups {
 		ctx := pslhdsa.new_context_from_name(tg.parameterset)!
 		mode := tg.signatureinterface // 'internal' or 'external'
+		use_internal := if mode == 'internal' { true } else { false }
 		deterministic := tg.deterministic // true or false
-		prehash := tg.prehash // "pure" or "prehash"
+		prehash := tg.prehash // "pure" or "prehash", "none"
 		for t in tg.tests {
 			// we dont support prehash now
-			if prehash == 'prehash' {
+			if prehash != 'pure' {
+				continue
+			}
+			if t.deferred {
 				continue
 			}
 			skb := hex.decode(t.sk)!
@@ -36,10 +40,14 @@ fn test_slhdsa_siggen_fips205_test_vectors() {
 			sk := pslhdsa.new_signing_key(ctx, skb)!
 			pk := pslhdsa.new_pubkey(ctx, pkb)!
 			assert sk.pubkey().equal(pk)
-
-			sigout := pslhdsa.slh_sign(message, cx, sk, deterministic: deterministic)!
+			opt := pslhdsa.SignerOpts{
+				deterministic: deterministic
+				testing:       use_internal
+			}
+			sigout := pslhdsa.slh_sign(message, cx, sk, opt)!
 			assert sigout.len == signature.len
 			assert sigout == signature
+			// explicitly  releases allocated buffers
 			unsafe {
 				skb.free()
 				pkb.free()

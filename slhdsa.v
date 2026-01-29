@@ -159,6 +159,11 @@ pub struct SignerOpts {
 pub mut:
 	// deterministic signature generation
 	deterministic bool
+	// testing flag to allow optional random value in test entropy
+	testing bool
+	// additional randomness, only for non-deterministic signature testing.
+	// Used for testing to pass a optional random value.
+	test_entropy []u8
 }
 
 // SLH-DSA signature data format

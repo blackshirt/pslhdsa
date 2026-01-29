@@ -9,7 +9,7 @@ import encoding.hex
 
 // Test 1
 // Test basic signing and verification
-fn test_sign_internal_basic() ! {
+fn test_sign_verify_internal_basic() ! {
 	sk := slh_keygen(.sha2_128f)!
 	pk := sk.pubkey()
 
@@ -31,7 +31,7 @@ struct SignShake128fTest {
 }
 
 // The test material was adapted from golang version of slh-dsa
-fn test_deterministic_sign_shake128f() ! {
+fn test_deterministic_sign_verify_shake128f() ! {
 	item := SignShake128fTest{
 		sk:        '6c1f4a3889984abd0d30e9454e8ae15d423be3aa1b0024599639b0bfb9c41e9fff34692100a04a8e9bea7ab80e2eaf8031e099f8dbdd09e71adf94836e3350b1'
 		pk:        'ff34692100a04a8e9bea7ab80e2eaf8031e099f8dbdd09e71adf94836e3350b1'
@@ -65,6 +65,10 @@ fn test_deterministic_sign_shake128f() ! {
 	assert sig.bytes() == signature // PASS
 
 	// verified := slh_verify(msg []u8, sig &SLHSignature, cx []u8, pk &PubKey) !bool
-	verified := slh_verify(msg, sig, cx, pk)!
+	verified := slh_verify_sig(msg, sig, cx, pk)!
 	assert verified == true
+
+	// the facing public api slh_verify(msg []u8, sig []u8, cx []u8, pk &PubKey) !bool
+	verified2 := slh_verify(msg, sig.bytes(), cx, pk)!
+	assert verified2 == true
 }

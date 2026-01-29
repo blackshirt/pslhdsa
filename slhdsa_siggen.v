@@ -11,34 +11,43 @@ import crypto.sha3
 import crypto.sha256
 import crypto.sha512
 
-const max_context_string_size = 255
-
 // 10.2.1 Pure SLH-DSA Signature Generation
 //
 // Algorithm 22 slh_sign(𝑀, 𝑐𝑡𝑥, SK)
 // Generates a pure SLH-DSA signature.
 // Input: Message 𝑀, context string cx, private key SK.
-// Output: SLH-DSA signature SIG.
-pub fn slh_sign(msg []u8, cx []u8, sk &SigningKey, opt SignerOpts) !&SLHSignature {
-	if opt.deterministic {
-		return slh_sign_deterministic(msg, cx, sk)!
-	}
-	// otherwise, the random one
-	return slh_sign_random(msg, cx, sk)!
-}
-
-@[direct_array_access; inline]
-fn slh_sign_random(msg []u8, cx []u8, sk &SigningKey) !&SLHSignature {
+// Optional params:
+// - deterministic: if true, use deterministic variant of SLH-DSA signature generation
+// Output: SLH-DSA signature bytes SIG.
+@[direct_array_access]
+pub fn slh_sign(msg []u8, cx []u8, sk &SigningKey, opt SignerOpts) ![]u8 {
 	// Check context string size, should not exceed max_context_string_size
 	if cx.len > max_context_string_size {
 		return error('pure SLH-DSA signature failed: exceed context-string')
 	}
+	mut out := []u8{}
+	// use deterministic variant
+	if opt.deterministic {
+		sig := slh_sign_deterministic(msg, cx, sk)!
+		out = sig.bytes()
+	}
+	// otherwise, the random one is used
+	sig := slh_sign_random(msg, cx, sk)!
+	out = sig.bytes()
+	return out
+}
+
+// slh_sign_random generates a random SLH-DSA signature.
+// Input: Message 𝑀, context string cx, private key SK.
+// Output: SLH-DSA signature SIG.
+@[direct_array_access; inline]
+fn slh_sign_random(msg []u8, cx []u8, sk &SigningKey) !&SLHSignature {
 	// randomized random for the randomized variant or
 	// 𝑜𝑝𝑡_𝑟𝑎𝑛𝑑 ← 𝑎𝑑𝑑𝑟𝑛, substitute 𝑜𝑝𝑡_𝑟𝑎𝑛𝑑 ← PK.seed for the deterministic variant,
 	opt_rand := rand.bytes(sk.ctx.prm.n)!
 
 	// 𝑀′ ← toByte(0, 1) ∥ toByte(|𝑐𝑡𝑥|, 1) ∥ 𝑐𝑡𝑥 ∥ m
-	msgout := compose_msg(u8(0), cx, msg)
+	msgout := compose_msg(msg_encoding_nul, cx, msg)
 
 	// SIG ← slh_sign_internal(msg []u8, sk &SigningKey, addrnd []u8) !&SLHSignature
 	// ▷ omit 𝑎𝑑𝑑𝑟𝑛𝑑 for the deterministic variant
@@ -51,7 +60,7 @@ fn slh_sign_random(msg []u8, cx []u8, sk &SigningKey) !&SLHSignature {
 @[direct_array_access; inline]
 fn slh_sign_deterministic(msg []u8, cx []u8, sk &SigningKey) !&SLHSignature {
 	// use the public key seed as the random seed for deterministic signature generation
-	msgout := compose_msg(u8(0), cx, msg)
+	msgout := compose_msg(msg_encoding_nul, cx, msg)
 	return slh_sign_internal(msgout, sk, sk.pkseed)!
 }
 
@@ -113,7 +122,7 @@ fn slh_sign_internal(msg []u8, sk &SigningKey, addrnd []u8) !&SLHSignature {
 	innerstart = 4 - h8d
 	copy(mut tmp_idxleaf[innerstart..], digest[start..stop])
 
-	idxtree := make_treeindex(tmp_idxtree, hhd).mod_2b(h - hp)
+	mut idxtree := make_treeindex(tmp_idxtree, hhd).mod_2b(h - hp)
 	idxleaf := u32(to_int(tmp_idxleaf, 4)) & ((1 << hp) - 1)
 
 	// ADRS.setTreeAddress(𝑖𝑑𝑥𝑡𝑟𝑒𝑒)
@@ -130,8 +139,7 @@ fn slh_sign_internal(msg []u8, sk &SigningKey, addrnd []u8) !&SLHSignature {
 	// get FORS key, PK𝐹𝑂𝑅𝑆 ← fors_pkFromSig(SIG𝐹𝑂𝑅𝑆, 𝑚𝑑, PK.seed, ADRS)
 	pkfors := fors_pkfromsig(sk.ctx, fors, md, sk.pkseed, mut addr)!
 	// 17: SIG𝐻𝑇 ← ht_sign(PK𝐹𝑂𝑅𝑆, SK.seed, PK.seed,𝑖𝑑𝑥𝑡𝑟𝑒𝑒,𝑖𝑑𝑥𝑙𝑒𝑎𝑓)
-	mut idxtree_c := idxtree.clone()
-	ht := ht_sign(sk.ctx, pkfors, sk.seed, sk.pkseed, mut idxtree_c, idxleaf)!
+	ht := ht_sign(sk.ctx, pkfors, sk.seed, sk.pkseed, mut idxtree, idxleaf)!
 
 	// : SIG ← SIG ∥ SIG𝐻𝑇
 
@@ -226,12 +234,8 @@ fn compose_msg(me u8, cx []u8, msg []u8) []u8 {
 	// to_byte(me, 1)
 	msgout << me
 	// to_byte(|𝑐𝑡𝑥|, 1), |𝑐𝑡𝑥| should fit in 1-byte
-	if cx.len == 0 {
-		msgout << cx
-	} else {
-		msgout << u8(cx.len)
-		msgout << cx
-	}
+	msgout << u8(cx.len)
+	msgout << cx
 	msgout << msg
 
 	return msgout

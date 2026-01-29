@@ -1,11 +1,17 @@
+// Copyright © 2024 blackshirt.
+// Use of this source code is governed by an MIT license
+// that can be found in the LICENSE file.
+//
+// SLH-DSA Signature generation test vectors
+// NOTE: Its a big test, so be quiet
 import pslhdsa
 import os
 import encoding.hex
 import x.json2
 
-fn test_siggen_fips205() {
+fn test_slhdsa_siggen_fips205_test_vectors() {
 	// read the siggen_fips205.json file
-	// The test material was taken from SLH-DSA keyGen-FIPS205 test vectors for key generation
+	// The test material was taken from SLH-DSA sigGen-FIPS205 test vectors for signature generation
 	// See https://github.com/usnistgov/ACVP-Server/blob/master/gen-val/json-files/SLH-DSA-sigGen-FIPS205/internalProjection.json
 	json_str := os.read_file('./kat/siggen_fips205.json')!
 	// parse the json string into a SigGenTest struct
@@ -17,6 +23,10 @@ fn test_siggen_fips205() {
 		deterministic := tg.deterministic // true or false
 		prehash := tg.prehash // "pure" or "prehash"
 		for t in tg.tests {
+			// we dont support prehash now
+			if prehash == 'prehash' {
+				continue
+			}
 			skb := hex.decode(t.sk)!
 			pkb := hex.decode(t.pk)!
 			message := hex.decode(t.message)!
@@ -27,16 +37,17 @@ fn test_siggen_fips205() {
 			pk := pslhdsa.new_pubkey(ctx, pkb)!
 			assert sk.pubkey().equal(pk)
 
-			// skseed := hex.decode(t.skseed)!
-			// skprf := hex.decode(t.skprf)!
-			// pkseed := hex.decode(t.pkseed)!
-
-			// skb := hex.decode(t.sk)!
-			// pkb := hex.decode(t.pk)!
-			// check if the generated key is valid
-			// sk := pslhdsa.slh_keygen_with_seed(ctx, skseed, skprf, pkseed)!
-			// assert sk.bytes() == skb
-			// assert sk.pubkey().bytes() == pkb
+			sigout := pslhdsa.slh_sign(message, cx, sk, deterministic: deterministic)!
+			assert sigout.len == signature.len
+			assert sigout == signature
+			unsafe {
+				skb.free()
+				pkb.free()
+				message.free()
+				cx.free()
+				sigout.free()
+				signature.free()
+			}
 		}
 	}
 }
@@ -61,11 +72,12 @@ struct SiggenGroupItem {
 }
 
 struct SiggenCaseItem {
-	tcid     int
-	deferred bool
-	skseed   string
-	skprf    string
-	pkseed   string
-	sk       string
-	pk       string
+	tcid      int
+	deferred  bool
+	sk        string
+	pk        string
+	message   string
+	context   string
+	hashalg   string
+	signature string
 }

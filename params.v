@@ -33,6 +33,8 @@ pub fn new_context(k Kind) &Context {
 }
 
 // new_context_from_name creates a new SLH-DSA Context from name string
+// name should be one of the supported kind name, e.g. 'SLH-DSA-SHA2-192f'
+// See Kind for the list of supported kind names
 @[inline]
 pub fn new_context_from_name(name string) !&Context {
 	return new_context(kind_from_name(name)!)

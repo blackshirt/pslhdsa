@@ -7,6 +7,11 @@ module pslhdsa
 
 import crypto.internal.subtle
 
+const msg_encoding_nul = u8(0)
+const msg_encoding_one = u8(1)
+const max_context_string_size = 255
+
+// the default context used by this SLH-DSA module. it uses the SHA-2 128f hash function
 const default_context = new_context(.sha2_128f)
 
 // The SLH-DSA Private Key
@@ -18,7 +23,7 @@ const default_context = new_context(.sha2_128f)
 // The private key has a size of 4 * n bytes, which includes the public key components.
 // i.e. It consists of the concatenation of SK.seed, SK.prf, PK.seed and PF.root
 @[noinit]
-struct SigningKey {
+pub struct SigningKey {
 mut:
 	// associated context of the signing key
 	ctx &Context
@@ -33,9 +38,8 @@ mut:
 }
 
 // new_signing_key creates a new signing key with the given context and seed.
-// The seed must be ctx.prm.n bytes long.
-// If not, it returns an error.
-@[inline]
+// The seed must be ctx.prm.n bytes long. If not, it returns an error.
+@[direct_array_access]
 fn new_signing_key(c &Context, seed []u8) !&SigningKey {
 	if seed.len != 4 * c.prm.n {
 		return error('seed must be 4*ctx.prm.n bytes long')
@@ -99,7 +103,7 @@ pub fn (s &SigningKey) equal(o &SigningKey) bool {
 // top layer XMSS tree).
 // The public key has a size of 2 * n bytes. i.e. It consists of the concatenation of PK.seed and PK.root
 @[noinit]
-struct PubKey {
+pub struct PubKey {
 mut:
 	// associated context of the public key, should equal to the context of the secret key
 	// where the public key is bind to the secret key
@@ -149,9 +153,10 @@ pub fn (p &PubKey) equal(o &PubKey) bool {
 		&& subtle.constant_time_compare(p.root, o.root) == 1
 }
 
+// SignerOpts for signing behaviour
 @[params]
-struct SignerOpts {
-mut:
+pub struct SignerOpts {
+pub mut:
 	// deterministic signature generation
 	deterministic bool
 }
@@ -166,6 +171,33 @@ mut:
 	fors []u8
 	// (ℎ + 𝑑 ⋅ 𝑙𝑒𝑛) ⋅ 𝑛 bytes of HT signature HT,
 	ht &HypertreeSignature
+}
+
+// parse_slhsignature parses the SLH-DSA signature from the given bytes.
+// The bytes must be ctx.prm.n + ctx.prm.k * (1 + ctx.prm.a) * ctx.prm.n + (ctx.prm.h + ctx.prm.d * ctx.prm.len) * ctx.prm.n bytes long.
+// If not, it returns an error.
+@[direct_array_access; inline]
+fn parse_slhsignature(c &Context, bytes []u8) !&SLHSignature {
+	k := c.prm.k
+	a := c.prm.a
+	n := c.prm.n
+	h := c.prm.h
+	d := c.prm.d
+	len := c.wots_len()
+
+	// calculated length of the signature
+	clength := n + k * (1 + a) * n + (h + d * len) * n
+	if bytes.len != clength {
+		return error('bytes must correct size for ${c.kind}')
+	}
+	r := bytes[0..n]
+	fors := bytes[n..n + k * (1 + a) * n]
+	ht := parse_hypertree(c, bytes[n + k * (1 + a) * n..clength])!
+	return &SLHSignature{
+		r:    r
+		fors: fors
+		ht:   ht
+	}
 }
 
 // bytes returns the signature bytes.

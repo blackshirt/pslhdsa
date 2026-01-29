@@ -12,10 +12,11 @@ import crypto.rand
 // Algorithm 21 slh_keygen()
 // Generates an SLH-DSA key pair.
 // Input: (none)
-// Output: SLH-DSA secret key
-// slh_keygen generates a SLH-DSA key with the given kind.
-@[inline]
-fn slh_keygen(k Kind) !&SigningKey {
+// Output: SLH-DSA key pair (SK, PK).
+// slh_keygen generates a SLH-DSA key pair with the given kind.
+// If the kind is not supported, it returns an error.
+// Its uses crypto.rand to generate random seed for the key generation.
+pub fn slh_keygen(k Kind) !&SigningKey {
 	// create a new context for the key generation
 	ctx := new_context(k)
 	// set SK.seed, SK.prf, and PK.seed to random 𝑛-byte
@@ -64,11 +65,13 @@ fn slh_keygen_internal(ctx &Context, skseed []u8, skprf []u8, pkseed []u8) !&Sig
 		return error('xmss_node failed')
 	}
 	// 4: return ( (SK.seed, SK.prf, PK.seed, PK.root), (PK.seed, PK.root) )
-	return &SigningKey{
-		ctx:    unsafe { ctx }
+	sk := &SigningKey{
+		ctx:    ctx.clone()
 		seed:   skseed
 		prf:    skprf
 		pkseed: pkseed
 		pkroot: pkroot_node
 	}
+
+	return sk
 }

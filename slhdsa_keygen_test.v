@@ -36,9 +36,9 @@ fn test_basic_slh_keygen_with_seed() ! {
 
 		sk := slh_keygen_with_seed(c, skseed, skprf, pkseed)!
 
-		assert sk.pk.root == pk_root
+		assert sk.pkroot == pk_root
 		assert sk.bytes() == skout
-		assert sk.pk.bytes() == pkout
+		assert sk.pubkey().bytes() == pkout
 	}
 }
 
@@ -55,7 +55,7 @@ fn test_keygen_sha192f() {
 	assert expected_sk == sk.bytes()
 
 	expected_pk := hex.decode('1EACBB554054B50FFDD3E422160DD0EC7CCBFB78F5444395CFA9D316F9FEDA6650AC3796A7989621D95BF6328D8547BD')!
-	assert expected_pk == sk.pk.bytes()
+	assert expected_pk == sk.pubkey().bytes()
 }
 
 // Test 3. Basic SLH-DSA keygen with seed for SLH-DSA-SHA2-256-2f
@@ -71,7 +71,7 @@ fn test_keygen_sha256f() {
 	assert expected_sk == sk.bytes()
 
 	expected_pk := hex.decode('F682CAED17CD784AD9DE06C8652924EA82193972E4E3109613A2302B83A2B063A262DE3A300218451FD7882DD12F4F47124C3573825FD862CADD5EBE7AA09C3C')!
-	assert expected_pk == sk.pk.bytes()
+	assert expected_pk == sk.pubkey().bytes()
 }
 
 // This samples of data was copied from SwiftSHPINCS test resources

@@ -1,9 +1,15 @@
+// Copyright © 2024 blackshirt.
+// Use of this source code is governed by an MIT license
+// that can be found in the LICENSE file.
+//
+// SLH-DSA Key generation test vectors
+// NOTE: Its a big test, so be quiet
 import pslhdsa
 import os
 import encoding.hex
 import x.json2
 
-fn test_keygen_fips205() {
+fn test_slhdsa_keygen_fips205_test_vectors() {
 	// read the keygen_fips205.json file
 	// The test material was taken from SLH-DSA keyGen-FIPS205 test vectors for key generation
 	// See https://github.com/usnistgov/ACVP-Server/blob/master/gen-val/json-files/SLH-DSA-keyGen-FIPS205/internalProjection.json

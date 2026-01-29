@@ -5,6 +5,36 @@
 // The main SLH-DSA Signature verification module
 module pslhdsa
 
+// 10.3 SLH-DSA Signature Verification
+//
+// Algorithm 24 slh_verify(𝑀, SIG, 𝑐𝑡𝑥, PK)
+// Verifies a pure SLH-DSA signature.
+// Input: Message 𝑀, signature sig , context string 𝑐𝑡𝑥, public key PK.
+// Output: Boolean.
+@[direct_array_access]
+pub fn slh_verify(msg []u8, sig []u8, cx []u8, pk &PubKey) !bool {
+	if cx.len > max_context_string_size {
+		return error('pure SLH-DSA signature failed: exceed context-string')
+	}
+	// parse signature bytes into SLHSignature struct
+	parsed_sig := parse_slhsignature(pk.ctx, sig)!
+
+	// return slh_verify_sig(msg []u8, sig &SLHSignature, cx []u8, pk &PubKey) !bool
+	return slh_verify_sig(msg, parsed_sig, cx, pk)!
+}
+
+// pure SLH-DSA signature verification
+// Input: Message 𝑀, SLHSignature sig , context string 𝑐𝑡𝑥, public key PK.
+// Output: Boolean.
+@[direct_array_access; inline]
+fn slh_verify_sig(msg []u8, sig &SLHSignature, cx []u8, pk &PubKey) !bool {
+	// 𝑀′ ← toByte(0, 1) ∥ toByte(|𝑐𝑡𝑥|, 1) ∥ 𝑐𝑡𝑥 ∥ m
+	msgout := compose_msg(msg_encoding_nul, cx, msg)
+
+	// return slh_verify_internal(msg []u8, sig &SLHSignature, pk &PubKey) !bool
+	return slh_verify_internal(msgout, sig, pk)!
+}
+
 // 9.3 SLH-DSA Signature Verification
 //
 // Algorithm 20 slh_verify_internal(𝑀, SIG, PK)
@@ -77,24 +107,6 @@ fn slh_verify_internal(msg []u8, sig &SLHSignature, pk &PubKey) !bool {
 	// mut idxtree_cloned := idxtree.clone()
 	// return ht_verify(pk.ctx, pkfors, ht, pk.seed, idxtree, idxleaf, pk.root)!
 	return ht_verify(pk.ctx, pkfors, sig.ht, pk.seed, mut idxtree, idxleaf, pk.root)!
-}
-
-// 10.3 SLH-DSA Signature Verification
-//
-// Algorithm 24 slh_verify(𝑀, SIG, 𝑐𝑡𝑥, PK)
-// Verifies a pure SLH-DSA signature.
-// Input: Message 𝑀, signature sig , context string 𝑐𝑡𝑥, public key PK.
-// Output: Boolean.
-@[direct_array_access; inline]
-fn slh_verify(msg []u8, sig &SLHSignature, cx []u8, pk &PubKey) !bool {
-	if cx.len > max_context_string_size {
-		return error('pure SLH-DSA signature failed: exceed context-string')
-	}
-	// 𝑀′ ← toByte(0, 1) ∥ toByte(|𝑐𝑡𝑥|, 1) ∥ 𝑐𝑡𝑥 ∥ m
-	msgout := compose_msg(u8(0), cx, msg)
-
-	// return slh_verify_internal(msg []u8, sig &SLHSignature, pk &PubKey) !bool
-	return slh_verify_internal(msgout, sig, pk)!
 }
 
 /*

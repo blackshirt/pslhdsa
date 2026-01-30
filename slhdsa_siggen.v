@@ -171,6 +171,25 @@ fn slh_sign_internal(msg []u8, sk &SigningKey, addrnd []u8) !&SLHSignature {
 	return sig
 }
 
+// HashSLH-DSA Signature Generation
+//
+
+// OID of SHA256 : 2.16.840.1.101.3.4.2.1
+// OID ← toByte(0x0609608648016503040201, 11)
+const oid_sha256 = [u8(0x06), 0x09, 0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x02, 0x01]
+
+// OID of SHA512 : 2.16.840.1.101.3.4.2.3
+// OID ← toByte(0x0609608648016503040203, 11) ▷ 2.16.840.1.101.3.4.2.3
+const oid_sha512 = [u8(0x06), 0x09, 0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x02, 0x03]
+
+// OID of SHAKE128 : 2.16.840.1.101.3.4.2.11
+// OID ← toByte(0x060960864801650304020B, 11) ▷ 2.16.840.1.101.3.4.2.11
+const oid_shake128 = [u8(0x06), 0x09, 0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x02, 0x0B]
+
+// OID of SHAKE256 : 2.16.840.1.101.3.4.2.12
+// OID ← toByte(0x060960864801650304020C, 11) ▷ 2.16.840.1.101.3.4.2.12
+const oid_shake256 = [u8(0x06), 0x09, 0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x02, 0x0C]
+
 // 10.2.2 HashSLH-DSA Signature Generation
 //
 // Algorithm 23 hash_slh_sign(𝑀, 𝑐𝑡𝑥, PH, SK)

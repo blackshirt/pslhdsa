@@ -7,7 +7,8 @@ module pslhdsa
 
 import encoding.binary
 
-// The Address type word will have a value of 0, 1, 2, 3, 4, 5, or 6.
+// The AddressType is an enum of SLH-DSA address type
+// Its value will be 0, 1, 2, 3, 4, 5, or 6.
 // In order to improve readability, these values will be
 // referred to in this standard by the constants WOTS_HASH, WOTS_PK, TREE,
 // FORS_TREE, FORS_ROOTS, WOTS_PRF, and FORS_PRF, respectively
@@ -36,7 +37,7 @@ fn new_addrtype(v u32) !AddressType {
 	}
 }
 
-// Address fundamentally is an 32 bytes opaque composed from:
+// The Address is fundamentally an 32 bytes opaque composed from:
 // -- layer address  4 bytes 	0	0..4
 // -- tree address  12 bytes 	1	4..8
 // -- tree address  			2	8..12
@@ -247,8 +248,7 @@ fn (mut ad Address) set_type_and_clear_not_kp(t AddressType) {
 	ad.data[7] = 0
 }
 
-// Port of TreeIndex from golang implementation of SL-HDSA.
-// 12-bytes of tree index
+// TreeIndex is a 12-bytes of tree address type.
 @[noinit]
 struct TreeIndex {
 	hi u32
@@ -308,14 +308,14 @@ fn (t TreeIndex) bytes() []u8 {
 	return out
 }
 
-// residue Returns the residue of the tree index modulo 2^h.
+// residue returns the least significant h bits of 𝑖𝑑𝑥𝑡𝑟𝑒e
 @[inline]
 fn (t TreeIndex) residue(h int) u32 {
 	m := u32(1 << h) - 1
 	return t.lo & m
 }
 
-// remove_bits Returns the tree index with the least significant h bits removed.
+// remove_bits returns the tree index with the least significant h bits removed.
 @[inline]
 fn (t TreeIndex) remove_bits(h int) TreeIndex {
 	m := u32(1 << h) - 1

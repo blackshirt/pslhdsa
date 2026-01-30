@@ -11,12 +11,13 @@ import crypto.internal.subtle
 // 10.1 SLH-DSA Key Generation
 //
 // Algorithm 21 slh_keygen()
-// Generates an SLH-DSA key pair.
-// Input: (none)
-// Output: SLH-DSA key pair (SK, PK).
-// slh_keygen generates a SLH-DSA key pair with the given kind.
-// If the kind is not supported, it returns an error.
-// Its uses crypto.rand to generate random seed for the key generation.
+// Generates an SLH-DSA signing key.
+// Input: The context of the SLH-DSA algorithm.
+// Output: SLH-DSA signing key
+// slh_keygen generates a SLH-DSA signing key with the given context.
+// By default, it uses crypto.rand to generate random seed for the key generation.
+// Internally, the signing key result embeds the public key part of the key pair.
+// You can get the public key part by calling the `pk := sk.pubkey()` method.
 pub fn slh_keygen(c &Context) !&SigningKey {
 	// set SK.seed, SK.prf, and PK.seed to random 𝑛-byte
 	skseed := rand.read(c.prm.n)!
@@ -31,7 +32,7 @@ pub fn slh_keygen(c &Context) !&SigningKey {
 	return slh_keygen_internal(c, skseed, skprf, pkseed)!
 }
 
-// slh_keygen_from_bytes generates a SLH-DSA key with the given bytes.
+// slh_keygen_from_bytes generates a SLH-DSA signing key with the given bytes.
 // By default, it will check if the public key root is valid for the given context.
 // If opt.check_pk is set to false, it will not check the public key root.
 @[direct_array_access]
@@ -76,13 +77,13 @@ pub fn slh_keygen_from_bytes(ctx &Context, bytes []u8, opt Options) !&SigningKey
 	}
 }
 
-// slh_keygen_from_seed generates a SLH-DSA key with the given seed.
-// The every seed must be of length ctx.prm.n.
+// slh_keygen_from_seed generates a SLH-DSA signing key with the given seed.
+// The every seed must be of length ctx.prm.n bytes.
 @[direct_array_access]
 pub fn slh_keygen_from_seed(ctx &Context, skseed []u8, skprf []u8, pkseed []u8) !&SigningKey {
 	// check for the length	
 	if skseed.len != ctx.prm.n || skprf.len != ctx.prm.n || pkseed.len != ctx.prm.n {
-		return error('seed length must be equal to n')
+		return error('every seed length must be equal to n bytes')
 	}
 	// check if the seed is all zeroes
 	if is_zero(skseed) || is_zero(skprf) || is_zero(pkseed) {
@@ -93,9 +94,9 @@ pub fn slh_keygen_from_seed(ctx &Context, skseed []u8, skprf []u8, pkseed []u8) 
 
 // Algorithm 18 slh_keygen_internal(SK.seed, SK.prf, PK.seed)
 //
-// Generates an SLH-DSA key pair.
-// Input: Secret seed SK.seed, PRF key SK.prf, public seed PK.seed
-// Output: SLH-DSA key pair (SK, PK).
+// Generates an SLH-DSA signing key with the given seed.
+// Input: SLH-DSA context, secret seed SK.seed, PRF key SK.prf, public seed PK.seed
+// Output: SLH-DSA signing key.
 @[direct_array_access; inline]
 fn slh_keygen_internal(ctx &Context, skseed []u8, skprf []u8, pkseed []u8) !&SigningKey {
 	// generate the public key for the top-level XMSS tree

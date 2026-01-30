@@ -89,11 +89,11 @@ mut:
 	root []u8
 }
 
-// new_pubkey creates a new public key with the given context, seed, and root.
-// The seed and root must be ctx.prm.n bytes long.
-// If not, it returns an error.
-@[inline]
-fn new_pubkey(ctx &Context, bytes []u8) !&PubKey {
+// new_pubkey creates a new public key with the given context and bytes.
+// The bytes must be ctx.prm.n * 2 bytes long. Its also check if the seed and root
+// components are all zeroes that unallowed in this module. If so, it returns an error.
+@[direct_array_access]
+pub fn new_pubkey(ctx &Context, bytes []u8) !&PubKey {
 	if bytes.len != ctx.prm.n * 2 {
 		return error('bytes must be ctx.prm.n * 2 bytes long')
 	}
@@ -128,26 +128,35 @@ pub fn (p &PubKey) equal(o &PubKey) bool {
 		&& subtle.constant_time_compare(p.root, o.root) == 1
 }
 
-// Options is an options struct for SLH-DSA operation, includes
-// key generation, signing and verification options.
+// default maximum of additional randomness size, 2048 bytes.
+const max_addrnd_size = 2048
+
+// Options is an options struct for SLH-DSA operation, includes key generation,
+// signature generation and verification options.
 @[params]
 pub struct Options {
 pub mut:
 	// check_pk flag was used in `slh_keygen_from_bytes` to check if the public key root
 	// is valid in SLH-DSA key generation.
 	// If set to true, it will check if the public key root is valid.
-	// If set to false, it will not check the public key root.
+	// If set to false, it will not check the public key root and maybe fails on
+	// signature verification, default to true.
 	check_pk bool = true
 
 	// The option below was used in signature generation.
 	//
-	// deterministic signature generation
+	// deterministic signature generation, where the randomness is replaced by sk.pkseed.
+	// default to false and use crypto.rand.read for randomness.
 	deterministic bool
-	// testing flag to allow optional random value in test entropy
-	testing bool
+
+	// msg_encoding flag to encode the message before hashing.
+	// Its modelled after `message-encoding` parameter of OpenSLL SLH-DSA implementation.
+	// The default value true means for 'Pure SLH-DSA Signature Generation'.
+	// Setting it to false does not encode the message, which is used for testing,
+	// but can also be used for 'Pre Hash SLH-DSA Signature Generation'.
+	msg_encoding bool = true
 	// additional randomness, only for non-deterministic signature testing.
-	// Used for testing to pass a optional random value.
-	test_entropy []u8
+	addrnd []u8
 }
 
 // SLH-DSA signature data format

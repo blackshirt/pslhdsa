@@ -32,7 +32,7 @@ fn test_slhdsa_keygen_fips205_test_vectors() {
 			skb := hex.decode(t.sk)!
 			pkb := hex.decode(t.pk)!
 			// check if the generated key is valid
-			sk := pslhdsa.slh_keygen_with_seed(ctx, skseed, skprf, pkseed)!
+			sk := pslhdsa.slh_keygen_from_bytes(ctx, skseed, skprf, pkseed)!
 			assert sk.bytes() == skb
 			assert sk.pubkey().bytes() == pkb
 		}

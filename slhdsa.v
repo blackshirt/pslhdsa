@@ -37,31 +37,6 @@ mut:
 	pkroot []u8
 }
 
-// new_signing_key creates a new signing key with the given context and seed.
-// The seed must be ctx.prm.n bytes long. If not, it returns an error.
-@[direct_array_access]
-fn new_signing_key(c &Context, seed []u8) !&SigningKey {
-	if seed.len != 4 * c.prm.n {
-		return error('seed must be 4*ctx.prm.n bytes long')
-	}
-	skseed := seed[0..c.prm.n]
-	skprf := seed[c.prm.n..c.prm.n * 2]
-	pkseed := seed[c.prm.n * 2..c.prm.n * 3]
-	pkroot := seed[c.prm.n * 3..c.prm.n * 4]
-	// check if the seed components are all zeroes
-	if is_zero(skseed) || is_zero(skprf) || is_zero(pkseed) || is_zero(pkroot) {
-		return error('seed components are all zeroes')
-	}
-
-	return &SigningKey{
-		ctx:    unsafe { c }
-		seed:   skseed
-		prf:    skprf
-		pkseed: pkseed
-		pkroot: pkroot
-	}
-}
-
 // bytes returns the signing key bytes.
 // The signing key has a size of 4 * n bytes, which includes the public key components.
 // i.e. It consists of the concatenation of SK.seed, SK.prf, PK.seed and PF.root
@@ -153,10 +128,19 @@ pub fn (p &PubKey) equal(o &PubKey) bool {
 		&& subtle.constant_time_compare(p.root, o.root) == 1
 }
 
-// SignerOpts for signing behaviour
+// Options is an options struct for SLH-DSA operation, includes
+// key generation, signing and verification options.
 @[params]
-pub struct SignerOpts {
+pub struct Options {
 pub mut:
+	// check_pk flag was used in `slh_keygen_from_bytes` to check if the public key root
+	// is valid in SLH-DSA key generation.
+	// If set to true, it will check if the public key root is valid.
+	// If set to false, it will not check the public key root.
+	check_pk bool = true
+
+	// The option below was used in signature generation.
+	//
 	// deterministic signature generation
 	deterministic bool
 	// testing flag to allow optional random value in test entropy

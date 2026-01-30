@@ -20,7 +20,7 @@ import crypto.sha512
 // - deterministic: if true, use deterministic variant of SLH-DSA signature generation
 // Output: SLH-DSA signature bytes SIG.
 @[direct_array_access]
-pub fn slh_sign(msg []u8, cx []u8, sk &SigningKey, opt SignerOpts) ![]u8 {
+pub fn slh_sign(msg []u8, cx []u8, sk &SigningKey, opt Options) ![]u8 {
 	// Check context string size, should not exceed max_context_string_size
 	if cx.len > max_context_string_size {
 		return error('pure SLH-DSA signature failed: exceed context-string')
@@ -171,7 +171,7 @@ fn slh_sign_internal(msg []u8, sk &SigningKey, addrnd []u8) !&SLHSignature {
 // Input: Message 𝑀, context string cx, pre-hash function PH, private key SK.
 // Output: SLH-DSA signature SIG.
 @[direct_array_access; inline]
-fn hash_slh_sign(msg []u8, cx []u8, ph crypto.Hash, sk &SigningKey, opt SignerOpts) !&SLHSignature {
+fn hash_slh_sign(msg []u8, cx []u8, ph crypto.Hash, sk &SigningKey, opt Options) !&SLHSignature {
 	if cx.len > max_context_string_size {
 		return error('pure SLH-DSA signature failed: exceed context-string')
 	}

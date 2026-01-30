@@ -10,7 +10,7 @@ import encoding.hex
 // Test 1
 // Test basic signing and verification
 fn test_sign_verify_internal_basic() ! {
-	sk := slh_keygen(.sha2_128f)!
+	sk := slh_keygen(new_context(.sha2_128f))!
 	pk := sk.pubkey()
 
 	msg := 'hello'.bytes()
@@ -53,7 +53,7 @@ fn test_deterministic_sign_verify_shake128f() ! {
 	cx := hex.decode(item.context)!
 	signature := hex.decode(item.signature)!
 
-	seckey := new_signing_key(c, skb)!
+	seckey := slh_keygen_from_bytes(c, skb)!
 	secpk := seckey.pubkey()
 	assert secpk.equal(pk)
 	assert secpk.bytes() == pkb

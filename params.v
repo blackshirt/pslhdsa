@@ -340,14 +340,16 @@ fn sha512_caddr_generic(n int, pkseed []u8, addr Address, msg []u8, outlen int) 
 @[direct_array_access; inline]
 fn hmac_sha256(seed []u8, data []u8) []u8 {
 	// fn new(key []u8, data []u8, hash_func fn ([]u8) []u8, blocksize int) []u8
-	return hmac.new(seed, data, sha256.sum256, sha256.size)
+	// NOTE: use block_size instead of size
+	return hmac.new(seed, data, sha256.sum256, sha256.block_size)
 }
 
 // hmac_sha512 creates new HMAC bytes with SHA512 hash
-@[directly; inline]
+@[direct_array_access; inline]
 fn hmac_sha512(seed []u8, data []u8) []u8 {
 	// fn new(key []u8, data []u8, hash_func fn ([]u8) []u8, blocksize int) []u8
-	return hmac.new(seed, data, sha512.sum512, sha512.size)
+	// NOTE: use block_size instead of size
+	return hmac.new(seed, data, sha512.sum512, sha512.block_size)
 }
 
 // for other need, SHA2-based Security category 1 was return SHA256

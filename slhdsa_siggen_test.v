@@ -1,3 +1,9 @@
+// Copyright © 2024 blackshirt.
+// Use of this source code is governed by an MIT license
+// that can be found in the LICENSE file.
+//
+// Test for SLH-DSA Signature generation
+// The test materials was taken partially from FIPS 205 sigGen test vector
 module pslhdsa
 
 import encoding.hex
@@ -32,12 +38,11 @@ fn test_public_purehash_deterministic_siggen() ! {
 		cx := hex.decode(t.context)!
 		expected_sig := hex.decode(t.signature)!
 
-		sk := new_signing_key(c, skb)!
-		dump(c)
+		sk := slh_keygen_from_bytes(c, skb)!
 		pk := new_pubkey(c, pkb)!
 		assert sk.pubkey().equal(pk)
 
-		sig := slh_sign(msg, cx, sk, deterministic: true)!
+		sig := slh_sign(msg, cx, sk, deterministic: siggen_item.deterministic)!
 		assert sig == expected_sig
 	}
 }

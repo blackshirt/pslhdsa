@@ -75,7 +75,49 @@ pub fn (s &SigningKey) sign(msg []u8, cx []u8, opt Options) ![]u8 {
 	if cx.len > max_context_string_size {
 		return error('cx must be at most max_context_string_size bytes long')
 	}
-	return error('not implemented')
+	match opt.deterministic {
+		true {
+			// deterministic variant, opt_rand == s.pkseed
+			opt_rand := s.pkseed.clone()
+			match opt.msg_encoding {
+				.purehash {
+					// 𝑀′ ← toByte(0, 1) ∥ toByte(|𝑐𝑡𝑥|, 1) ∥ 𝑐𝑡𝑥 ∥ m
+					msgout := compose_msg_purehash(cx, msg)
+					// SIG ← slh_sign_internal(msgout []u8, sk &SigningKey, addrnd []u8) !&SLHSignature
+					sig := slh_sign_internal(msgout, s, opt_rand)!
+					return sig.bytes()
+				}
+				.prehash {
+					return error('preHash variant is not supported for deterministic variant')
+				}
+				.nohash {
+					return error('nohash variant is not supported for deterministic variant')
+				}
+			}
+		}
+		false {
+			// non-deterministic variant
+			match opt.testing {
+				true {
+					// testing variant, opt_rand == opt.entropy
+					opt_rand := opt.entropy.clone()
+				}
+				false {
+					// non-testing variant, opt_rand == s.prf
+					opt_rand := s.prf.clone()
+				}
+			}
+			match opt.msg_encoding {
+				.purehash {}
+				.prehash {
+					return error('preHash variant is not supported for non-deterministic variant')
+				}
+				.nohash {
+					return error('nohash variant is not supported for non-deterministic variant')
+				}
+			}
+		}
+	}
 }
 
 // SLH-DSA Public Key
@@ -147,7 +189,7 @@ pub fn (p &PubKey) verify(msg []u8, sig []u8, cx []u8, opt Options) !bool {
 }
 
 // default maximum of additional randomness size, 2048 bytes.
-const max_addrnd_size = 2048
+const max_entropy_size = 2048
 
 // Options is an options struct for SLH-DSA operation, includes key generation,
 // signature generation and verification options.
@@ -167,20 +209,36 @@ pub mut:
 	// default to false and use crypto.rand.read for randomness.
 	deterministic bool
 
-	// encode_msg flag to encode the message before hashing.
-	// Its modelled after `message-encoding` parameter of OpenSLL SLH-DSA implementation.
-	// The default value true means for 'Pure SLH-DSA Signature Generation'.
-	// Setting it to false does not encode the message, which is used for testing,
+	// msg_encoding defines the way signature generation was performed.
+	// The default value .purehash means for 'Pure SLH-DSA Signature Generation'.
+	// Setting it to .prehash does not encode the message, which is used for testing,
 	// but can also be used for 'Pre Hash SLH-DSA Signature Generation'.
-	encode_msg bool = true
+	msg_encoding MsgEncoding = .purehash
 
-	// use_addrnd flag to use addrnd for signature generation. Its ignored when deterministic is true.
-	// default to false and use crypto.rand.read for randomness.
-	use_addrnd bool
+	// hfunc is the hash function used in signature generation, used only when msg_encoding is .prehash.
+	// The default value is sha3.shake256.
+	hfunc crypto.Hash = .shake256
 
-	// addrnd is additional randomness, only for non-deterministic signature testing.
-	// addrnd must be at most max_addrnd_size bytes long.
-	addrnd []u8
+	// testing flag for testing purposes. if set to true, it will use entropy bytes
+	// as a random values pass to internal signing process. when deterministic is set,
+	// it will be ignored.
+	testing bool
+
+	// entropy is an additional randomness, only for non-deterministic signature testing.
+	// the testing flag should be set to true to enable this option.
+	// entropy must be at most max_entropy_size bytes long.
+	entropy []u8
+}
+
+// the way signature generation is applied.
+pub enum MsgEncoding {
+	// default, pure SLH-DSA signature generation
+	purehash
+	// pre-hash SLH-DSA signature generation
+	prehash
+	// no-hash SLH-DSA signature generation, non-standard
+	// NOTE: DONT USE THIS
+	nohash
 }
 
 // SLH-DSA signature data format

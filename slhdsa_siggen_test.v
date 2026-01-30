@@ -75,7 +75,7 @@ fn test_public_purehash_deterministic_siggen() ! {
 		pk := new_pubkey(c, pkb)!
 		assert sk.pubkey().equal(pk)
 
-		sig := slh_sign(msg, cx, sk, deterministic: siggen_item.deterministic)!
+		sig := slh_sign_deterministic(msg, cx, sk)!
 		assert sig == expected_sig
 	}
 }

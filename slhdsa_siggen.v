@@ -14,46 +14,43 @@ import crypto.sha512
 // 10.2.1 Pure SLH-DSA Signature Generation
 //
 // Algorithm 22 slh_sign(𝑀, 𝑐𝑡𝑥, SK)
-// Generates a pure SLH-DSA signature.
+// Generates a pure SLH-DSA signature with crypto.rand for randomness.
 // Input: Message 𝑀, context string cx, private key SK.
-// Optional params:
-// - deterministic: if true, use deterministic variant of SLH-DSA signature generation
 // Output: SLH-DSA signature bytes SIG.
+// slh_sign generates a pure SLH-DSA signature with crypto.rand for randomness.
 @[direct_array_access]
-pub fn slh_sign(msg []u8, cx []u8, sk &SigningKey, opt Options) ![]u8 {
+pub fn slh_sign(msg []u8, cx []u8, sk &SigningKey) ![]u8 {
 	// Check context string size, should not exceed max_context_string_size
 	if cx.len > max_context_string_size {
 		return error('pure SLH-DSA signature failed: exceed context-string')
 	}
-	// use deterministic variant
-	if opt.deterministic {
-		sig := slh_sign_deterministic(msg, cx, sk)!
-		return sig.bytes()
-	}
-	// otherwise, the sytem random one is used
-	sigrandom := slh_sign_random(msg, cx, sk)!
+	// randomized random for the randomized variant or
+	// 𝑜𝑝𝑡_𝑟𝑎𝑛𝑑 ← 𝑎𝑑𝑑𝑟𝑛, substitute 𝑜𝑝𝑡_𝑟𝑎𝑛𝑑 ← PK.seed for the deterministic variant,
+	opt_rand := rand.bytes(sk.ctx.prm.n)!
+
+	// 𝑀′ ← toByte(0, 1) ∥ toByte(|𝑐𝑡𝑥|, 1) ∥ 𝑐𝑡𝑥 ∥ m
+	msgout := compose_msg_purehash(cx, msg)
+
+	// SIG ← slh_sign_internal(msg []u8, sk &SigningKey, addrnd []u8) !&SLHSignature
+	// ▷ omit 𝑎𝑑𝑑𝑟𝑛𝑑 for the deterministic variant
+	sigrandom := slh_sign_internal(msgout, sk, opt_rand)!
 
 	return sigrandom.bytes()
 }
 
+// slh_sign_deterministic generates a deterministic SLH-DSA signature.
 @[direct_array_access; inline]
-fn slh_sign_with_addrnd(msg []u8, cx []u8, sk &SigningKey, addrnd []u8) ![]u8 {
-	msgout := compose_msg(u8(0), cx, msg)
-	sig := slh_sign_internal(msgout, sk, addrnd)!
-	return sig.bytes()
+fn slh_sign_deterministic(msg []u8, cx []u8, sk &SigningKey) ![]u8 {
+	// use the public key seed as the random seed for deterministic signature generation
+	msgout := compose_msg_purehash(cx, msg)
+	return slh_sign_internal(msgout, sk, sk.pkseed)!.bytes()
 }
 
-// using test entropy as additional randomness
-// TODO: limiting test entropy size
 @[direct_array_access; inline]
-fn slh_sign_internal_testentropy(msg []u8, sk &SigningKey, entropy []u8) !&SLHSignature {
-	// 𝑀′ ← toByte(0, 1) ∥ toByte(|𝑐𝑡𝑥|, 1) ∥ 𝑐𝑡𝑥 ∥ m
-	// msgout := compose_msg(u8(0), cx, msg)
-
-	// SIG ← slh_sign_internal(msg []u8, sk &SigningKey, addrnd []u8) !&SLHSignature
-	// ▷ omit 𝑎𝑑𝑑𝑟𝑛𝑑 for the deterministic variant
-	sig := slh_sign_internal(msg, sk, entropy)!
-	return sig
+fn slh_sign_with_addrnd(msg []u8, cx []u8, sk &SigningKey, addrnd []u8) ![]u8 {
+	msgout := compose_msg_purehash(cx, msg)
+	sig := slh_sign_internal(msgout, sk, addrnd)!
+	return sig.bytes()
 }
 
 // slh_sign_random generates a random SLH-DSA signature.
@@ -66,21 +63,13 @@ fn slh_sign_random(msg []u8, cx []u8, sk &SigningKey) !&SLHSignature {
 	opt_rand := rand.bytes(sk.ctx.prm.n)!
 
 	// 𝑀′ ← toByte(0, 1) ∥ toByte(|𝑐𝑡𝑥|, 1) ∥ 𝑐𝑡𝑥 ∥ m
-	msgout := compose_msg(u8(0), cx, msg)
+	msgout := compose_msg_purehash(cx, msg)
 
 	// SIG ← slh_sign_internal(msg []u8, sk &SigningKey, addrnd []u8) !&SLHSignature
 	// ▷ omit 𝑎𝑑𝑑𝑟𝑛𝑑 for the deterministic variant
 	sig := slh_sign_internal(msgout, sk, opt_rand)!
 
 	return sig
-}
-
-// slh_sign_deterministic generates a deterministic SLH-DSA signature.
-@[direct_array_access; inline]
-fn slh_sign_deterministic(msg []u8, cx []u8, sk &SigningKey) !&SLHSignature {
-	// use the public key seed as the random seed for deterministic signature generation
-	msgout := compose_msg(u8(0), cx, msg)
-	return slh_sign_internal(msgout, sk, sk.pkseed)!
 }
 
 // 9.2 SLH-DSA Signature Generation
@@ -264,17 +253,37 @@ fn hash_slh_sign(msg []u8, cx []u8, ph crypto.Hash, sk &SigningKey, opt Options)
 
 // Helpers for message combination
 
-// compose_msg combines the message components into a single message.
+const me_null = u8(0)
+const me_ones = u8(1)
+
+// compose_msg_purehash combines the message components into a single message.
 @[direct_array_access; inline]
-fn compose_msg(me u8, cx []u8, msg []u8) []u8 {
+fn compose_msg_purehash(cx []u8, msg []u8) []u8 {
 	// 𝑀′ ← toByte(me, 1) ∥ toByte(|𝑐𝑡𝑥|, 1) ∥ 𝑐𝑡𝑥 ∥ m
 	mut msgout := []u8{cap: 2 + cx.len + msg.len}
-	// to_byte(me, 1)
-	msgout << me
+	// to_byte(0, 1)
+	msgout << me_null
 	// to_byte(|𝑐𝑡𝑥|, 1), |𝑐𝑡𝑥| should fit in 1-byte
 	msgout << u8(cx.len)
 	msgout << cx
 	msgout << msg
+
+	return msgout
+}
+
+@[direct_array_access; inline]
+fn compose_msg_prehash(cx []u8, oid []u8, phm []u8) []u8 {
+	// 𝑀′ ← toByte(1, 1) ∥ toByte(|𝑐𝑡𝑥|, 1) ∥ 𝑐𝑡𝑥 ∥ OID ∥ PHm
+	mut msgout := []u8{cap: 2 + cx.len + oid.len + phm.len}
+	// to_byte(1, 1)
+	msgout << me_ones
+	// to_byte(|𝑐𝑡𝑥|, 1), |𝑐𝑡𝑥| should fit in 1-byte
+	msgout << u8(cx.len)
+	msgout << cx
+	// underlying ASN.1 DER serialized OID
+	msgout << oid
+	// pre-hashed message
+	msgout << phm
 
 	return msgout
 }

@@ -18,7 +18,7 @@ fn test_sign_verify_internal_basic() ! {
 	sig := slh_sign_internal(msg, sk, addrnd)!
 
 	verified := slh_verify_internal(msg, sig, pk)!
-	assert verified // NEED TO BE TRUE
+	assert verified == true
 }
 
 // Test 2
@@ -61,14 +61,25 @@ fn test_deterministic_sign_verify_shake128f() ! {
 
 	// deterministic testing
 	sig := slh_sign_deterministic(msg, cx, seckey)!
-	assert sig.bytes().len == signature.len
-	assert sig.bytes() == signature // PASS
+	assert sig.len == signature.len
+	assert sig == signature // PASS
+	sigback := parse_slhsignature(c, sig)!
 
 	// verified := slh_verify(msg []u8, sig &SLHSignature, cx []u8, pk &PubKey) !bool
-	verified := slh_verify_sig(msg, sig, cx, pk)!
+	verified := slh_verify_sig(msg, sigback, cx, pk)!
 	assert verified == true
 
 	// the facing public api slh_verify(msg []u8, sig []u8, cx []u8, pk &PubKey) !bool
-	verified2 := slh_verify(msg, sig.bytes(), cx, pk)!
+	verified2 := slh_verify(msg, sig, cx, pk)!
 	assert verified2 == true
+
+	// Test with SigningKey.sign API
+	// sig is deterministic signature
+	opt := Options{
+		deterministic: true
+	}
+	sig2 := seckey.sign(msg, cx, opt)!
+	assert sig2 == sig
+	verified3 := slh_verify(msg, sig2, cx, pk)!
+	assert verified3 == true
 }

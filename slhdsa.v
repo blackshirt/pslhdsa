@@ -5,6 +5,11 @@
 // The main SLH-DSA Signature module
 module pslhdsa
 
+import crypto
+import crypto.rand
+import crypto.sha256
+import crypto.sha512
+import crypto.sha3
 import crypto.internal.subtle
 
 const max_context_string_size = 255
@@ -72,52 +77,117 @@ pub fn (s &SigningKey) equal(o &SigningKey) bool {
 // The context string cx must be at most max_context_string_size bytes long.
 @[direct_array_access]
 pub fn (s &SigningKey) sign(msg []u8, cx []u8, opt Options) ![]u8 {
+	// validate the context string
 	if cx.len > max_context_string_size {
 		return error('cx must be at most max_context_string_size bytes long')
 	}
-	match opt.deterministic {
-		true {
-			// deterministic variant, opt_rand == s.pkseed
-			opt_rand := s.pkseed.clone()
-			match opt.msg_encoding {
-				.purehash {
-					// 𝑀′ ← toByte(0, 1) ∥ toByte(|𝑐𝑡𝑥|, 1) ∥ 𝑐𝑡𝑥 ∥ m
-					msgout := compose_msg_purehash(cx, msg)
-					// SIG ← slh_sign_internal(msgout []u8, sk &SigningKey, addrnd []u8) !&SLHSignature
-					sig := slh_sign_internal(msgout, s, opt_rand)!
-					return sig.bytes()
-				}
-				.prehash {
-					return error('preHash variant is not supported for deterministic variant')
-				}
-				.nohash {
-					return error('nohash variant is not supported for deterministic variant')
-				}
-			}
+	// Get the random value
+	//
+	// if deterministic was set, use the PK.seed as the random seed for deterministic signature
+	// generation. if testing was set, use the entropy bytes as the random seed for testing purposes
+	// otherwise, use the default crypto.rand.read for randomness
+	opt_rand := if opt.deterministic {
+		// use the public key seed as the random seed for deterministic signature generation
+		s.pkseed
+	} else if opt.testing {
+		// use the testing entropy as the random seed for testing purposes
+		if opt.entropy.len > max_entropy_size {
+			return error('entropy must be at most max_entropy_size bytes long')
 		}
-		false {
-			// non-deterministic variant
-			match opt.testing {
-				true {
-					// testing variant, opt_rand == opt.entropy
-					opt_rand := opt.entropy.clone()
-				}
-				false {
-					// non-testing variant, opt_rand == s.prf
-					opt_rand := s.prf.clone()
-				}
+		opt.entropy
+	} else {
+		// Hedged variant, use the random one by calling crypto.rand
+		rand.read(s.ctx.prm.n)!
+	}
+
+	// gets the message encoding, the default is pure-hash SLH-DSA message encoding.
+	//
+	//
+	msgout := if opt.msg_encoding {
+		// pure hash message encoding, the default one
+		encode_msg_purehash(cx, msg)
+	} else {
+		if opt.no_prehash {
+			// Make sure testing flag is also set
+			if !opt.testing {
+				return error('testing not set for no_prehash feature')
 			}
-			match opt.msg_encoding {
-				.purehash {}
-				.prehash {
-					return error('preHash variant is not supported for non-deterministic variant')
-				}
-				.nohash {
-					return error('nohash variant is not supported for non-deterministic variant')
-				}
+			// with this no_prehash was set, the msg was not encoded.
+			// NOTE: this features deviates from the FIPS 205 spec that
+			// only support for pure-hash and pre-hash SLH-DSA generation.
+			// USE WITH CAUTION!!
+			msg
+		} else {
+			// pre-hashed message encoding
+			// TODO: add supported hash algorithms into list
+			if opt.hfunc !in supported_prehash_algo {
+				return error('hfunc must be one of the supported prehash algorithms')
 			}
+			// get the ASN.1 DER serialized bytes for the hash oid
+			oid := oid_for_hashfunc(opt.hfunc)!
+			// pre-hashed message with hfunc
+			phm := phm_for_hashfunc(opt.hfunc, msg)!
+
+			// pre-hash message encoding
+			encode_msg_prehash(cx, oid, phm)
 		}
 	}
+
+	// use slh_sign_internal to generate the signature
+	sig := slh_sign_internal(msgout, s, opt_rand)!
+
+	return sig.bytes()
+}
+
+// default maximum of additional randomness size, 2048 bytes.
+const max_entropy_size = 2048
+
+// supported_prehash_algo is a list of supported prehash algorithms in pre-hash message encoding
+const supported_prehash_algo = [crypto.Hash.sha256, .sha512, .sha3_224, .sha3_256]
+
+// Options is an options struct for SLH-DSA operation, includes key generation,
+// signature generation and signature verification.
+@[params]
+pub struct Options {
+pub mut:
+	// check_pk flag was used in SLH-DSA key generation, especially in `slh_keygen_from_bytes`
+	// to check if the public key root is valid in SLH-DSA key generation.
+	// If set to true, it will check if the public key root is valid.
+	// If set to false, it will not check the public key root and maybe fails on
+	// signature verification, default to true.
+	check_pk bool = true
+
+	// The option below was used in signature generation.
+	//
+	// deterministic signature generation, where the randomness is replaced by sk.pkseed.
+	// default to false and use crypto.rand.read for randomness.
+	deterministic bool
+
+	// testing flag for testing or advanced purposes. if set to true, it will use entropy bytes
+	// as a random values pass to internal signing process. When deterministic flag is set,
+	// it will be ignored.
+	testing bool
+
+	// entropy is an additional randomness value, only for non-deterministic signature testing.
+	// the testing flag should be set to true to enable this option.
+	// the entropy size must be at most max_entropy_size bytes long.
+	entropy []u8
+
+	// msg_encoding defines the way of message encoding for signature generation was performed.
+	// The default value true means for 'Pure SLH-DSA Signature Generation'.
+	// When it set to false, its mean for 'Pre Hash SLH-DSA Signature Generation' or
+	// does not encode the mesage behaviour, depends on teh `no_prehash` flag.
+	msg_encoding bool = true
+
+	// Its used for two purposes, 'Pre Hash SLH-DSA Signature Generation' or
+	// do not encodes the mesage completely behaviour. Its only for testing purposes.
+	// When set to true, pre-hash message encode step was not performed, and
+	// message left completely untouched.
+	no_prehash bool
+
+	// hfunc is the hash function used in pre-hashed message encoding,
+	// used only when msg_encoding is false. The default value is sha256.
+	hfunc crypto.Hash = .sha256
 }
 
 // SLH-DSA Public Key
@@ -188,59 +258,6 @@ pub fn (p &PubKey) verify(msg []u8, sig []u8, cx []u8, opt Options) !bool {
 	return error('not implemented')
 }
 
-// default maximum of additional randomness size, 2048 bytes.
-const max_entropy_size = 2048
-
-// Options is an options struct for SLH-DSA operation, includes key generation,
-// signature generation and verification options.
-@[params]
-pub struct Options {
-pub mut:
-	// check_pk flag was used in `slh_keygen_from_bytes` to check if the public key root
-	// is valid in SLH-DSA key generation.
-	// If set to true, it will check if the public key root is valid.
-	// If set to false, it will not check the public key root and maybe fails on
-	// signature verification, default to true.
-	check_pk bool = true
-
-	// The option below was used in signature generation.
-	//
-	// deterministic signature generation, where the randomness is replaced by sk.pkseed.
-	// default to false and use crypto.rand.read for randomness.
-	deterministic bool
-
-	// msg_encoding defines the way signature generation was performed.
-	// The default value .purehash means for 'Pure SLH-DSA Signature Generation'.
-	// Setting it to .prehash does not encode the message, which is used for testing,
-	// but can also be used for 'Pre Hash SLH-DSA Signature Generation'.
-	msg_encoding MsgEncoding = .purehash
-
-	// hfunc is the hash function used in signature generation, used only when msg_encoding is .prehash.
-	// The default value is sha3.shake256.
-	hfunc crypto.Hash = .shake256
-
-	// testing flag for testing purposes. if set to true, it will use entropy bytes
-	// as a random values pass to internal signing process. when deterministic is set,
-	// it will be ignored.
-	testing bool
-
-	// entropy is an additional randomness, only for non-deterministic signature testing.
-	// the testing flag should be set to true to enable this option.
-	// entropy must be at most max_entropy_size bytes long.
-	entropy []u8
-}
-
-// the way signature generation is applied.
-pub enum MsgEncoding {
-	// default, pure SLH-DSA signature generation
-	purehash
-	// pre-hash SLH-DSA signature generation
-	prehash
-	// no-hash SLH-DSA signature generation, non-standard
-	// NOTE: DONT USE THIS
-	nohash
-}
-
 // SLH-DSA signature data format
 @[noinit]
 struct SLHSignature {
@@ -293,3 +310,101 @@ fn (s &SLHSignature) bytes() []u8 {
 
 	return out
 }
+
+// Message encoding
+//
+const me_null = u8(0)
+const me_ones = u8(1)
+
+// encode_msg_purehash combines the message components into a single message.
+// The message is encoded as per the SLH-DSA specification, section 10.2.1.
+// See on 10.2.1 Pure SLH-DSA Signature Generation
+@[direct_array_access; inline]
+fn encode_msg_purehash(cx []u8, msg []u8) []u8 {
+	// 𝑀′ ← toByte(me, 1) ∥ toByte(|𝑐𝑡𝑥|, 1) ∥ 𝑐𝑡𝑥 ∥ m
+	mut msgout := []u8{cap: 2 + cx.len + msg.len}
+	// to_byte(0, 1)
+	msgout << me_null
+	// to_byte(|𝑐𝑡𝑥|, 1), |𝑐𝑡𝑥| should fit in 1-byte
+	msgout << u8(cx.len)
+	msgout << cx
+	msgout << msg
+
+	return msgout
+}
+
+// encode_msg_prehash combines the message components into a single message.
+// The message is encoded as per the SLH-DSA specification, section 10.2.2.
+// See on 10.2.2 HashSLH-DSA Signature Generation
+@[direct_array_access; inline]
+fn encode_msg_prehash(cx []u8, oid []u8, phm []u8) []u8 {
+	// 𝑀′ ← toByte(1, 1) ∥ toByte(|𝑐𝑡𝑥|, 1) ∥ 𝑐𝑡𝑥 ∥ OID ∥ PHm
+	mut msgout := []u8{cap: 2 + cx.len + oid.len + phm.len}
+	// to_byte(1, 1)
+	msgout << me_ones
+	// to_byte(|𝑐𝑡𝑥|, 1), |𝑐𝑡𝑥| should fit in 1-byte
+	msgout << u8(cx.len)
+	msgout << cx
+	// underlying ASN.1 DER serialized OID
+	msgout << oid
+	// pre-hashed message
+	msgout << phm
+
+	return msgout
+}
+
+// oid_for_hashfunc returns the OID for the given hash function.
+// If the hash function is not supported, it panics.
+@[inline]
+fn oid_for_hashfunc(hfunc crypto.Hash) ![]u8 {
+	return match hfunc {
+		.sha256 { oid_sha256 }
+		.sha512 { oid_sha512 }
+		.sha3_224 { oid_shake128 }
+		.sha3_256 { oid_shake256 }
+		else { return error('unsupported hash function') }
+	}
+}
+
+// phm_for_hashfunc returns the pre-hashed message for the given hash function.
+// If the hash function is not supported, it returns an error.
+@[inline]
+fn phm_for_hashfunc(hfunc crypto.Hash, msg []u8) ![]u8 {
+	return match hfunc {
+		.sha256 {
+			// PH𝑀 ← SHA-256(𝑀)
+			return sha256.sum256(msg)
+		}
+		.sha512 {
+			// PH𝑀 ← SHA-512(𝑀)
+			return sha512.sum512(msg)
+		}
+		.sha3_224 {
+			// 17: PH𝑀 ← SHAKE128(𝑀, 256), 32-bytes
+			return sha3.shake128(msg, 32)
+		}
+		.sha3_256 {
+			// PH𝑀 ← SHAKE256(𝑀, 512), 64-bytes
+			return sha3.shake256(msg, 64)
+		}
+		else {
+			return error('unsupported hash function')
+		}
+	}
+}
+
+// OID of SHA256 : 2.16.840.1.101.3.4.2.1
+// OID ← toByte(0x0609608648016503040201, 11)
+const oid_sha256 = [u8(0x06), 0x09, 0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x02, 0x01]
+
+// OID of SHA512 : 2.16.840.1.101.3.4.2.3
+// OID ← toByte(0x0609608648016503040203, 11) ▷ 2.16.840.1.101.3.4.2.3
+const oid_sha512 = [u8(0x06), 0x09, 0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x02, 0x03]
+
+// OID of SHAKE128 : 2.16.840.1.101.3.4.2.11
+// OID ← toByte(0x060960864801650304020B, 11) ▷ 2.16.840.1.101.3.4.2.11
+const oid_shake128 = [u8(0x06), 0x09, 0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x02, 0x0B]
+
+// OID of SHAKE256 : 2.16.840.1.101.3.4.2.12
+// OID ← toByte(0x060960864801650304020C, 11) ▷ 2.16.840.1.101.3.4.2.12
+const oid_shake256 = [u8(0x06), 0x09, 0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x02, 0x0C]

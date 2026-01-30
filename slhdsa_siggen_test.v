@@ -39,6 +39,21 @@ fn test_siggen_nondeterministic_external_pure() ! {
 
 	outsig := slh_sign_with_addrnd(msg, cx, sk, addrnd)!
 	assert outsig == sig
+
+	// Testing with SigningKey.sign API
+	opt := Options{
+		// non-deterministic options
+		deterministic: false
+		// pureHash generation, default. can be ommited
+		msg_encoding: true
+		// use testing entropy, for testing should be true
+		testing: true
+		// set the entropy to randomness value
+		entropy: addrnd
+	}
+
+	sig2 := sk.sign(msg, cx, opt)!
+	assert sig2 == sig
 }
 
 struct SiggenGroupItem {

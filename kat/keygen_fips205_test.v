@@ -35,6 +35,14 @@ fn test_slhdsa_keygen_fips205_test_vectors() {
 			sk := pslhdsa.slh_keygen_from_seed(ctx, skseed, skprf, pkseed)!
 			assert sk.bytes() == skb
 			assert sk.pubkey().bytes() == pkb
+			// explicitly release the resources
+			unsafe {
+				free(skseed)
+				free(skprf)
+				free(pkseed)
+				free(skb)
+				free(pkb)
+			}
 		}
 	}
 }

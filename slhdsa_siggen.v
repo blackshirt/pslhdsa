@@ -38,7 +38,7 @@ pub fn slh_sign(msg []u8, cx []u8, sk &SigningKey, opt Options) ![]u8 {
 
 @[direct_array_access; inline]
 fn slh_sign_with_addrnd(msg []u8, cx []u8, sk &SigningKey, addrnd []u8) ![]u8 {
-	msgout := compose_msg(msg_encoding_nul, cx, msg)
+	msgout := compose_msg(u8(0), cx, msg)
 	sig := slh_sign_internal(msgout, sk, addrnd)!
 	return sig.bytes()
 }
@@ -48,7 +48,7 @@ fn slh_sign_with_addrnd(msg []u8, cx []u8, sk &SigningKey, addrnd []u8) ![]u8 {
 @[direct_array_access; inline]
 fn slh_sign_internal_testentropy(msg []u8, sk &SigningKey, entropy []u8) !&SLHSignature {
 	// 𝑀′ ← toByte(0, 1) ∥ toByte(|𝑐𝑡𝑥|, 1) ∥ 𝑐𝑡𝑥 ∥ m
-	// msgout := compose_msg(msg_encoding_nul, cx, msg)
+	// msgout := compose_msg(u8(0), cx, msg)
 
 	// SIG ← slh_sign_internal(msg []u8, sk &SigningKey, addrnd []u8) !&SLHSignature
 	// ▷ omit 𝑎𝑑𝑑𝑟𝑛𝑑 for the deterministic variant
@@ -66,7 +66,7 @@ fn slh_sign_random(msg []u8, cx []u8, sk &SigningKey) !&SLHSignature {
 	opt_rand := rand.bytes(sk.ctx.prm.n)!
 
 	// 𝑀′ ← toByte(0, 1) ∥ toByte(|𝑐𝑡𝑥|, 1) ∥ 𝑐𝑡𝑥 ∥ m
-	msgout := compose_msg(msg_encoding_nul, cx, msg)
+	msgout := compose_msg(u8(0), cx, msg)
 
 	// SIG ← slh_sign_internal(msg []u8, sk &SigningKey, addrnd []u8) !&SLHSignature
 	// ▷ omit 𝑎𝑑𝑑𝑟𝑛𝑑 for the deterministic variant
@@ -79,7 +79,7 @@ fn slh_sign_random(msg []u8, cx []u8, sk &SigningKey) !&SLHSignature {
 @[direct_array_access; inline]
 fn slh_sign_deterministic(msg []u8, cx []u8, sk &SigningKey) !&SLHSignature {
 	// use the public key seed as the random seed for deterministic signature generation
-	msgout := compose_msg(msg_encoding_nul, cx, msg)
+	msgout := compose_msg(u8(0), cx, msg)
 	return slh_sign_internal(msgout, sk, sk.pkseed)!
 }
 

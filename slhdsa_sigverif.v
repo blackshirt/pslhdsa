@@ -29,7 +29,7 @@ pub fn slh_verify(msg []u8, sig []u8, cx []u8, pk &PubKey) !bool {
 @[direct_array_access; inline]
 fn slh_verify_sig(msg []u8, sig &SLHSignature, cx []u8, pk &PubKey) !bool {
 	// 𝑀′ ← toByte(0, 1) ∥ toByte(|𝑐𝑡𝑥|, 1) ∥ 𝑐𝑡𝑥 ∥ m
-	msgout := compose_msg(msg_encoding_nul, cx, msg)
+	msgout := compose_msg(u8(0), cx, msg)
 
 	// return slh_verify_internal(msg []u8, sig &SLHSignature, pk &PubKey) !bool
 	return slh_verify_internal(msgout, sig, pk)!

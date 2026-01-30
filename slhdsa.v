@@ -7,8 +7,6 @@ module pslhdsa
 
 import crypto.internal.subtle
 
-const msg_encoding_nul = u8(0)
-const msg_encoding_one = u8(1)
 const max_context_string_size = 255
 
 // the default context used by this SLH-DSA module. it uses the SHA-2 128f hash function
@@ -70,6 +68,16 @@ pub fn (s &SigningKey) equal(o &SigningKey) bool {
 		&& subtle.constant_time_compare(s.pkroot, o.pkroot) == 1
 }
 
+// sign signs the message msg with the signing key s.
+// The context string cx must be at most max_context_string_size bytes long.
+@[direct_array_access]
+pub fn (s &SigningKey) sign(msg []u8, cx []u8, opt Options) ![]u8 {
+	if cx.len > max_context_string_size {
+		return error('cx must be at most max_context_string_size bytes long')
+	}
+	return error('not implemented')
+}
+
 // SLH-DSA Public Key
 //
 // The public keys contain two elements. The first is an 𝑛-byte public seed
@@ -128,6 +136,16 @@ pub fn (p &PubKey) equal(o &PubKey) bool {
 		&& subtle.constant_time_compare(p.root, o.root) == 1
 }
 
+// verify verifies the signature of the message msg against the public key p.
+// The context string cx must be at most max_context_string_size bytes long.
+@[direct_array_access]
+pub fn (p &PubKey) verify(msg []u8, sig []u8, cx []u8, opt Options) !bool {
+	if cx.len > max_context_string_size {
+		return error('cx must be at most max_context_string_size bytes long')
+	}
+	return error('not implemented')
+}
+
 // default maximum of additional randomness size, 2048 bytes.
 const max_addrnd_size = 2048
 
@@ -149,13 +167,19 @@ pub mut:
 	// default to false and use crypto.rand.read for randomness.
 	deterministic bool
 
-	// msg_encoding flag to encode the message before hashing.
+	// encode_msg flag to encode the message before hashing.
 	// Its modelled after `message-encoding` parameter of OpenSLL SLH-DSA implementation.
 	// The default value true means for 'Pure SLH-DSA Signature Generation'.
 	// Setting it to false does not encode the message, which is used for testing,
 	// but can also be used for 'Pre Hash SLH-DSA Signature Generation'.
-	msg_encoding bool = true
-	// additional randomness, only for non-deterministic signature testing.
+	encode_msg bool = true
+
+	// use_addrnd flag to use addrnd for signature generation. Its ignored when deterministic is true.
+	// default to false and use crypto.rand.read for randomness.
+	use_addrnd bool
+
+	// addrnd is additional randomness, only for non-deterministic signature testing.
+	// addrnd must be at most max_addrnd_size bytes long.
 	addrnd []u8
 }
 

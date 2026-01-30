@@ -41,7 +41,6 @@ fn test_siggen_nondeterministic_external_pure() ! {
 	assert outsig == sig
 }
 
-
 struct SiggenGroupItem {
 	tgid               int
 	testtype           string
@@ -161,4 +160,3 @@ const siggen_item = SiggenGroupItem{
 		},
 	]
 }
-

@@ -36,6 +36,13 @@ pub fn slh_sign(msg []u8, cx []u8, sk &SigningKey, opt Options) ![]u8 {
 	return sigrandom.bytes()
 }
 
+@[direct_array_access; inline]
+fn slh_sign_with_addrnd(msg []u8, cx []u8, sk &SigningKey, addrnd []u8) ![]u8 {
+	msgout := compose_msg(msg_encoding_nul, cx, msg)
+	sig := slh_sign_internal(msgout, sk, addrnd)!
+	return sig.bytes()
+}
+
 // using test entropy as additional randomness
 // TODO: limiting test entropy size
 @[direct_array_access; inline]

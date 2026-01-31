@@ -20,10 +20,12 @@ fn test_slhdsa_sigverify_fips205_test_vectors() {
 	for tg in sigver_test.testgroups {
 		ctx := pslhdsa.new_context_from_name(tg.parameterset)!
 		mode := tg.signatureinterface // 'internal' or 'external'
-		deterministic := tg.deterministic // true or false
-		prehash := tg.prehash // "pure" or "prehash"
-
+		prehash := tg.prehash // "pure", "prehash" or "none" (for internal interface)
+		//
+		mut opt := Options{}
+		msg_encoding := if mode == 'external' && prehash == 'pure' { true } else { false }
 		for t in tg.tests {
+			dump(t.tcid)
 			// we dont support prehash now
 			if prehash == 'prehash' {
 				continue
@@ -34,10 +36,7 @@ fn test_slhdsa_sigverify_fips205_test_vectors() {
 			cx := hex.decode(t.context)!
 			signature := hex.decode(t.signature)!
 			addrnd := hex.decode(t.additionalrandomness)!
-			opt := SignerOpts{
-				deterministic: deterministic
-				test_entropy:  addrnd
-			}
+
 			sk := pslhdsa.new_signing_key(ctx, skb)!
 			pk := pslhdsa.new_pubkey(ctx, pkb)!
 			assert sk.pubkey().equal(pk)
@@ -62,14 +61,13 @@ struct SigVerifGroupItem {
 	tgid               int
 	testtype           string
 	parameterset       string
-	deterministic      bool
 	signatureinterface string
 	prehash            string
 	tests              []SigVerifCaseItem
 }
 
 struct SigVerifCaseItem {
-	tcid                 1
+	tcid                 int
 	testpassed           bool
 	deferred             bool
 	sk                   string

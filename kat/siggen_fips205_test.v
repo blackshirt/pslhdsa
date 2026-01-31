@@ -49,12 +49,12 @@ fn test_slhdsa_siggen_fips205_test_vectors() {
 			assert sigout == signature
 			// explicitly  releases allocated buffers
 			unsafe {
-				skb.free()
-				pkb.free()
-				message.free()
-				cx.free()
-				sigout.free()
-				signature.free()
+				free(skb)
+				free(pkb)
+				free(message)
+				free(cx)
+				free(sigout)
+				free(signature)
 			}
 		}
 	}

@@ -103,16 +103,16 @@ pub fn (s &SigningKey) sign(msg []u8, cx []u8, opt Options) ![]u8 {
 	// gets the message encoding, the default is pure-hash SLH-DSA message encoding.
 	//
 	//
-	msgout := if opt.msg_encoding {
+	msgout := if opt.msg_encoding == .pure {
 		// pure hash message encoding, the default one
 		encode_msg_purehash(cx, msg)
 	} else {
-		if opt.no_prehash {
+		if opt.msg_encoding == .noencode {
 			// Make sure testing flag is also set
 			if !opt.testing {
 				return error('testing not set for no_prehash feature')
 			}
-			// with this no_prehash was set, the msg was not encoded.
+			// with this .noencode was set, the msg was not encoded.
 			// NOTE: this features deviates from the FIPS 205 spec that
 			// only support for pure-hash and pre-hash SLH-DSA generation.
 			// USE WITH CAUTION!!
@@ -173,17 +173,11 @@ pub mut:
 	// the entropy size must be at most max_entropy_size bytes long.
 	entropy []u8
 
-	// msg_encoding defines the way of message encoding for signature generation was performed.
-	// The default value true means for 'Pure SLH-DSA Signature Generation'.
-	// When it set to false, its mean for 'Pre Hash SLH-DSA Signature Generation' or
-	// does not encode the mesage behaviour, depends on teh `no_prehash` flag.
-	msg_encoding bool = true
-
-	// Its used for two purposes, 'Pre Hash SLH-DSA Signature Generation' or
-	// do not encodes the mesage completely behaviour. Its only for testing purposes.
-	// When set to true, pre-hash message encode step was not performed, and
-	// message left completely untouched.
-	no_prehash bool
+	// msg_encoding defines the way of message encoding for signature generation (verication)
+	// was performed. The default value .pure means for 'Pure SLH-DSA Signature Generation (verification)'.
+	// .pre for 'Pre Hash SLH-DSA Signature Generation (verification)' or .noencode for not encode the mesage behaviour,
+	// .noencode was intended for testing. If not sure, just use the default .pure value.
+	msg_encoding MsgEncoding = .pure
 
 	// hfunc is the hash function used in pre-hashed message encoding,
 	// used only when msg_encoding is false. The default value is sha256.
@@ -252,10 +246,45 @@ pub fn (p &PubKey) equal(o &PubKey) bool {
 // The context string cx must be at most max_context_string_size bytes long.
 @[direct_array_access]
 pub fn (p &PubKey) verify(msg []u8, sig []u8, cx []u8, opt Options) !bool {
+	// check for context string size
 	if cx.len > max_context_string_size {
 		return error('cx must be at most max_context_string_size bytes long')
 	}
-	return error('not implemented')
+	// Parse signature bytes into SLHSignature opaque
+	slh_sig := parse_slhsignature(p.ctx, sig)!
+
+	// gets the message encoding, the default is pure-hash SLH-DSA message encoding.
+	//
+	msgout := if opt.msg_encoding == .pure {
+		// pure hash message encoding, the default one
+		encode_msg_purehash(cx, msg)
+	} else {
+		if opt.msg_encoding == .noencode {
+			// Make sure testing flag is also set
+			if !opt.testing {
+				return error('testing not set for noencode feature')
+			}
+			// with this noencode was set, the msg was not encoded.
+			// NOTE: this features deviates from the FIPS 205 spec that
+			// only support for pure-hash and pre-hash SLH-DSA generation.
+			// USE WITH CAUTION!!
+			msg
+		} else {
+			// pre-hashed message encoding
+			// TODO: add supported hash algorithms into list
+			if opt.hfunc !in supported_prehash_algo {
+				return error('hfunc must be one of the supported prehash algorithms')
+			}
+			// get the ASN.1 DER serialized bytes for the hash oid
+			oid := oid_for_hashfunc(opt.hfunc)!
+			// pre-hashed message with hfunc
+			phm := phm_for_hashfunc(opt.hfunc, msg)!
+
+			// pre-hash message encoding
+			encode_msg_prehash(cx, oid, phm)
+		}
+	}
+	return slh_verify_internal(msgout, slh_sig, p)!
 }
 
 // SLH-DSA signature data format
@@ -315,6 +344,15 @@ fn (s &SLHSignature) bytes() []u8 {
 //
 const me_null = u8(0)
 const me_ones = u8(1)
+
+pub enum MsgEncoding {
+	// Pure SLH-DSA hash message encoding construct
+	pure
+	// Pre-hash SLH-DSA message encoding construct
+	pre
+	// No encode message encoding
+	noencode
+}
 
 // encode_msg_purehash combines the message components into a single message.
 // The message is encoded as per the SLH-DSA specification, section 10.2.1.

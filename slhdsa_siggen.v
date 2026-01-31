@@ -7,9 +7,6 @@ module pslhdsa
 
 import crypto
 import crypto.rand
-import crypto.sha3
-import crypto.sha256
-import crypto.sha512
 
 // 10.2.1 Pure SLH-DSA Signature Generation
 //

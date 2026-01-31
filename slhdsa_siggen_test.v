@@ -37,7 +37,10 @@ fn test_siggen_nondeterministic_external_pure() ! {
 	ctx := new_context_from_name('SLH-DSA-SHA2-128f')!
 	sk := slh_keygen_from_bytes(ctx, skb)!
 
-	outsig := slh_sign_with_addrnd(msg, cx, sk, addrnd)!
+	// signing with custom random
+	msgout := encode_msg_purehash(cx, msg)
+	outsig := slh_sign_internal(msgout, sk, addrnd)!.bytes()
+
 	assert outsig == sig
 
 	// Testing with SigningKey.sign API
@@ -90,7 +93,10 @@ fn test_public_purehash_deterministic_siggen() ! {
 		pk := new_pubkey(c, pkb)!
 		assert sk.pubkey().equal(pk)
 
-		sig := slh_sign_deterministic(msg, cx, sk)!
+		// sign in deterministic way
+		msgout := encode_msg_purehash(cx, msg)
+		sig := slh_sign_internal(msgout, sk, sk.pkseed)!.bytes()
+
 		assert sig == expected_sig
 	}
 }

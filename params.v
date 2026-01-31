@@ -14,6 +14,8 @@ import crypto.sha512
 
 // SLH-DSA Context
 //
+// The Context structure describes SLH-DSA type and underlying parameter set
+// defined in the FIPS205 standard.
 @[noinit]
 pub struct Context {
 mut:
@@ -507,7 +509,7 @@ pub enum Kind {
 
 // kind_from_name make a Kind from name string
 @[inline]
-pub fn kind_from_name(name string) !Kind {
+fn kind_from_name(name string) !Kind {
 	match name {
 		// SHA2-based family
 		'SLH-DSA-SHA2-128s' { return .sha2_128s }
@@ -525,12 +527,6 @@ pub fn kind_from_name(name string) !Kind {
 		'SLH-DSA-SHAKE-256f' { return .shake_256f }
 		else { return error('Invalid SLH-DSA name string') }
 	}
-}
-
-// clone returns a deep copy of Kind k
-@[inline]
-fn (k Kind) clone() Kind {
-	return k
 }
 
 // name returns the famous name of this Kind

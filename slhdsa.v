@@ -353,8 +353,8 @@ fn encode_msg_prehash(cx []u8, oid []u8, phm []u8) []u8 {
 	return msgout
 }
 
-// oid_for_hashfunc returns the OID for the given hash function.
-// If the hash function is not supported, it panics.
+// oid_for_hashfunc returns the serialized OID for the given hash function.
+// If the hash function is not supported, it return error.
 @[inline]
 fn oid_for_hashfunc(hfunc crypto.Hash) ![]u8 {
 	return match hfunc {

@@ -9,6 +9,7 @@ import os
 import encoding.hex
 import x.json2
 
+// Test vectors for SLH-DSA key generation
 fn test_slhdsa_keygen_fips205_test_vectors() {
 	// read the keygen_fips205.json file
 	// The test material was taken from SLH-DSA keyGen-FIPS205 test vectors for key generation

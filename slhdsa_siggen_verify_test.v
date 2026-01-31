@@ -59,8 +59,10 @@ fn test_deterministic_sign_verify_shake128f() ! {
 	assert secpk.bytes() == pkb
 	assert seckey.bytes() == skb
 
-	// deterministic testing
-	sig := slh_sign_deterministic(msg, cx, seckey)!
+	// sign in deterministic way
+	msgout := encode_msg_purehash(cx, msg)
+	sig := slh_sign_internal(msgout, seckey, seckey.pkseed)!.bytes()
+
 	assert sig.len == signature.len
 	assert sig == signature // PASS
 	sigback := parse_slhsignature(c, sig)!

@@ -26,7 +26,7 @@ pub fn slh_sign(msg []u8, cx []u8, sk &SigningKey) ![]u8 {
 	}
 	// randomized random for the randomized variant or
 	// 𝑜𝑝𝑡_𝑟𝑎𝑛𝑑 ← 𝑎𝑑𝑑𝑟𝑛, substitute 𝑜𝑝𝑡_𝑟𝑎𝑛𝑑 ← PK.seed for the deterministic variant,
-	opt_rand := rand.bytes(sk.ctx.prm.n)!
+	opt_rand := rand.read(sk.ctx.prm.n)!
 
 	// 𝑀′ ← toByte(0, 1) ∥ toByte(|𝑐𝑡𝑥|, 1) ∥ 𝑐𝑡𝑥 ∥ m
 	msgout := encode_msg_purehash(cx, msg)
@@ -36,40 +36,6 @@ pub fn slh_sign(msg []u8, cx []u8, sk &SigningKey) ![]u8 {
 	sigrandom := slh_sign_internal(msgout, sk, opt_rand)!
 
 	return sigrandom.bytes()
-}
-
-// slh_sign_deterministic generates a deterministic SLH-DSA signature.
-@[direct_array_access; inline]
-fn slh_sign_deterministic(msg []u8, cx []u8, sk &SigningKey) ![]u8 {
-	// use the public key seed as the random seed for deterministic signature generation
-	msgout := encode_msg_purehash(cx, msg)
-	return slh_sign_internal(msgout, sk, sk.pkseed)!.bytes()
-}
-
-@[direct_array_access; inline]
-fn slh_sign_with_addrnd(msg []u8, cx []u8, sk &SigningKey, addrnd []u8) ![]u8 {
-	msgout := encode_msg_purehash(cx, msg)
-	sig := slh_sign_internal(msgout, sk, addrnd)!
-	return sig.bytes()
-}
-
-// slh_sign_random generates a random SLH-DSA signature.
-// Input: Message 𝑀, context string cx, private key SK.
-// Output: SLH-DSA signature SIG.
-@[direct_array_access; inline]
-fn slh_sign_random(msg []u8, cx []u8, sk &SigningKey) !&SLHSignature {
-	// randomized random for the randomized variant or
-	// 𝑜𝑝𝑡_𝑟𝑎𝑛𝑑 ← 𝑎𝑑𝑑𝑟𝑛, substitute 𝑜𝑝𝑡_𝑟𝑎𝑛𝑑 ← PK.seed for the deterministic variant,
-	opt_rand := rand.bytes(sk.ctx.prm.n)!
-
-	// 𝑀′ ← toByte(0, 1) ∥ toByte(|𝑐𝑡𝑥|, 1) ∥ 𝑐𝑡𝑥 ∥ m
-	msgout := encode_msg_purehash(cx, msg)
-
-	// SIG ← slh_sign_internal(msg []u8, sk &SigningKey, addrnd []u8) !&SLHSignature
-	// ▷ omit 𝑎𝑑𝑑𝑟𝑛𝑑 for the deterministic variant
-	sig := slh_sign_internal(msgout, sk, opt_rand)!
-
-	return sig
 }
 
 // 9.2 SLH-DSA Signature Generation
@@ -174,68 +140,31 @@ fn slh_sign_internal(msg []u8, sk &SigningKey, addrnd []u8) !&SLHSignature {
 // Generates a pre-hash SLH-DSA signature.
 // Input: Message 𝑀, context string cx, pre-hash function PH, private key SK.
 // Output: SLH-DSA signature SIG.
-@[direct_array_access; inline]
-fn hash_slh_sign(msg []u8, cx []u8, ph crypto.Hash, sk &SigningKey, opt Options) !&SLHSignature {
+@[direct_array_access]
+pub fn hash_slh_sign(msg []u8, cx []u8, ph crypto.Hash, sk &SigningKey) ![]u8 {
+	// check for context string
 	if cx.len > max_context_string_size {
 		return error('pure SLH-DSA signature failed: exceed context-string')
 	}
-	// randomized random for the randomized variant or
+	// TODO: add supported hash algorithms into list
+	if ph !in supported_prehash_algo {
+		return error('hash must be one of the supported prehash algorithms')
+	}
 	// substitute 𝑜𝑝𝑡_𝑟𝑎𝑛𝑑 ← PK.seed for the deterministic variant,
-	addrnd := if opt.deterministic {
-		sk.pkseed
-	} else {
-		rrbytes := rand.read(sk.ctx.prm.n)!
-		rrbytes
-	}
-	// the biggest 64-bytes
-	mut phm := []u8{cap: 64}
-	mut oid := []u8{cap: 11}
+	opt_rand := rand.read(sk.ctx.prm.n)!
 
-	match ph {
-		.sha256 {
-			// OID ← toByte(0x0609608648016503040201, 11)
-			oid = [u8(0x06), 0x09, 0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x02, 0x01]
-			// PH𝑀 ← SHA-256(𝑀)
-			phm = sha256.sum256(msg)
-		}
-		.sha512 {
-			// OID ← toByte(0x0609608648016503040203, 11) ▷ 2.16.840.1.101.3.4.2.3
-			oid = [u8(0x06), 0x09, u8(0x60), u8(0x86), u8(0x48), u8(0x01), u8(0x65), u8(0x03),
-				u8(0x04), u8(0x02), u8(0x03)]
-			// PH𝑀 ← SHA-512(𝑀)
-			phm = sha512.sum512(msg)
-		}
-		// need to be patched into .shake128
-		.sha3_224 {
-			// OID ← toByte(0x060960864801650304020B, 11) ▷ 2.16.840.1.101.3.4.2.11
-			oid = [u8(0x06), 0x09, u8(0x60), u8(0x86), u8(0x48), u8(0x01), u8(0x65), u8(0x03),
-				u8(0x04), u8(0x02), u8(0x0B)]
-			// 17: PH𝑀 ← SHAKE128(𝑀, 256), 32-bytes
-			phm = sha3.shake128(msg, 32)
-		}
-		// need to be patched into .shake256
-		.sha3_256 {
-			// OID ← toByte(0x060960864801650304020C, 11) ▷ 2.16.840.1.101.3.4.2.12
-			oid = [u8(0x06), (0x09), u8(0x60), u8(0x86), u8(0x48), u8(0x01), u8(0x65), u8(0x03),
-				u8(0x04), u8(0x02), u8(0x0C)]
-			// PH𝑀 ← SHAKE256(𝑀, 512), 64-bytes
-			phm = sha3.shake256(msg, 64)
-		}
-		else {
-			return error('Unsupported hash')
-		}
-	}
+	// pre-hashed message encoding
+	//
+	// get the ASN.1 DER serialized bytes for the hash oid
+	oid := oid_for_hashfunc(ph)!
+	// pre-hashed message with ph
+	phm := phm_for_hashfunc(ph, msg)!
 
-	// 𝑀′ ← toByte(1, 1) ∥ toByte(|𝑐𝑡𝑥|, 1) ∥ 𝑐𝑡𝑥 ∥ OID ∥ PHm
-	mut msgout := []u8{cap: 1 + 1 + cx.len + oid.len + phm.len}
-	msgout << u8(0x01) // to_byte(0, 1)(1, 1)
-	msgout << u8(cx.len) // to_byte(|𝑐𝑡𝑥|, 1), |𝑐𝑡𝑥| should fit in 1-byte
-	msgout << cx
-	msgout << oid
-	msgout << phm
+	// pre-hash message encoding
+	msgout := encode_msg_prehash(cx, oid, phm)
 
 	// SIG ← slh_sign_internal(𝑀′, SK, 𝑎𝑑𝑑𝑟𝑛𝑑) ▷ omit 𝑎𝑑𝑑𝑟𝑛𝑑 for the deterministic variant
-	sig := slh_sign_internal(msgout, sk, addrnd)!
+	sig := slh_sign_internal(msgout, sk, opt_rand)!
 
-	return sig
+	return sig.bytes()
 }

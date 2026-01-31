@@ -5,6 +5,8 @@
 // The main SLH-DSA Signature verification module
 module pslhdsa
 
+import crypto
+
 // 10.3 SLH-DSA Signature Verification
 //
 // Algorithm 24 slh_verify(𝑀, SIG, 𝑐𝑡𝑥, PK)
@@ -109,59 +111,32 @@ fn slh_verify_internal(msg []u8, sig &SLHSignature, pk &PubKey) !bool {
 	return ht_verify(pk.ctx, pkfors, sig.ht, pk.seed, mut idxtree, idxleaf, pk.root)!
 }
 
-/*
 // Algorithm 25 hash_slh_verify(𝑀, SIG, 𝑐𝑡𝑥, PH, PK)
 // Verifies a pre-hash SLH-DSA signature.
 // Input: Message 𝑀, signature SIG, context string 𝑐𝑡𝑥, pre-hash function PH, public key PK.
 // Output: Boolean.
-@[inline]
-fn hash_slh_verify(c &Context, m []u8, sig []u8, cx []u8, ph crypto.Hash, p &PubKey) !bool {
+@[direct_array_access]
+pub fn hash_slh_verify(msg []u8, sig []u8, cx []u8, ph crypto.Hash, p &PubKey) !bool {
 	if cx.len > max_context_string_size {
 		return error('pure SLH-DSA signature failed: exceed context-string')
 	}
-	// default to sha256
-	// OID ← toByte(0x0609608648016503040201, 11)
-	mut oid := to_byte(0, 1)(u64(0x0609608648016503040201), 11)
-	// PH𝑀 ← SHA-256(𝑀 )
-	mut phm := sha256.sum256(m)
-
-	match ph {
-		.sha256 {
-			// do nothing
-		}
-		.sha512 {
-			// OID ← toByte(0x0609608648016503040203, 11) ▷ 2.16.840.1.101.3.4.2.3
-			oid = to_byte(0, 1)(u64(0x0609608648016503040203), 11)
-			// PH𝑀 ← SHA-512(𝑀 )
-			phm = sha512.sum512(m)
-		}
-		// need to be patched into .shake128
-		.sha3_224 {
-			// OID ← toByte(0x060960864801650304020B, 11) ▷ 2.16.840.1.101.3.4.2.11
-			oid = to_byte(0, 1)(u64(0x060960864801650304020B), 11)
-			// 17: PH𝑀 ← SHAKE128(𝑀, 256)
-			phm = sha3.shake128(m, 256)
-		}
-		// // need to be patched into .shake256
-		.sha3_256 {
-			// OID ← toByte(0x060960864801650304020C, 11) ▷ 2.16.840.1.101.3.4.2.12
-			oid = to_byte(0, 1)(u64(0x060960864801650304020C), 11)
-			// PH𝑀 ← SHAKE256(𝑀, 512)
-			phm = sha3.shake256(m, 512)
-		}
-		else {
-			return error('Unsupported hash')
-		}
+	// TODO: add supported hash algorithms into list
+	if ph !in supported_prehash_algo {
+		return error('hash must be one of the supported prehash algorithms')
 	}
-	// 𝑀′ ← toByte(1, 1) ∥ toByte(|𝑐𝑡𝑥|, 1) ∥ 𝑐𝑡𝑥 ∥ OID ∥ PHm
-	mut msg := []u8{}
-	msg << u8(0x01)
-	msg << u8(cx.len)
-	msg << cx
-	msg << oid
-	msg << phm
+	// parse into SLHSignature opaque
+	slh_sig := parse_slhsignature(p.ctx, sig)!
+
+	// pre-hashed message encoding
+	//
+	// get the ASN.1 DER serialized bytes for the hash oid
+	oid := oid_for_hashfunc(ph)!
+	// pre-hashed message with ph
+	phm := phm_for_hashfunc(ph, msg)!
+
+	// pre-hash message encoding
+	msgout := encode_msg_prehash(cx, oid, phm)
 
 	// return slh_verify_internal(𝑀′, SIG, PK)
-	return slh_verify_internal(c, msg, sig, p)!
+	return slh_verify_internal(msgout, slh_sig, p)!
 }
-*/

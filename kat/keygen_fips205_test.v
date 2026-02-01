@@ -38,11 +38,11 @@ fn test_slhdsa_keygen_fips205_test_vectors() {
 			assert sk.pubkey().bytes() == pkb
 			// explicitly release the resources
 			unsafe {
-				free(skseed)
-				free(skprf)
-				free(pkseed)
-				free(skb)
-				free(pkb)
+				skseed.free()
+				skprf.free()
+				pkseed.free()
+				skb.free()
+				pkb.free()
 			}
 		}
 	}

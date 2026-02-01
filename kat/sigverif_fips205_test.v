@@ -80,7 +80,7 @@ fn test_slhdsa_sigverify_fips205_external_test_vectors() {
 	// read the sigverif_fips205.json file
 	// The test material was taken from SLH-DSA sigVer-FIPS205 test vectors for signature verification
 	// See https://github.com/usnistgov/ACVP-Server/blob/master/gen-val/json-files/SLH-DSA-sigVer-FIPS205/internalProjection.json
-	json_str := os.read_file('./kat/sigverif_fips205_kat.json')!
+	json_str := os.read_file('./kat/sigverif_fips205.json')!
 	// parse the json string into a SigVerifTest struct
 	sigver_test := json2.decode[SigVerifTest](json_str)!
 	// Test for every test group
@@ -89,8 +89,7 @@ fn test_slhdsa_sigverify_fips205_external_test_vectors() {
 		mode := tg.prehash // "pure", "prehash" or "none" (for internal interface)
 		mut opt := pslhdsa.Options{}
 		for t in tg.tests {
-			// only test pure prehash message encoding currently
-			// skip for prehash encoding
+			// only test pure prehash message encoding currently, and skip for prehash encoding
 			if mode != 'pure' {
 				continue
 			}

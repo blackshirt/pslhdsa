@@ -18,10 +18,10 @@ import crypto.sha512
 // defined in the FIPS205 standard.
 @[noinit]
 pub struct Context {
-mut:
 	// The kind (type) of this SLH-DSA context, set on context creation
 	kind Kind
 	// Underlying SLH-DSA parameter set described in the doc
+pub:
 	prm Param
 }
 
@@ -44,7 +44,7 @@ pub fn new_context_from_name(name string) !&Context {
 
 // name returns the name of this context
 @[inline]
-fn (c &Context) name() string {
+pub fn (c &Context) name() string {
 	return c.kind.name()
 }
 
@@ -59,7 +59,7 @@ fn (c &Context) clone() &Context {
 
 // equal returns true if this context is equal to the other context
 @[inline]
-fn (c &Context) equal(o &Context) bool {
+pub fn (c &Context) equal(o &Context) bool {
 	// for sake of simplicity, only check for kind equality, not the parameter set
 	return c.kind == o.kind
 }
@@ -411,7 +411,7 @@ fn (c &Context) is_sha2family_cat5() bool {
 //
 @[noinit]
 struct Param {
-mut:
+pub:
 	// The name indicates SLH-DSA its belong to
 	name string
 	// the length in bits of the security parameter 𝑛, Its parameters for WOTS+

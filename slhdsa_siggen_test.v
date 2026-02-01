@@ -48,7 +48,7 @@ fn test_siggen_nondeterministic_external_pure() ! {
 		// non-deterministic options
 		deterministic: false
 		// pureHash generation, default. can be ommited
-		msg_encoding: true
+		msg_encoding: .pure
 		// use testing entropy, for testing should be true
 		testing: true
 		// set the entropy to randomness value

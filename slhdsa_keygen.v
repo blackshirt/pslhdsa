@@ -69,7 +69,7 @@ pub fn slh_keygen_from_bytes(ctx &Context, bytes []u8, opt Options) !&SigningKey
 	}
 	// otherwise, its ok to return the signing key
 	return &SigningKey{
-		ctx:    ctx.clone()
+		ctx:    unsafe { ctx }
 		seed:   skseed
 		prf:    skprf
 		pkseed: pkseed
@@ -112,7 +112,7 @@ fn slh_keygen_internal(ctx &Context, skseed []u8, skprf []u8, pkseed []u8) !&Sig
 	}
 	// 4: return ( (SK.seed, SK.prf, PK.seed, PK.root), (PK.seed, PK.root) )
 	sk := &SigningKey{
-		ctx:    ctx.clone()
+		ctx:    unsafe { ctx }
 		seed:   skseed
 		prf:    skprf
 		pkseed: pkseed

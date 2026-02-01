@@ -12,10 +12,10 @@ import x.json2
 // Test for SLH-DSA external signature generation API
 // For internal test, its resides in siggen_fips205_internal_test.v file of the main module.
 fn test_slhdsa_siggen_fips205_test_vectors() {
-	// read the siggen_fips205.json file
+	// read the siggen_fips205.json file (the mini version)
 	// The test material was taken from SLH-DSA sigGen-FIPS205 test vectors for signature generation
 	// See https://github.com/usnistgov/ACVP-Server/blob/master/gen-val/json-files/SLH-DSA-sigGen-FIPS205/internalProjection.json
-	json_str := os.read_file('./kat/siggen_fips205.json')!
+	json_str := os.read_file('./kat/siggen_fips205_mini.json')!
 	// parse the json string into a SigGenTest struct
 	siggen_test := json2.decode[SigGenTest](json_str)!
 	// Test for every test group

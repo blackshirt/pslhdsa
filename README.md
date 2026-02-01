@@ -10,7 +10,7 @@ The signatures range from ±8K - ±50K depending on the type chosen.
 
 # Features
 - Support signature types defined on the standard
-- support for pure SLH-DSA hash and pre-hash signature generation
+- Support for pure SLH-DSA hash and pre-hash signature generation
 - Fully implemented in pure V language, no depends on any external libraries
 
 # Basic 
@@ -31,16 +31,24 @@ You can create a `Context` opaque by calling `new_context(k Kind)`
 or `new_context_from_name(name string)!` 
 
 2. SLH-DSA Signing key
-`pslhdsa` provides a `SigningKey` structure to describe a SLH-DSA signing key where you 
+
+`pslhdsa` provides a `SigningKey` structure to hold a SLH-DSA signing key where you 
 can generate the SLH-DSA signature.
 
 3. SLH-DSA Verifying key
-`pslhdsa` provides a `PubKey` structure to describe a SLH-DSA verifying key.
+
+`pslhdsa` provides a `PubKey` structure to hold a SLH-DSA verifying key.
 You can use the `PubKey` opaque to verify the SLH-DSA signature.
 
 # Key Generation
-You can use several routines to generate keys for SLH-DSA.
+You can use several routines to generate keys for SLH-DSA to operate on.
 The most common way is to use the `Context` structure to generate keys.
 1. ```fn slh_keygen(c &Context) !&SigningKey```
 2. ```fn slh_keygen_from_bytes(ctx &Context, bytes []u8, opt Options) !&SigningKey```
 3. ```fn slh_keygen_from_seed(ctx &Context, skseed []u8, skprf []u8, pkseed []u8) !&SigningKey```
+
+# Signature generation
+- TODO
+
+# Signature verification
+- TODO

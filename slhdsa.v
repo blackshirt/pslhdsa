@@ -143,7 +143,7 @@ pub fn (s &SigningKey) sign(msg []u8, cx []u8, opt Options) ![]u8 {
 const max_entropy_size = 2048
 
 // supported_prehash_algo is a list of supported prehash algorithms in pre-hash message encoding
-const supported_prehash_algo = [crypto.Hash.sha256, .sha512, .sha3_224, .sha3_256]
+const supported_prehash_algo = [crypto.Hash.sha256, .sha512, .md4, .md5]
 
 // Options is an options struct for SLH-DSA operation, includes key generation,
 // signature generation and signature verification.
@@ -401,8 +401,8 @@ fn oid_for_hashfunc(hfunc crypto.Hash) ![]u8 {
 	return match hfunc {
 		.sha256 { oid_sha256 }
 		.sha512 { oid_sha512 }
-		.sha3_224 { oid_shake128 }
-		.sha3_256 { oid_shake256 }
+		.md4 { oid_shake128 }
+		.md5 { oid_shake256 }
 		else { return error('unsupported hash function') }
 	}
 }
@@ -420,11 +420,11 @@ fn phm_for_hashfunc(hfunc crypto.Hash, msg []u8) ![]u8 {
 			// PH𝑀 ← SHA-512(𝑀)
 			return sha512.sum512(msg)
 		}
-		.sha3_224 {
+		.md4 {
 			// 17: PH𝑀 ← SHAKE128(𝑀, 256), 32-bytes
 			return sha3.shake128(msg, 32)
 		}
-		.sha3_256 {
+		.md5 {
 			// PH𝑀 ← SHAKE256(𝑀, 512), 64-bytes
 			return sha3.shake256(msg, 64)
 		}

@@ -30,12 +30,12 @@ where `Kind` is an enum that describes the signature type chosen.
 You can create a `Context` opaque by calling `new_context(k Kind)` 
 or `new_context_from_name(name string)!` 
 
-2. SLH-DSA Signing key \n
+2. SLH-DSA Signing key <br>
 `pslhdsa` provides a `SigningKey` structure to hold a SLH-DSA signing key where you 
 can generate the SLH-DSA signature. `SigningKey` itself embeds public key part 
 to verify the signature.
 
-3. SLH-DSA Verifying key \n
+3. SLH-DSA Verifying key <br>
 `pslhdsa` provides a `PubKey` structure to hold a SLH-DSA verifying key.
 You can use the `PubKey` opaque to verify the SLH-DSA signature.
 

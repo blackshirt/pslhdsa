@@ -311,14 +311,17 @@ fn parse_slhsignature(c &Context, bytes []u8) !&SLHSignature {
 	d := c.prm.d
 	len := c.wots_len()
 
-	// calculated length of the signature
+	// 	calculated length of the signature
 	clength := n + k * (1 + a) * n + (h + d * len) * n
 	if bytes.len != clength {
-		return error('bytes must correct size for ${c.kind}')
+		return error('signature bytes must correct size for ${c.kind}')
 	}
 	r := bytes[0..n]
 	fors := bytes[n..n + k * (1 + a) * n]
+	// relaxed length size to the end of the bytes,
+	// so that the hypertree signature can handle this.
 	ht := parse_hypertree(c, bytes[n + k * (1 + a) * n..clength])!
+
 	return &SLHSignature{
 		r:    r
 		fors: fors

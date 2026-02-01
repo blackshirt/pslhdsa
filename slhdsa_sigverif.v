@@ -45,6 +45,7 @@ fn slh_verify_sig(msg []u8, sig &SLHSignature, cx []u8, pk &PubKey) !bool {
 // Output: Boolean.
 @[direct_array_access; inline]
 fn slh_verify_internal(msg []u8, sig &SLHSignature, pk &PubKey) !bool {
+	// localizes some context variables
 	// n := pk.ctx.prm.n
 	a := pk.ctx.prm.a
 	k := pk.ctx.prm.k

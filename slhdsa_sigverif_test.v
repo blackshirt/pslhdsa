@@ -2,6 +2,7 @@ module pslhdsa
 
 import encoding.hex
 
+// The test material parly taken from the test vectors
 fn test_slhdsa_internal_signature_verify() ! {
 	parameterset := 'SLH-DSA-SHAKE-256s'
 	// "signatureinterface": "internal",

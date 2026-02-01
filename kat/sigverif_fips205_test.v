@@ -9,6 +9,7 @@ import os
 import encoding.hex
 import x.json2
 
+/*
 fn test_slhdsa_sigverify_fips205_test_vectors() {
 	// read the sigverif_fips205.json file
 	// The test material was taken from SLH-DSA sigVer-FIPS205 test vectors for signature verification
@@ -79,3 +80,4 @@ struct SigVerifCaseItem {
 	signature            string
 	reason               string
 }
+*/

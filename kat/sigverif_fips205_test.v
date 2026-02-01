@@ -89,8 +89,8 @@ fn test_slhdsa_sigverify_fips205_external_test_vectors() {
 		mode := tg.prehash // "pure", "prehash" or "none" (for internal interface)
 		mut opt := pslhdsa.Options{}
 		for t in tg.tests {
-			// only test pure prehash message encoding
-			// skip for prehash encoding currently
+			// only test pure prehash message encoding currently
+			// skip for prehash encoding
 			if mode != 'pure' {
 				continue
 			}
@@ -116,6 +116,7 @@ fn test_slhdsa_sigverify_fips205_external_test_vectors() {
 				pkb.free()
 				message.free()
 				cx.free()
+				addrnd.free()
 				signature.free()
 			}
 		}

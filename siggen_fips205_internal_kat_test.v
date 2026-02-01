@@ -17,8 +17,6 @@ fn test_slhdsa_siggen_fips205_internal_test_vectors() {
 	json_str := os.read_file('./siggen_fips205_internal.json')!
 	// parse the json string into a SigGenTest struct
 	siggen_test := json.decode(SigGenTest, json_str)!
-	dump(siggen_test)
-	// Test for every test group
 	for tg in siggen_test.testgroups {
 		ctx := new_context_from_name(tg.parameterset)!
 		// we only test internal interface here
@@ -26,13 +24,11 @@ fn test_slhdsa_siggen_fips205_internal_test_vectors() {
 		for t in tg.tests {
 			// we skip signature verification path
 			skb := hex.decode(t.sk)!
-			// pkb := hex.decode(t.pk)!
+
 			msg := hex.decode(t.message)!
 			signature := hex.decode(t.signature)!
 
 			sk := slh_keygen_from_bytes(ctx, skb)!
-			// pk := pslhdsa.new_pubkey(ctx, pkb)!
-			// assert sk.pubkey().equal(pk)
 
 			// get optional randomness, if deterministic, use SK.pkseed (PK.seed)
 			// otherwise use decoded additionalrandomness bytes

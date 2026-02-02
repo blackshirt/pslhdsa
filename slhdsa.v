@@ -145,7 +145,8 @@ const max_entropy_size = 2048
 // supported_prehash_algo is a list of supported prehash algorithms in pre-hash message encoding
 // TODO: currently, md4 and md5 are marker for shake128 and shake256 respectively.
 // Add support for shake128 and shake256 into crypto.Hash enum
-const supported_prehash_algo = [crypto.Hash.sha256, .sha512, .md4, .md5]
+const supported_prehash_algo = [crypto.Hash.sha256, .sha512, .sha384, .sha224, .sha512_224,
+	.sha512_256, .sha3_224, .sha3_256, .sha3_384, .sha3_512, .md4, .md5]
 
 // Options is an options struct for SLH-DSA operation, includes key generation,
 // signature generation and signature verification.

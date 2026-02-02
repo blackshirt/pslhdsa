@@ -493,35 +493,8 @@ fn phm_for_hashfunc(hfunc crypto.Hash, msg []u8) ![]u8 {
 //       us(840) organization(1) gov(101) csor(3) nistAlgorithm(4) 2 }
 //
 //   id-sha3-224 OBJECT IDENTIFIER ::= { hashAlgs 7 }
-//
 //   id-sha3-256 OBJECT IDENTIFIER ::= { hashAlgs 8 }
-//
 //   id-sha3-384 OBJECT IDENTIFIER ::= { hashAlgs 9 }
-//
-//   id-sha3-512 OBJECT IDENTIFIER ::= { hashAlgs 10 }
-
-// OID for SHA2-224 (1.2.840.113549.1.1.14)
-// 060b2a864886f70d01010e
-const oid_sha224 = [u8(0x06), 0x0b, 0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x01, 0x0e]
-
-// OID of SHA256 : 2.16.840.1.101.3.4.2.1
-// OID ← toByte(0x0609608648016503040201, 11)
-const oid_sha256 = [u8(0x06), 0x09, 0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x02, 0x01]
-
-// (OID) for SHA-384 is 2.16.840.1.101.3.4.2.2
-// 06 09 60 86 48 01 65 03 04 02 02
-const oid_sha384 = [u8(0x06), 0x09, 0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x02, 0x02]
-
-// OID of SHA512 : 2.16.840.1.101.3.4.2.3
-// OID ← toByte(0x0609608648016503040203, 11) ▷ 2.16.840.1.101.3.4.2.3
-const oid_sha512 = [u8(0x06), 0x09, 0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x02, 0x03]
-
-// (OID) for SHA-512/224 (2.16.840.1.101.3.4.2.5)
-const oid_sha512_224 = [u8(0x06), 0x09, 0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x02, 0x05]
-
-// (OID) for SHA-512/256 (2.16.840.1.101.3.4.2.6)
-// 06 09 60 86 48 01 65 03 04 02 06
-const oid_sha512_256 = [u8(0x06), 0x09, 0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x02, 0x06]
 
 // OID for SHA3-224 (2.16.840.1.101.3.4.2.7)
 // 06 08 60 86 48 01 65 03 04 02 07
@@ -539,10 +512,93 @@ const oid_sha3_384 = [u8(0x06), 0x09, 0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 
 // 06 09 60 86 48 01 65 03 04 02 0A
 const oid_sha3_512 = [u8(0x06), 0x09, 0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x02, 0x0A]
 
+// FOR SHA2 See https://nvlpubs.nist.gov/nistpubs/FIPS/NIST.FIPS.180-4.pdf
+// See at https://csrc.nist.gov/projects/computer-security-objects-register/algorithm-registration
+//
+// nistAlgorithms OBJECT IDENTIFIER ::= { joint-iso-ccitt(2) country(16) us(840)
+//						organization(1) gov(101) csor(3) nistAlgorithm(4) }
+// hashAlgs OBJECT IDENTIFIER ::= { nistAlgorithms 2 }
+// ie, 2.16.840.1.101.3.4.2
+// And for SHA-2 family
+// id-sha256 OBJECT IDENTIFIER ::= { hashAlgs 1 }
+// id-sha384 OBJECT IDENTIFIER ::= { hashAlgs 2 }
+// id-sha512 OBJECT IDENTIFIER ::= { hashAlgs 3 }
+// id-sha224 OBJECT IDENTIFIER ::= { hashAlgs 4 }
+// id-sha512-224 OBJECT IDENTIFIER ::= { hashAlgs 5 }
+// id-sha512-256 OBJECT IDENTIFIER ::= { hashAlgs 6 }
+// id-sha3-512 OBJECT IDENTIFIER ::= { hashAlgs 10 }
+
+// (OID) for SHA-512/224 (2.16.840.1.101.3.4.2.5)
+const oid_sha512_224 = [u8(0x06), 0x09, 0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x02, 0x05]
+
+// (OID) for SHA-512/256 (2.16.840.1.101.3.4.2.6)
+// 06 09 60 86 48 01 65 03 04 02 06
+const oid_sha512_256 = [u8(0x06), 0x09, 0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x02, 0x06]
+
+// OID for SHA2-224, SHA2-256, SHA2-384, and SHA2-512
+// See https://datatracker.ietf.org/doc/html/rfc5754#section-2
+//
+// 2.1 SHA-224
+// The algorithm identifier for SHA-224 is:
+//     id-sha224 OBJECT IDENTIFIER ::= {
+//       joint-iso-itu-t(2) country(16) us(840) organization(1) gov(101)
+//       csor(3) nistalgorithm(4) hashalgs(2) 4 }
+//	id-sha224: 30 0b 06 09 60 86 48 01 65 03 04 02 04
+//
+// OID of SHA2-224 2.16.840.1.101.3.4.2.4
+// 06 09 60 86 48 01 65 03 04 02 04	
+//
+const oid_sha224 = [u8(0x06), 0x09, 0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x02, 0x04]
+
+// 2.2.  SHA-256
+// The algorithm identifier for SHA-256 is:
+//      id-sha256 OBJECT IDENTIFIER ::= {
+//        joint-iso-itu-t(2) country(16) us(840) organization(1) gov(101)
+//        csor(3) nistalgorithm(4) hashalgs(2) 1 }
+//	id-sha256: 30 0b 06 09 60 86 48 01 65 03 04 02 01
+//
+// OID of SHA256 : 2.16.840.1.101.3.4.2.1
+// OID ← toByte(0x0609608648016503040201, 11)
+const oid_sha256 = [u8(0x06), 0x09, 0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x02, 0x01]
+
+// 2.3.  SHA-384
+// The algorithm identifier for SHA-384 is:
+//      id-sha384 OBJECT IDENTIFIER ::= {
+//        joint-iso-itu-t(2) country(16) us(840) organization(1) gov(101)
+//        csor(3) nistalgorithm(4) hashalgs(2) 2 }
+// id-sha384: 30 0b 06 09 60 86 48 01 65 03 04 02 02
+//
+// OID of SHA-384 is 2.16.840.1.101.3.4.2.2
+// 06 09 60 86 48 01 65 03 04 02 02
+const oid_sha384 = [u8(0x06), 0x09, 0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x02, 0x02]
+
+// 2.4.  SHA-512
+// The algorithm identifier for SHA-512 is:
+//      id-sha512 OBJECT IDENTIFIER ::= {
+//        joint-iso-itu-t(2) country(16) us(840) organization(1) gov(101)
+//        csor(3) nistalgorithm(4) hashalgs(2) 3 }
+//	 id-sha512: 30 0b 06 09 60 86 48 01 65 03 04 02 03
+//
+// OID of SHA512 : 2.16.840.1.101.3.4.2.3
+// OID ← toByte(0x0609608648016503040203, 11) ▷ 2.16.840.1.101.3.4.2.3
+const oid_sha512 = [u8(0x06), 0x09, 0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x02, 0x03]
+
+// OID for SHAKE128 and SHAKE256
+// SEE https://www.rfc-editor.org/rfc/rfc8702.html#oids
+// Two object identifiers for SHAKE128 and SHAKE256 hash functions are defined as:
+//
+// id-shake128 OBJECT IDENTIFIER ::= { joint-iso-itu-t(2)
+//       country(16) us(840) organization(1) gov(101) csor(3)
+//       nistAlgorithm(4) 2 11 }
+//
 // OID of SHAKE128 : 2.16.840.1.101.3.4.2.11
 // OID ← toByte(0x060960864801650304020B, 11) ▷ 2.16.840.1.101.3.4.2.11
 const oid_shake128 = [u8(0x06), 0x09, 0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x02, 0x0B]
 
+//  id-shake256 OBJECT IDENTIFIER ::= { joint-iso-itu-t(2)
+//       country(16) us(840) organization(1) gov(101) csor(3)
+//       nistAlgorithm(4) 2 12 }
+//
 // OID of SHAKE256 : 2.16.840.1.101.3.4.2.12
 // OID ← toByte(0x060960864801650304020C, 11) ▷ 2.16.840.1.101.3.4.2.12
 const oid_shake256 = [u8(0x06), 0x09, 0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x02, 0x0C]

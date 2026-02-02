@@ -28,7 +28,7 @@ pub fn slh_keygen(c &Context) !&SigningKey {
 	if is_zero(skseed) || is_zero(skprf) || is_zero(pkseed) {
 		return error('seed is all zeroes')
 	}
-
+	// 10.1.1 Key Generation Steps
 	return slh_keygen_internal(c, skseed, skprf, pkseed)!
 }
 

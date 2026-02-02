@@ -22,10 +22,6 @@ fn test_slhdsa_keygen_fips205_test_vectors() {
 		ctx := pslhdsa.new_context_from_name(tg.parameterset)!
 		for t in tg.tests {
 			dump(t.tcid)
-			// check if the test case is valid
-			if t.deferred {
-				continue
-			}
 			skseed := hex.decode(t.skseed)!
 			skprf := hex.decode(t.skprf)!
 			pkseed := hex.decode(t.pkseed)!

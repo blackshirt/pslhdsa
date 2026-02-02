@@ -20,8 +20,8 @@ import crypto.sha512
 pub struct Context {
 	// The kind (type) of this SLH-DSA context, set on context creation
 	kind Kind
-	// Underlying SLH-DSA parameter set described in the doc
 pub:
+	// Underlying SLH-DSA parameter set described in the doc
 	prm Param
 }
 

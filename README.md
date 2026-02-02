@@ -47,7 +47,19 @@ The most common way is to use the `Context` structure to generate keys.
 3. ```fn slh_keygen_from_seed(ctx &Context, skseed []u8, skprf []u8, pkseed []u8) !&SigningKey```
 
 ## Signature generation
-- TODO
+- ```fn slh_sign(msg []u8, cx []u8, sk &SigningKey) ![]u8``` for pure SLH-DSA 
+signature generation (recommended).
+- ```fn hash_slh_sign(msg []u8, cx []u8, ph crypto.Hash, sk &SigningKey) ![]u8``` for pre-hash 
+SLH-DSA signature.
+- ```fn (s &SigningKey) sign(msg []u8, cx []u8, opt Options) ![]u8``` for more control over 
+the signature generation process.
+where `cx` is a context string that is used to bind the signature to a specific context and 
+`Options` is a struct that describes the signature generation options.
 
 ## Signature verification
-- TODO
+- ```fn slh_verify(msg []u8, sig []u8, cx []u8, pk &PubKey) !bool``` for pure SLH-DSA signature 
+verification (recommended).
+- ```fn hash_slh_verify(msg []u8, sig []u8, cx []u8, ph crypto.Hash, p &PubKey) !bool``` 
+for pre-hash SLH-DSA signature verification.
+- ```fn (p &PubKey) verify(msg []u8, sig []u8, cx []u8, opt Options) !bool``` for more control over 
+the signature verification process.

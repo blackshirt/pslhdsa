@@ -24,7 +24,6 @@ fn test_slhdsa_siggen_fips205_internal_test_vectors() {
 		for t in tg.tests {
 			// we skip signature verification path
 			skb := hex.decode(t.sk)!
-
 			msg := hex.decode(t.message)!
 			signature := hex.decode(t.signature)!
 

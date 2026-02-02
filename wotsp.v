@@ -2,7 +2,7 @@
 // Use of this source code is governed by an MIT license
 // that can be found in the LICENSE file.
 //
-// WOTS+ module
+// Winternitz One-Time Signature Plus Scheme (WOTS+) module
 module pslhdsa
 
 // 5.1 WOTS+ Public-Key Generation
@@ -25,14 +25,15 @@ fn wots_pkgen(c &Context, skseed []u8, pkseed []u8, mut adr Address) ![]u8 {
 	length := c.wots_len()
 	// temporary buffer to store output
 	mut tmp := [][]u8{len: length}
-	for i := 0; i < length; i++ {
+	for i := u32(0); i < length; i++ {
 		// skADRS.setChainAddress(𝑖)
-		sk_addr.set_chain_address(u32(i))
+		sk_addr.set_chain_address(i)
 		// compute secret value for chain i, 𝑠𝑘 ← PRF(PK.seed, SK.seed, skADRS)
 		sk := c.prf(pkseed, skseed, sk_addr, c.prm.n)!
 		// ADRS.setChainAddress(𝑖)
-		adr.set_chain_address(u32(i))
+		adr.set_chain_address(i)
 		// compute public value for chain 𝑖, 𝑡𝑚𝑝[𝑖] ← chain(𝑠𝑘, 0, 𝑤 − 1, PK.seed, ADRS)
+		// w == 16 in this standard
 		tmp[i] = chain(c, sk, 0, 15, pkseed, mut adr)!
 		// tmp << tmp_i
 	}
@@ -84,15 +85,15 @@ fn wots_sign(c &Context, m []u8, skseed []u8, pkseed []u8, mut adr Address) ![][
 	sk_addr.set_keypair_address(adr.get_keypair_address())
 
 	mut sig := [][]u8{len: length}
-	for i := 0; i < length; i++ {
+	for i := u32(0); i < length; i++ {
 		// skADRS.setChainAddress(𝑖)
-		sk_addr.set_chain_address(u32(i))
+		sk_addr.set_chain_address(i)
 		// compute chain 𝑖 secret value, 𝑠𝑘 ← PRF(PK.seed, SK.seed, skADRS)
 		sk := c.prf(pkseed, skseed, sk_addr, c.prm.n)!
 		// ADRS.setChainAddress(𝑖)
-		adr.set_chain_address(u32(i))
+		adr.set_chain_address(i)
 		// compute chain 𝑖 signature value, 𝑠𝑖𝑔[𝑖] ← chain(𝑠𝑘, 0, 𝑚𝑠𝑔[𝑖], PK.seed, ADRS)
-		sig[i] = chain(c, sk, 0, int(msg[i]), pkseed, mut adr)!
+		sig[i] = chain(c, sk, 0, msg[i], pkseed, mut adr)!
 		// sig << sig_i
 	}
 	return sig
@@ -125,12 +126,12 @@ fn wots_pkfromsig(c &Context, sig [][]u8, m []u8, pkseed []u8, mut adr Address) 
 	// setup temporary buffers with appropriate length
 	mut tmp := [][]u8{len: length}
 
-	for i := 0; i < length; i++ {
+	for i := u32(0); i < length; i++ {
 		// ADRS.setChainAddress(𝑖)
-		adr.set_chain_address(u32(i))
+		adr.set_chain_address(i)
 		// 𝑡𝑚𝑝[𝑖] ← chain(𝑠𝑖𝑔[𝑖], 𝑚𝑠𝑔[𝑖], 𝑤 − 1 − 𝑚𝑠𝑔[𝑖], PK.seed, ADRS)
 		// x := sig[i * c.prm.n..(i + 1) * c.prm.n]
-		tmp[i] = chain(c, sig[i], int(msg[i]), int(w - 1 - msg[i]), pkseed, mut adr)!
+		tmp[i] = chain(c, sig[i], msg[i], u32(w) - 1 - msg[i], pkseed, mut adr)!
 	}
 	// copy address to create WOTS+ public key address, wotspkADRS ← ADRS
 	mut wots_pkadr := adr.clone()
@@ -154,7 +155,7 @@ fn wots_pkfromsig(c &Context, sig [][]u8, m []u8, pkseed []u8, mut adr Address) 
 // Output: Value of F iterated 𝑠 times on 𝑋.
 // (where 𝑖 + 𝑠 < w
 @[direct_array_access; inline]
-fn chain(c &Context, x []u8, i int, s int, pkseed []u8, mut adr Address) ![]u8 {
+fn chain(c &Context, x []u8, i u32, s u32, pkseed []u8, mut adr Address) ![]u8 {
 	assert x.len == c.prm.n
 	if i + s >= w {
 		return error('Invalid wots+ params')
@@ -162,7 +163,7 @@ fn chain(c &Context, x []u8, i int, s int, pkseed []u8, mut adr Address) ![]u8 {
 	mut tmp := x.clone()
 	for j := i; j < i + s; j++ {
 		// ADRS.setHashAddress(𝑗)
-		adr.set_hash_address(u32(j))
+		adr.set_hash_address(j)
 		// 𝑡𝑚𝑝 ← F(PK.seed, ADRS,𝑡𝑚𝑝)
 		tmp = c.f(pkseed, adr, tmp, c.prm.n)!
 	}

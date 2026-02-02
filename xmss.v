@@ -149,7 +149,7 @@ fn xmss_node(c &Context, skseed []u8, i u32, z u32, pkseed []u8, mut addr Addres
 		// ADRS.setTypeAndClear(WOTS_HASH)
 		addr.set_type_and_clear(.wots_hash)
 		// ADRS.setKeyPairAddress(𝑖)
-		addr.set_keypair_address(u32(i))
+		addr.set_keypair_address(i)
 		// 𝑛𝑜𝑑𝑒 ← wots_pkGen(SK.seed, PK.seed, ADRS)
 		// wots_pkgen(c &Context, skseed []u8, pkseed []u8, addr Address)
 		return wots_pkgen(c, skseed, pkseed, mut addr)!
@@ -162,9 +162,9 @@ fn xmss_node(c &Context, skseed []u8, i u32, z u32, pkseed []u8, mut addr Addres
 	// 8: ADRS.setTypeAndClear(TREE)
 	addr.set_type_and_clear(.tree)
 	// 9: ADRS.setTreeHeight(𝑧)
-	addr.set_tree_height(u32(z))
+	addr.set_tree_height(z)
 	// 10: ADRS.setTreeIndex(𝑖)
-	addr.set_tree_index(u32(i))
+	addr.set_tree_index(i)
 
 	// 11: 𝑛𝑜𝑑𝑒 ← H(PK.seed, ADRS, 𝑙𝑛𝑜𝑑𝑒 ∥ 𝑟𝑛𝑜𝑑𝑒)
 	mut gab := []u8{cap: lnode.len + rnode.len}
@@ -241,7 +241,7 @@ fn xmms_pkfromsig(c &Context, idx u32, sig_xmss &XmssSignature, m []u8, pkseed [
 		// if ⌊𝑖𝑑𝑥/2^𝑘⌋ is even then
 		if (idx >> k) % 2 == 0 {
 			// 11: ADRS.setTreeIndex(ADRS.getTreeIndex()/2)
-			addr.set_tree_index(u32(addr.get_tree_index() >> 1))
+			addr.set_tree_index(addr.get_tree_index() >> 1)
 			// 12: 𝑛𝑜𝑑𝑒[1] ← H(PK.seed, ADRS, 𝑛𝑜𝑑𝑒[0] ∥ AUTH[𝑘])
 			// m_auth_k := auth[k * c.prm.n..(k + 1) * c.prm.n]
 			m2 << node_0
@@ -250,7 +250,7 @@ fn xmms_pkfromsig(c &Context, idx u32, sig_xmss &XmssSignature, m []u8, pkseed [
 		} else {
 			// ADRS.setTreeIndex((ADRS.getTreeIndex() − 1)/2)
 			// TODO: correctly handles > max_int
-			ix := u32((addr.get_tree_index() - 1) >> 1)
+			ix := (addr.get_tree_index() - 1) >> 1
 			addr.set_tree_index(ix)
 			// 𝑛𝑜𝑑𝑒[1] ← H(PK.seed, ADRS, AUTH[𝑘] ∥ 𝑛𝑜𝑑𝑒[0])
 			// m_auth_k := auth[k * c.prm.n..(k + 1) * c.prm.n]

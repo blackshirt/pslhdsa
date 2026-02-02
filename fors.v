@@ -5,8 +5,6 @@
 // Forest of Random Subsets (FORS) module
 module pslhdsa
 
-// 8. Forest of Random Subsets (FORS)
-
 // 8.1 Generating FORS Secret Values
 //
 // Algorithm 14 fors_skGen(SK.seed, PK.seed, ADRS, 𝑖𝑑𝑥)
@@ -15,7 +13,7 @@ module pslhdsa
 // Output: 𝑛-byte FORS private-key value.
 @[direct_array_access; inline]
 fn fors_skgen(c &Context, skseed []u8, pkseed []u8, addr Address, idx u32) ![]u8 {
-	// idx >=0
+	// assert idx >=0
 	// copy address to create key generation address
 	mut skaddr := addr.clone()
 	// skADRS.setTypeAndClear(FORS_PRF)

@@ -96,14 +96,12 @@ fn ht_sign(c &Context, m []u8, skseed []u8, pkseed []u8, mut idxtree TreeIndex, 
 
 	// for 𝑗 from 1 to 𝑑 − 1
 	for j := u32(1); j < c.prm.d; j++ {
-		idxleaf = idxtree.residue(c.prm.hp)
-		idxtree = idxtree.remove_bits(c.prm.hp)
 		// 𝑖𝑑𝑥𝑙𝑒𝑎𝑓 ← 𝑖𝑑𝑥𝑡𝑟𝑒𝑒 mod 2^ℎ′, ℎ′ least significant bits of 𝑖𝑑𝑥𝑡𝑟𝑒e
-		// idxleaf = u32(idxtree & mask1)
+		idxleaf = idxtree.residue(c.prm.hp)
 		// remove least significant ℎ′ bits from 𝑖𝑑𝑥𝑡𝑟𝑒e, 𝑖𝑑𝑥𝑡𝑟𝑒𝑒 ← 𝑖𝑑𝑥𝑡𝑟𝑒𝑒 ≫ ℎ′
-		// idxtree = (idxtree >> c.prm.hp) & mask2
+		idxtree = idxtree.remove_bits(c.prm.hp)
 		// ADRS.setLayerAddress(𝑗)
-		adrs.set_layer_address(u32(j))
+		adrs.set_layer_address(j)
 		// 10: ADRS.setTreeAddress(𝑖𝑑𝑥𝑡𝑟𝑒𝑒)
 		adrs.set_tree_address(idxtree)
 		// SIG𝑡𝑚𝑝 ← xmss_sign(𝑟𝑜𝑜𝑡, SK.seed,𝑖𝑑𝑥𝑙𝑒𝑎𝑓, PK.seed, ADRS)
@@ -147,7 +145,7 @@ fn ht_verify(c &Context, m []u8, sight &HypertreeSignature, pkseed []u8, mut idx
 		// remove least significant ℎ′ bits from 𝑖𝑑𝑥𝑡𝑟𝑒e, 𝑖𝑑𝑥𝑡𝑟𝑒𝑒 ← 𝑖𝑑𝑥𝑡𝑟𝑒𝑒 ≫ ℎ′
 		idxtree = idxtree.remove_bits(c.prm.hp)
 		// ADRS.setLayerAddress(𝑗)
-		adrs.set_layer_address(u32(j))
+		adrs.set_layer_address(j)
 		// 10: ADRS.setTreeAddress(𝑖𝑑𝑥𝑡𝑟𝑒𝑒)
 		adrs.set_tree_address(idxtree)
 

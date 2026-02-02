@@ -143,6 +143,8 @@ pub fn (s &SigningKey) sign(msg []u8, cx []u8, opt Options) ![]u8 {
 const max_entropy_size = 2048
 
 // supported_prehash_algo is a list of supported prehash algorithms in pre-hash message encoding
+// TODO: currently, md4 and md5 are marker for shake128 and shake256 respectively.
+// Add support for shake128 and shake256 into crypto.Hash enum
 const supported_prehash_algo = [crypto.Hash.sha256, .sha512, .md4, .md5]
 
 // Options is an options struct for SLH-DSA operation, includes key generation,
@@ -348,12 +350,16 @@ fn (s &SLHSignature) bytes() []u8 {
 const me_null = u8(0)
 const me_ones = u8(1)
 
+// MsgEncoding defines the the message encoding construct for SLH-DSA.
 pub enum MsgEncoding {
 	// Pure SLH-DSA hash message encoding construct
 	pure
 	// Pre-hash SLH-DSA message encoding construct
 	pre
-	// No encode message encoding
+	// No encode message encoding construct.
+	// This option is NOT STANDARD, and should be used with caution.
+	// It is only provided for testing purposes or to flag the signer
+	// callers that the message was not encoded.
 	noencode
 }
 
@@ -399,8 +405,16 @@ fn encode_msg_prehash(cx []u8, oid []u8, phm []u8) []u8 {
 @[inline]
 fn oid_for_hashfunc(hfunc crypto.Hash) ![]u8 {
 	return match hfunc {
+		.sha224 { oid_sha224 }
 		.sha256 { oid_sha256 }
+		.sha384 { oid_sha384 }
 		.sha512 { oid_sha512 }
+		.sha512_224 { oid_sha512_224 }
+		.sha512_256 { oid_sha512_256 }
+		.sha3_224 { oid_sha3_224 }
+		.sha3_256 { oid_sha3_256 }
+		.sha3_384 { oid_sha3_384 }
+		.sha3_512 { oid_sha3_512 }
 		.md4 { oid_shake128 }
 		.md5 { oid_shake256 }
 		else { return error('unsupported hash function') }
@@ -412,13 +426,45 @@ fn oid_for_hashfunc(hfunc crypto.Hash) ![]u8 {
 @[inline]
 fn phm_for_hashfunc(hfunc crypto.Hash, msg []u8) ![]u8 {
 	return match hfunc {
+		.sha224 {
+			// PH𝑀 ← SHA-224(𝑀)
+			return sha256.sum224(msg)
+		}
 		.sha256 {
 			// PH𝑀 ← SHA-256(𝑀)
 			return sha256.sum256(msg)
 		}
+		.sha384 {
+			// PH𝑀 ← SHA-384(𝑀)
+			return sha512.sum384(msg)
+		}
 		.sha512 {
 			// PH𝑀 ← SHA-512(𝑀)
 			return sha512.sum512(msg)
+		}
+		.sha512_224 {
+			// PH𝑀 ← SHA-512/224(𝑀)
+			return sha512.sum512_224(msg)
+		}
+		.sha512_256 {
+			// PH𝑀 ← SHA-512/256(𝑀)
+			return sha512.sum512_256(msg)
+		}
+		.sha3_224 {
+			// PH𝑀 ← SHA-3-224(𝑀)
+			return sha3.sum224(msg)
+		}
+		.sha3_256 {
+			// PH𝑀 ← SHA-3-256(𝑀)
+			return sha3.sum256(msg)
+		}
+		.sha3_384 {
+			// PH𝑀 ← SHA-3-384(𝑀)
+			return sha3.sum384(msg)
+		}
+		.sha3_512 {
+			// PH𝑀 ← SHA-3-512(𝑀)
+			return sha3.sum512(msg)
 		}
 		.md4 {
 			// 17: PH𝑀 ← SHAKE128(𝑀, 256), 32-bytes
@@ -434,21 +480,41 @@ fn phm_for_hashfunc(hfunc crypto.Hash, msg []u8) ![]u8 {
 	}
 }
 
+// TODO: validates this constants,
+// Only shake128, shake256, sha256 and sha512 was validated in the docs.
+// The others was not verified currently
+//
+// This definition taken from https://www.rfc-editor.org/rfc/rfc9688.html
+//
+// SHA3-224, SHA3-256, SHA3-384, and SHA3-512 produce output values with 224, 256, 384, and 512 bits,
+// respectively. The object identifiers for these four one-way hash functions are as follows:
+//
+//   hashAlgs OBJECT IDENTIFIER ::= { joint-iso-itu-t(2) country(16)
+//       us(840) organization(1) gov(101) csor(3) nistAlgorithm(4) 2 }
+//
+//   id-sha3-224 OBJECT IDENTIFIER ::= { hashAlgs 7 }
+//
+//   id-sha3-256 OBJECT IDENTIFIER ::= { hashAlgs 8 }
+//
+//   id-sha3-384 OBJECT IDENTIFIER ::= { hashAlgs 9 }
+//
+//   id-sha3-512 OBJECT IDENTIFIER ::= { hashAlgs 10 }
+
+// OID for SHA2-224 (1.2.840.113549.1.1.14)
+// 060b2a864886f70d01010e
+const oid_sha224 = [u8(0x06), 0x0b, 0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x01, 0x0e]
+
 // OID of SHA256 : 2.16.840.1.101.3.4.2.1
 // OID ← toByte(0x0609608648016503040201, 11)
 const oid_sha256 = [u8(0x06), 0x09, 0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x02, 0x01]
 
+// (OID) for SHA-384 is 2.16.840.1.101.3.4.2.2
+// 06 09 60 86 48 01 65 03 04 02 02
+const oid_sha384 = [u8(0x06), 0x09, 0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x02, 0x02]
+
 // OID of SHA512 : 2.16.840.1.101.3.4.2.3
 // OID ← toByte(0x0609608648016503040203, 11) ▷ 2.16.840.1.101.3.4.2.3
 const oid_sha512 = [u8(0x06), 0x09, 0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x02, 0x03]
-
-// OID of SHAKE128 : 2.16.840.1.101.3.4.2.11
-// OID ← toByte(0x060960864801650304020B, 11) ▷ 2.16.840.1.101.3.4.2.11
-const oid_shake128 = [u8(0x06), 0x09, 0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x02, 0x0B]
-
-// OID of SHAKE256 : 2.16.840.1.101.3.4.2.12
-// OID ← toByte(0x060960864801650304020C, 11) ▷ 2.16.840.1.101.3.4.2.12
-const oid_shake256 = [u8(0x06), 0x09, 0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x02, 0x0C]
 
 // (OID) for SHA-512/224 (2.16.840.1.101.3.4.2.5)
 const oid_sha512_224 = [u8(0x06), 0x09, 0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x02, 0x05]
@@ -457,10 +523,26 @@ const oid_sha512_224 = [u8(0x06), 0x09, 0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04
 // 06 09 60 86 48 01 65 03 04 02 06
 const oid_sha512_256 = [u8(0x06), 0x09, 0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x02, 0x06]
 
-// (OID) for SHA-384 is 2.16.840.1.101.3.4.2.2
-// 06 09 60 86 48 01 65 03 04 02 02
-const oid_sha384 = [u8(0x06), 0x09, 0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x02, 0x02]
+// OID for SHA3-224 (2.16.840.1.101.3.4.2.7)
+// 06 08 60 86 48 01 65 03 04 02 07
+const oid_sha3_224 = [u8(0x06), 0x08, 0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x02, 0x07]
 
-// OID for SHA2-224 (1.2.840.113549.1.1.14)
-// 060b2a864886f70d01010e
-const oid_sha2_224 = [u8(0x06), 0x0b, 0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x01, 0x0e]
+// OID of SHA3-256 : 2.16.840.1.101.3.4.2.8
+// 06 08 60 86 48 01 65 03 04 02 08
+const oid_sha3_256 = [u8(0x06), 0x08, 0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x02, 0x08]
+
+// (OID) for SHA-3-384 (2.16.840.1.101.3.4.2.9)
+// 06 09 60 86 48 01 65 03 04 02 09
+const oid_sha3_384 = [u8(0x06), 0x09, 0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x02, 0x09]
+
+// (OID) for SHA-3-512 (2.16.840.1.101.3.4.2.10)
+// 06 09 60 86 48 01 65 03 04 02 0A
+const oid_sha3_512 = [u8(0x06), 0x09, 0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x02, 0x0A]
+
+// OID of SHAKE128 : 2.16.840.1.101.3.4.2.11
+// OID ← toByte(0x060960864801650304020B, 11) ▷ 2.16.840.1.101.3.4.2.11
+const oid_shake128 = [u8(0x06), 0x09, 0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x02, 0x0B]
+
+// OID of SHAKE256 : 2.16.840.1.101.3.4.2.12
+// OID ← toByte(0x060960864801650304020C, 11) ▷ 2.16.840.1.101.3.4.2.12
+const oid_shake256 = [u8(0x06), 0x09, 0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x02, 0x0C]

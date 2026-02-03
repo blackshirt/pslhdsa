@@ -1,7 +1,7 @@
 ## pslhdsa
 a SLH-DSA implementation in pure V language
 
-`pslhdsa` is an (experimental) quantum resistent cryptographic digital signature standard based on 
+`pslhdsa` is an (experimental) quantum resistent cryptographic digital signature library based on 
 Stateless Hash-Based Digital Signature Standard (SLH-DSA) implemented in pure V language.
 A SLH-DSA was approved and publicly published by NIST at August, 2024. 
 Its availables on NIST FIPS 205. SLH-DSA allow builds relatively big signaturue size with 
@@ -11,7 +11,7 @@ The signatures range from ±8K - ±50K depending on the type chosen.
 ## Features
 - Support signature types defined on the standard
 - Support for pure SLH-DSA hash and pre-hash signature generation
-- Fully implemented in pure V language, no depends on any external libraries
+- Fully implemented in pure V language, no dependencies on any external C libraries
 
 ## Basic 
 `pslhdsa` provides a simple interface for generating and verifying signatures.

@@ -64,58 +64,64 @@ fn test_slhdsa_siggen_fips205_test_vectors() {
 	// parse the json string into a SigGenTest struct
 	siggen_test := json2.decode[SigGenTest](json_str)!
 	// Test for every test group
-	for tg in siggen_test.testgroups {
-		dump(tg.tgid)
-		ctx := pslhdsa.new_context_from_name(tg.parameterset)!
-		dump(ctx)
-		// get deterministic flag		
-		deterministic := tg.deterministic // true or false
-		mode := tg.prehash // "pure" or "prehash" ( "none" was at internal test)
-		msg_encoding := if mode == 'pure' { pslhdsa.MsgEncoding.pure } else { .pre }
-
-		mut opt := pslhdsa.Options{
-			deterministic: deterministic
-			msg_encoding:  msg_encoding
+	for tg in siggen_cases {
+		ctx := new_context_from_name(tg.parameterset)!
+		// get message encoding mode
+		mode := if tg.prehash == 'pure' {
+			MsgEncoding.pure
+		} else {
+			if tg.prehash == 'prehash' { MsgEncoding.pre } else { MsgEncoding.noencode }
+		}
+		mut opt := Options{
+			deterministic: tg.deterministic
+			msg_encoding:  mode
 		}
 		for t in tg.tests {
-			dump(t.tcid)
-			// we dont support prehash now
-			// if mode != 'pure' {
-			// 	continue
-			// }
-			if msg_encoding == .pre {
-				hfunc, _ := name_to_hfunc(t.hashalg)!
-				opt.hfunc = hfunc
-			}
-			// set message encoding to prehash if mode == prehash
-			// if mode == 'pre' { opt.msg_encoding = .pre }
-			opt.testing = true
-
-			// We only test for signature generation path
 			skb := hex.decode(t.sk)!
-			addrnd := hex.decode(t.additionalrandomness)!
-			message := hex.decode(t.message)!
+			pkb := hex.decode(t.pk)!
+			msg := hex.decode(t.message)!
 			cx := hex.decode(t.context)!
-			signature := hex.decode(t.signature)!
+			addrnd := hex.decode(t.additionalrandomness)!
+			sig := hex.decode(t.signature)!
 
-			// generate signing key
-			sk := pslhdsa.slh_keygen_from_bytes(ctx, skb)!
+			//
+			sk := slh_keygen_from_bytes(ctx, skb)!
+			pk := new_pubkey(ctx, pkb)!
+			assert sk.pubkey().bytes() == pkb
+			assert pk.bytes() == pkb
 
-			// get optional randomness
-			pkseed := skb[2 * ctx.prm.n..3 * ctx.prm.n]
-			opt_rand := if deterministic { pkseed } else { addrnd }
-			opt.entropy = opt_rand
-			dump(opt)
-			// sign(msg []u8, cx []u8, opt Options) ![]u8
-			sigout := sk.sign(message, cx, opt)!
-			// assert sigout == signature
-			// explicitly  releases allocated buffers
+			// get hash function when its pre-hashed mode
+			if opt.msg_encoding == .pre {
+				hfn, _ := name_to_hfunc(t.hashalg)!
+				opt.hfunc = hfn
+			}
+			opt.testing = true
+			// Get the randomness value
+			opt_rnd := if opt.deterministic {
+				pk.seed
+			} else {
+				addrnd
+			}
+			opt.entropy = opt_rnd
+
+			// SK.sign(msg []u8, cx []u8, opt Options) API
+			signature := sk.sign(msg, cx, opt)!
+			assert signature == sig
+
+			// verification path
+			// verify(msg []u8, sig []u8, cx []u8, opt Options)
+			valid := pk.verify(msg, signature, cx, opt)!
+			assert valid
+
+			// explicitly release resources
 			unsafe {
+				pkb.free()
 				skb.free()
-				message.free()
+				msg.free()
 				cx.free()
+				addrnd.free()
 				signature.free()
-				pkseed.free()
+				sig.free()
 			}
 		}
 	}

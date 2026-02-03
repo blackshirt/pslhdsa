@@ -58,7 +58,7 @@ pub fn (s &SigningKey) bytes() []u8 {
 @[inline]
 pub fn (s &SigningKey) pubkey() &PubKey {
 	return &PubKey{
-		ctx:  unsafe { s.ctx }
+		ctx:  s.ctx.clone()
 		seed: s.pkseed
 		root: s.pkroot
 	}
@@ -221,7 +221,7 @@ pub fn new_pubkey(ctx &Context, bytes []u8) !&PubKey {
 		return error('seed and root components are all zeroes')
 	}
 	return &PubKey{
-		ctx:  unsafe { ctx }
+		ctx:  ctx.clone()
 		seed: seed
 		root: root
 	}
@@ -481,7 +481,7 @@ fn phm_for_hashfunc(hfunc crypto.Hash, msg []u8) ![]u8 {
 	}
 }
 
-// TODO: validates this constants,
+// TODO: Its need to be checked, we have
 // Only shake128, shake256, sha256 and sha512 was validated in the docs.
 // The others was not verified currently
 //
@@ -498,12 +498,12 @@ fn phm_for_hashfunc(hfunc crypto.Hash, msg []u8) ![]u8 {
 //   id-sha3-384 OBJECT IDENTIFIER ::= { hashAlgs 9 }
 
 // OID for SHA3-224 (2.16.840.1.101.3.4.2.7)
-// 06 08 60 86 48 01 65 03 04 02 07
-const oid_sha3_224 = [u8(0x06), 0x08, 0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x02, 0x07]
+// 06 09 60 86 48 01 65 03 04 02 07
+const oid_sha3_224 = [u8(0x06), 0x09, 0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x02, 0x07]
 
 // OID of SHA3-256 : 2.16.840.1.101.3.4.2.8
-// 06 08 60 86 48 01 65 03 04 02 08
-const oid_sha3_256 = [u8(0x06), 0x08, 0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x02, 0x08]
+// 06 09 60 86 48 01 65 03 04 02 08
+const oid_sha3_256 = [u8(0x06), 0x09, 0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x02, 0x08]
 
 // (OID) for SHA-3-384 (2.16.840.1.101.3.4.2.9)
 // 06 09 60 86 48 01 65 03 04 02 09

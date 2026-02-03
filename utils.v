@@ -5,6 +5,8 @@
 // Some utilities used across the module
 module pslhdsa
 
+import crypto
+
 // Algorithm 1 gen_len2(𝑛, 𝑙𝑔𝑤)
 //
 @[inline]
@@ -104,4 +106,50 @@ fn is_zero(seed []u8) bool {
 		acc |= b
 	}
 	return acc == 0
+}
+
+// name_to_hfunc get the Hash enum and their size from string name, usually for testing purposes
+@[inline]
+fn name_to_hfunc(name string) !(crypto.Hash, int) {
+	match name {
+		'SHAKE-128' {
+			return crypto.Hash.md4, 32
+		} // not availables on crypto.Hash enum, map to md4
+		'SHAKE-256' {
+			return crypto.Hash.md5, 64
+		} // map to 64-size
+		'SHA2-224' {
+			return crypto.Hash.sha224, 28
+		} // 224/8-bytes
+		'SHA2-256' {
+			return crypto.Hash.sha256, 32
+		} // 256/8-bytes
+		'SHA2-384' {
+			return crypto.Hash.sha384, 48
+		} // 384/8-bytes
+		'SHA2-512' {
+			return crypto.Hash.sha512, 64
+		} // 512/8-bytes
+		'SHA2-512/224' {
+			return crypto.Hash.sha512_224, 28
+		} // 224/8-bytes
+		'SHA2-512/256' {
+			return crypto.Hash.sha512_256, 32
+		} // 256/8-bytes
+		'SHA3-224' {
+			return crypto.Hash.sha3_224, 28
+		} // 224/8-bytes
+		'SHA3-256' {
+			return crypto.Hash.sha3_256, 32
+		} // 256/8-bytes
+		'SHA3-384' {
+			return crypto.Hash.sha3_384, 48
+		} // 384/8-bytes
+		'SHA3-512' {
+			return crypto.Hash.sha3_512, 64
+		} // 512/8-bytes
+		else {
+			return error('hash algorithm ${name} not supported')
+		}
+	}
 }

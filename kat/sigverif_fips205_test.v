@@ -35,7 +35,7 @@ fn name_to_hfunc(name string) !(crypto.Hash, int) {
 			return crypto.Hash.md4, 32
 		} // not availables on crypto.Hash enum, map to md4
 		'SHAKE-256' {
-			return crypto.Hash.md5, 54
+			return crypto.Hash.md5, 64
 		} // map to 64-size
 		'SHA2-224' {
 			return crypto.Hash.sha224, 28
@@ -86,34 +86,49 @@ fn test_slhdsa_sigverify_fips205_external_test_vectors() {
 	// Test for every test group
 	for tg in sigver_test.testgroups {
 		ctx := pslhdsa.new_context_from_name(tg.parameterset)!
-		mode := tg.prehash // "pure", "prehash" or "none" (for internal interface)
-		mut opt := pslhdsa.Options{}
-		for t in tg.tests {
-			// only test pure prehash message encoding currently, and skip for prehash encoding
-			if mode != 'pure' {
-				continue
+		// get message encoding mode
+		mode := if tg.prehash == 'pure' {
+			pslhdsa.MsgEncoding.pure
+		} else {
+			if tg.prehash == 'prehash' {
+				pslhdsa.MsgEncoding.pre
+			} else {
+				pslhdsa.MsgEncoding.noencode
 			}
+		}
+		// build an options for signing (verifying)
+		mut opt := pslhdsa.Options{
+			// This is non-deterministic test
+			// set testing to true, its need for testing
+			testing:      true
+			msg_encoding: mode
+		}
+		for t in tg.tests {
 			// We only test for signature verification step, so
 			// we ommit signature generation step
 			pkb := hex.decode(t.pk)!
-			message := hex.decode(t.message)!
+			msg := hex.decode(t.message)!
 			cx := hex.decode(t.context)!
 			addrnd := hex.decode(t.additionalrandomness)!
 			signature := hex.decode(t.signature)!
-			// set testing options and related entropy for testing
-			opt.testing = true
-			opt.entropy = addrnd
 
 			pk := pslhdsa.new_pubkey(ctx, pkb)!
+			// get hash function when its in pre-hashed mode
+			if opt.msg_encoding == pslhdsa.MsgEncoding.pre {
+				hfn, _ := name_to_hfunc(t.hashalg)!
+				opt.hfunc = hfn
+			}
+			// set the randomness value
+			opt.entropy = addrnd
 
 			// Some test cases has invalid signature size, and return error
 			// when be parsed into internal SLHSignature opaque struct
-			verified := pk.verify(message, signature, cx, opt) or { false }
+			verified := pk.verify(msg, signature, cx, opt) or { false }
 			assert verified == t.testpassed
 			// explicitly release the resource
 			unsafe {
 				pkb.free()
-				message.free()
+				msg.free()
 				cx.free()
 				addrnd.free()
 				signature.free()

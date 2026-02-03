@@ -21,7 +21,6 @@ fn test_slhdsa_keygen_fips205_test_vectors() {
 	for tg in keygen_test.testgroups {
 		ctx := pslhdsa.new_context_from_name(tg.parameterset)!
 		for t in tg.tests {
-			dump(t.tcid)
 			skseed := hex.decode(t.skseed)!
 			skprf := hex.decode(t.skprf)!
 			pkseed := hex.decode(t.pkseed)!

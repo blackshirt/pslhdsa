@@ -10,6 +10,7 @@ import crypto
 import encoding.hex
 import x.json2
 
+// copied here from utils, its not publicly availables
 fn name_to_hfunc(name string) !(crypto.Hash, int) {
 	match name {
 		'SHAKE-128' {
@@ -54,7 +55,7 @@ fn name_to_hfunc(name string) !(crypto.Hash, int) {
 	}
 }
 
-// Test for SLH-DSA external signature generation API
+// Test for SLH-DSA external signature generation API, but with minified sizes.
 // For internal test, its resides in siggen_fips205_internal_test.v file of the main module.
 fn test_slhdsa_siggen_fips205_test_vectors() {
 	// read the siggen_fips205.json file (the mini version)
@@ -64,17 +65,24 @@ fn test_slhdsa_siggen_fips205_test_vectors() {
 	// parse the json string into a SigGenTest struct
 	siggen_test := json2.decode[SigGenTest](json_str)!
 	// Test for every test group
-	for tg in siggen_cases {
-		ctx := new_context_from_name(tg.parameterset)!
+	for tg in siggen_test.testgroups {
+		ctx := pslhdsa.new_context_from_name(tg.parameterset)!
 		// get message encoding mode
 		mode := if tg.prehash == 'pure' {
-			MsgEncoding.pure
+			pslhdsa.MsgEncoding.pure
 		} else {
-			if tg.prehash == 'prehash' { MsgEncoding.pre } else { MsgEncoding.noencode }
+			if tg.prehash == 'prehash' {
+				pslhdsa.MsgEncoding.pre
+			} else {
+				pslhdsa.MsgEncoding.noencode
+			}
 		}
-		mut opt := Options{
+		// build an options for signing (verifying)
+		mut opt := pslhdsa.Options{
 			deterministic: tg.deterministic
-			msg_encoding:  mode
+			// set testing to true, its need for testing
+			testing:      true
+			msg_encoding: mode
 		}
 		for t in tg.tests {
 			skb := hex.decode(t.sk)!
@@ -84,21 +92,21 @@ fn test_slhdsa_siggen_fips205_test_vectors() {
 			addrnd := hex.decode(t.additionalrandomness)!
 			sig := hex.decode(t.signature)!
 
-			//
-			sk := slh_keygen_from_bytes(ctx, skb)!
-			pk := new_pubkey(ctx, pkb)!
+			// generate SigningKey and PubKey opaque
+			sk := pslhdsa.slh_keygen_from_bytes(ctx, skb)!
+			pk := pslhdsa.new_pubkey(ctx, pkb)!
 			assert sk.pubkey().bytes() == pkb
 			assert pk.bytes() == pkb
 
-			// get hash function when its pre-hashed mode
-			if opt.msg_encoding == .pre {
+			// get hash function when its in pre-hashed mode
+			if opt.msg_encoding == pslhdsa.MsgEncoding.pre {
 				hfn, _ := name_to_hfunc(t.hashalg)!
 				opt.hfunc = hfn
 			}
-			opt.testing = true
 			// Get the randomness value
 			opt_rnd := if opt.deterministic {
-				pk.seed
+				// pk.seed is not public field, use bytes directly
+				skb[2 * ctx.prm.n..3 * ctx.prm.n]
 			} else {
 				addrnd
 			}

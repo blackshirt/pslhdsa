@@ -59,10 +59,10 @@ fn slh_sign_internal(msg []u8, sk &SigningKey, addrnd []u8) !&SLHSignature {
 	// ADRS ← toByte(0, 32) ▷ set layer and tree address to bottom layer	
 	mut addr := new_address()
 	// 𝑜𝑝𝑡_𝑟𝑎𝑛𝑑 ← 𝑎𝑑𝑑𝑟𝑛, substitute 𝑜𝑝𝑡_𝑟𝑎𝑛𝑑 ← PK.seed for the deterministic variant,
-	mut opt_rand := addrnd.clone()
+	// opt_rand := unsafe { addrnd }
 
 	// generate randomizer, 𝑅 ← PRF𝑚𝑠𝑔(SK.prf, 𝑜𝑝𝑡_𝑟𝑎𝑛𝑑, 𝑀 )
-	r := sk.ctx.prf_msg(sk.prf, opt_rand, msg, outlen)!
+	r := sk.ctx.prf_msg(sk.prf, addrnd, msg, outlen)!
 	// SIG ← r
 
 	// compute message digest, ie, 𝑑𝑖𝑔𝑒𝑠𝑡 ← H𝑚𝑠𝑔(𝑅, PK.seed, PK.root, 𝑀 )

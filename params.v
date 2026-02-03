@@ -199,7 +199,7 @@ fn (c &Context) prf(pkseed []u8, skseed []u8, addr Address, outlen int) ![]u8 {
 
 	// generates the digest, and return it
 	digest := h.sum([]u8{})
-
+	unsafe { h.reset() }
 	// Only returns the clone of appropriate outlen size
 	return digest[0..outlen].clone()
 }
@@ -322,7 +322,7 @@ fn sha256_caddr_generic(n int, pkseed []u8, addr Address, msg []u8, outlen int) 
 	h.write(cadr)!
 	h.write(msg)!
 	out := h.sum([]u8{})
-
+	unsafe { h.reset() }
 	return out[0..outlen].clone()
 }
 
@@ -335,6 +335,7 @@ fn sha512_caddr_generic(n int, pkseed []u8, addr Address, msg []u8, outlen int) 
 	h.write(cadr)!
 	h.write(msg)!
 	out := h.sum([]u8{})
+	unsafe { h.reset() }
 	return out[0..outlen].clone()
 }
 

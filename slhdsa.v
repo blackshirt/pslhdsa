@@ -153,37 +153,38 @@ const supported_prehash_algo = [crypto.Hash.sha256, .sha512, .sha384, .sha224, .
 @[params]
 pub struct Options {
 pub mut:
-	// check_pk flag was used in SLH-DSA key generation, especially in `slh_keygen_from_bytes`
-	// to check if the public key root is valid in SLH-DSA key generation.
-	// If set to true, it will check if the public key root is valid.
-	// If set to false, it will not check the public key root and maybe fails on
-	// signature verification, default to true.
+	// check_pk flag was used in the SLH-DSA key generation process,
+	// especially in `slh_keygen_from_bytes` to tell the routine to perform
+	// checking on the PK.root was result in a valid value in SLH-DSA key generation.
+	// By default its set to true, to always to do the check on key generation.
 	check_pk bool = true
 
-	// The option below was used in signature generation.
+	// The option below was used in signature generation (verification).
 	//
-	// deterministic signature generation, where the randomness is replaced by sk.pkseed.
-	// default to false and use crypto.rand.read for randomness.
-	deterministic bool
-
-	// testing flag for testing or advanced purposes. if set to true, it will use entropy bytes
-	// as a random values pass to internal signing process. When deterministic flag is set,
-	// it will be ignored.
+	// testing flag for testing or advanced purposes, and acts as a knob for other flag.
 	testing bool
 
+	// deterministic flag affects how the random seed was used in signature generation (verification).
+	// If set into true, given PK.seed as a random seed into generator. If set into false,
+	// its depends on the `testing` flag above. When testing was set into true,
+	// its mean to use custom random seed provided in `entropy` field, otherwise it will use
+	// random generator from `crypto.rand` seed, the default generator..
+	deterministic bool
+
 	// entropy is an additional randomness value, only for non-deterministic signature testing.
-	// the testing flag should be set to true to enable this option.
+	// the testing flag should be set into true to enable this option.
 	// the entropy size must be at most max_entropy_size bytes long.
 	entropy []u8
 
-	// msg_encoding defines the way of message encoding for signature generation (verication)
-	// was performed. The default value .pure means for 'Pure SLH-DSA Signature Generation (verification)'.
+	// msg_encoding defines the way of message encoding for signature generation (verication) was performed.
+	// The default value .pure means for 'Pure SLH-DSA Signature Generation (verification)'.
 	// .pre for 'Pre Hash SLH-DSA Signature Generation (verification)' or .noencode for not encode the mesage behaviour,
 	// .noencode was intended for testing. If not sure, just use the default .pure value.
 	msg_encoding MsgEncoding = .pure
 
 	// hfunc is the hash function used in pre-hashed message encoding,
-	// used only when msg_encoding is false. The default value is sha256.
+	// used only when msg_encoding is .pre mode. You should set it into correct hash.
+	// The default value is sha256.
 	hfunc crypto.Hash = .sha256
 }
 

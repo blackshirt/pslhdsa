@@ -158,7 +158,7 @@ fn (c &Context) hmsg(r []u8, pkseed []u8, pkroot []u8, msg []u8, outlen int) ![]
 	return mgf1(data, outlen, mut h)!
 }
 
-// prf is a pseudorandom function  (PRF) that is used to generate the secret values
+// prf is a pseudorandom function (PRF) that is used to generate the secret values
 // in WOTS+ and FORS private keys.
 @[direct_array_access]
 fn (c &Context) prf(pkseed []u8, skseed []u8, addr Address, outlen int) ![]u8 {
@@ -526,7 +526,7 @@ fn kind_from_name(name string) !Kind {
 		'SLH-DSA-SHAKE-192f' { return .shake_192f }
 		'SLH-DSA-SHAKE-256s' { return .shake_256s }
 		'SLH-DSA-SHAKE-256f' { return .shake_256f }
-		else { return error('Invalid SLH-DSA name string') }
+		else { return error('Invalid SLH-DSA name string ${name}') }
 	}
 }
 

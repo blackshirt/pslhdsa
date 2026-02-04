@@ -17,6 +17,7 @@ fn test_slhdsa_siggen_fips205_internal_test_vectors() {
 	json_str := os.read_file('./siggen_fips205_internal.json')!
 	// parse the json string into a SigGenTest struct
 	siggen_test := json.decode(SigGenTest, json_str)!
+	dump(siggen_test)
 	for tg in siggen_test.testgroups {
 		ctx := new_context_from_name(tg.parameterset)!
 		// we only test internal interface here

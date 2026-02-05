@@ -80,7 +80,7 @@ fn (ad Address) bytes() []u8 {
 // 𝑡𝑦𝑝𝑒             1 byte
 // final          12 bytes
 //
-// compress compressing the Address ad into 22-bytes compressed address
+// compress takes the 32-bytes of Address ad and transforms into form of a 22-bytes of compressed address
 // ie, ADRS𝑐 = ADRS[3] ∥ ADRS[8 ∶ 16] ∥ ADRS[19] ∥ ADRS[20 ∶ 32]).
 @[direct_array_access; inline]
 fn (ad Address) compress() []u8 {
@@ -298,7 +298,7 @@ fn (t TreeIndex) clone() TreeIndex {
 	}
 }
 
-// Returns the 12-bytes representation of the tree index.
+// bytes represents 12-bytes representation of the tree index.
 @[inline]
 fn (t TreeIndex) bytes() []u8 {
 	mut out := []u8{len: 12}

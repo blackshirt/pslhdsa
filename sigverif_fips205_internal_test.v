@@ -19,6 +19,7 @@ fn test_slhdsa_sigverify_fips205_internal_test_vectors() {
 	// See https://github.com/usnistgov/ACVP-Server/blob/master/gen-val/json-files/SLH-DSA-sigVer-FIPS205/internalProjection.json
 	json_str := os.read_file('./sigverif_fips205_internal.json')!
 	// parse the json string into a SigVerif struct
+	// BUG: This json.decode fails with `-prod` flag
 	sigver_test := json.decode(SigVerif, json_str)!
 	// Test for every test group
 	for tg in sigver_test.testgroups {

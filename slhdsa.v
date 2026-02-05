@@ -153,10 +153,16 @@ const supported_prehash_algo = [crypto.Hash.sha256, .sha512, .sha384, .sha224, .
 @[params]
 pub struct Options {
 pub mut:
-	// check_pk flag was used in the SLH-DSA key generation process,
-	// especially in `slh_keygen_from_bytes` to tell the routine to perform
-	// checking on the PK.root was result in a valid value in SLH-DSA key generation.
-	// By default its set to true, to always to do the check on key generation.
+	// check_pk flag was used in the SLH-DSA key generation process, especially in `slh_keygen_from_bytes`
+	// to tell the routine to perform checking on the PK.root was result in a valid value on the key generation.
+	// By default its set to true, to always to do the check the PK.root on the key generation.
+	//
+	// From the docs stated:
+	// In the case of SLH-DSA, where public-key validation is required, implementations
+	// shall verify that the public key is 2𝑛 bytes in length. When the assurance of private
+	// key possession is obtained via regeneration, the owner of the private key shall check
+	// that the private key is 4𝑛 bytes in length and shall use SK.seed and PK.seed to recompute
+	// PK.root and compare the newly generated value with the value in the private key currently held
 	check_pk bool = true
 
 	// The option below was used in signature generation (verification).

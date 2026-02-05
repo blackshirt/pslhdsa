@@ -16,8 +16,8 @@ fn test_slhdsa_siggen_fips205_internal_test_vectors() {
 	// See https://github.com/usnistgov/ACVP-Server/blob/master/gen-val/json-files/SLH-DSA-sigGen-FIPS205/internalProjection.json
 	json_str := os.read_file('./siggen_fips205_internal.json')!
 	// parse the json string into a SigGenTest struct
+	// BUG: This json.decode fails with `-prod` flag
 	siggen_test := json.decode(SigGenTest, json_str)!
-	dump(siggen_test)
 	for tg in siggen_test.testgroups {
 		ctx := new_context_from_name(tg.parameterset)!
 		// we only test internal interface here

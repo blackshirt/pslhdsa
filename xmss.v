@@ -181,6 +181,7 @@ fn xmss_node(c &Context, skseed []u8, i u32, z u32, pkseed []u8, mut addr Addres
 // Input: 𝑛-byte message 𝑀, secret seed SK.seed, index 𝑖𝑑𝑥, public seed PK.seed,
 // address ADRS.
 // Output: XMSS signature SIG𝑋𝑀𝑆𝑆 = (𝑠𝑖𝑔 ∥ AUTH).
+@[direct_array_access; inline]
 fn xmss_sign(c &Context, m []u8, skseed []u8, idx u32, pkseed []u8, mut addr Address) !&XmssSignature {
 	mut auth := [][]u8{len: c.prm.hp}
 	// build authentication path
@@ -239,6 +240,7 @@ fn xmms_pkfromsig(c &Context, idx u32, sig_xmss &XmssSignature, m []u8, pkseed [
 		addr.set_tree_height(k + 1)
 		mut m2 := []u8{cap: node_0.len + auth[k].len}
 		// if ⌊𝑖𝑑𝑥/2^𝑘⌋ is even then
+		// TODO: constant-time branching
 		if (idx >> k) % 2 == 0 {
 			// 11: ADRS.setTreeIndex(ADRS.getTreeIndex()/2)
 			addr.set_tree_index(addr.get_tree_index() >> 1)

@@ -35,6 +35,8 @@ pub fn slh_keygen(c &Context) !&SigningKey {
 // slh_keygen_from_bytes generates a SLH-DSA signing key with the given bytes.
 // By default, it will check if the public key root is valid for the given context.
 // If opt.check_pk is set to false, it will not check the public key root.
+// NOTE: For each invocation of key generation, bytes of values shall be a fresh
+// (i.e., not previously used) random value generated using an approved random bit generator
 @[direct_array_access]
 pub fn slh_keygen_from_bytes(ctx &Context, bytes []u8, opt Options) !&SigningKey {
 	// check if the bytes length is equal to n * 4
@@ -79,6 +81,8 @@ pub fn slh_keygen_from_bytes(ctx &Context, bytes []u8, opt Options) !&SigningKey
 
 // slh_keygen_from_seed generates a SLH-DSA signing key with the given seed.
 // The every seed must be of length ctx.prm.n bytes.
+// NOTE: For each invocation of key generation, these seed of values shall be a fresh
+// (i.e., not previously used) random value generated using an approved random bit generator
 @[direct_array_access]
 pub fn slh_keygen_from_seed(ctx &Context, skseed []u8, skprf []u8, pkseed []u8) !&SigningKey {
 	// check for the length	

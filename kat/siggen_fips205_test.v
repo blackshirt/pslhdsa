@@ -11,43 +11,43 @@ import encoding.hex
 import x.json2
 
 // copied here from utils, its not publicly availables
-fn name_to_hfunc(name string) !(crypto.Hash, int) {
+fn name_to_hfunc(name string) !crypto.Hash {
 	match name {
 		'SHAKE-128' {
-			return crypto.Hash.md4, 32
+			return crypto.Hash.md4
 		} // not availables on crypto.Hash enum, map to md4
 		'SHAKE-256' {
-			return crypto.Hash.md5, 54
+			return crypto.Hash.md5
 		} // map to 64-size
 		'SHA2-224' {
-			return crypto.Hash.sha224, 28
+			return crypto.Hash.sha224
 		} // 224/8-bytes
 		'SHA2-256' {
-			return crypto.Hash.sha256, 32
+			return crypto.Hash.sha256
 		} // 256/8-bytes
 		'SHA2-384' {
-			return crypto.Hash.sha384, 48
+			return crypto.Hash.sha384
 		} // 384/8-bytes
 		'SHA2-512' {
-			return crypto.Hash.sha512, 64
+			return crypto.Hash.sha512
 		} // 512/8-bytes
 		'SHA2-512/224' {
-			return crypto.Hash.sha512_224, 28
+			return crypto.Hash.sha512_224
 		} // 224/8-bytes
 		'SHA2-512/256' {
-			return crypto.Hash.sha512_256, 32
+			return crypto.Hash.sha512_256
 		} // 256/8-bytes
 		'SHA3-224' {
-			return crypto.Hash.sha3_224, 28
+			return crypto.Hash.sha3_224
 		} // 224/8-bytes
 		'SHA3-256' {
-			return crypto.Hash.sha3_256, 32
+			return crypto.Hash.sha3_256
 		} // 256/8-bytes
 		'SHA3-384' {
-			return crypto.Hash.sha3_384, 48
+			return crypto.Hash.sha3_384
 		} // 384/8-bytes
 		'SHA3-512' {
-			return crypto.Hash.sha3_512, 64
+			return crypto.Hash.sha3_512
 		} // 512/8-bytes
 		else {
 			return error('hash algorithm ${name} not supported')
@@ -100,8 +100,7 @@ fn test_slhdsa_siggen_fips205_test_vectors() {
 
 			// get hash function when its in pre-hashed mode
 			if opt.msg_encoding == pslhdsa.MsgEncoding.pre {
-				hfn, _ := name_to_hfunc(t.hashalg)!
-				opt.hfunc = hfn
+				opt.hfunc = name_to_hfunc(t.hashalg)!
 			}
 			// Get the randomness value
 			opt_rnd := if opt.deterministic {

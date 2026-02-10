@@ -126,8 +126,7 @@ fn test_pure_prehash_signature_generation_verify() ! {
 
 			// get hash function when its pre-hashed mode
 			if opt.msg_encoding == .pre {
-				hfn, _ := name_to_hfunc(t.hashalg)!
-				opt.hfunc = hfn
+				opt.hfunc = name_to_hfunc(t.hashalg)!
 			}
 
 			// Get the randomness value

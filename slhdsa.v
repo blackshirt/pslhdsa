@@ -610,3 +610,50 @@ const oid_shake128 = [u8(0x06), 0x09, 0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 
 // OID of SHAKE256 : 2.16.840.1.101.3.4.2.12
 // OID ← toByte(0x060960864801650304020C, 11) ▷ 2.16.840.1.101.3.4.2.12
 const oid_shake256 = [u8(0x06), 0x09, 0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x02, 0x0C]
+
+// name_to_hfunc get the Hash enum and their size from string name, usually for testing purposes.
+// Its only supports for SHA-2, SHA-3 and SHAKE hash families
+@[inline]
+fn name_to_hfunc(name string) !crypto.Hash {
+	match name {
+		'SHAKE-128' {
+			return crypto.Hash.md4
+		} // not availables on crypto.Hash enum, map to md4
+		'SHAKE-256' {
+			return crypto.Hash.md5
+		} // map to 64-size
+		'SHA2-224' {
+			return crypto.Hash.sha224
+		} // 224/8-bytes
+		'SHA2-256' {
+			return crypto.Hash.sha256
+		} // 256/8-bytes
+		'SHA2-384' {
+			return crypto.Hash.sha384
+		} // 384/8-bytes
+		'SHA2-512' {
+			return crypto.Hash.sha512
+		} // 512/8-bytes
+		'SHA2-512/224' {
+			return crypto.Hash.sha512_224
+		} // 224/8-bytes
+		'SHA2-512/256' {
+			return crypto.Hash.sha512_256
+		} // 256/8-bytes
+		'SHA3-224' {
+			return crypto.Hash.sha3_224
+		} // 224/8-bytes
+		'SHA3-256' {
+			return crypto.Hash.sha3_256
+		} // 256/8-bytes
+		'SHA3-384' {
+			return crypto.Hash.sha3_384
+		} // 384/8-bytes
+		'SHA3-512' {
+			return crypto.Hash.sha3_512
+		} // 512/8-bytes
+		else {
+			return error('hash algorithm ${name} not supported')
+		}
+	}
+}

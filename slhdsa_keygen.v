@@ -101,7 +101,7 @@ pub fn slh_keygen_from_seed(ctx &Context, skseed []u8, skprf []u8, pkseed []u8) 
 // Generates an SLH-DSA signing key with the given seed.
 // Input: SLH-DSA context, secret seed SK.seed, PRF key SK.prf, public seed PK.seed
 // Output: SLH-DSA signing key.
-@[direct_array_access; inline]
+@[direct_array_access]
 fn slh_keygen_internal(ctx &Context, skseed []u8, skprf []u8, pkseed []u8) !&SigningKey {
 	// generate the public key for the top-level XMSS tree
 	// 1: ADRS ← toByte(0, 32) ▷ set layer and tree address to bottom layer	

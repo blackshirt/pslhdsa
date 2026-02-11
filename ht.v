@@ -17,7 +17,6 @@ mut:
 }
 
 // new_hypertree creates a new HypertreeSignature from a slice of XmssSignature
-@[inline]
 fn new_hypertree(xs []XmssSignature) &HypertreeSignature {
 	return &HypertreeSignature{
 		xmss: xs
@@ -29,7 +28,6 @@ fn new_hypertree(xs []XmssSignature) &HypertreeSignature {
 // The size of a hypertree signature is (ℎ + 𝑑 ⋅ 𝑙𝑒𝑛) ⋅ 𝑛 bytes, where ℎ is the height of the hypertree,
 // 𝑑 is the number of XMSS trees in the hypertree, 𝑙𝑒𝑛 is the length of each XMSS tree, and 𝑛 is the
 // number of bytes in a signature of an XMSS tree.
-@[inline]
 fn (h &HypertreeSignature) ht_size() int {
 	// for every item in xmss, add its size to n
 	mut n := 0
@@ -40,7 +38,6 @@ fn (h &HypertreeSignature) ht_size() int {
 }
 
 // bytes returns flatten-ed HypertreeSignature h into bytes array
-@[inline]
 fn (h &HypertreeSignature) bytes() []u8 {
 	mut out := []u8{len: h.ht_size()}
 	mut n := 0
@@ -76,7 +73,7 @@ fn parse_hypertree(c Context, sig []u8) !&HypertreeSignature {
 // Input: Message 𝑀, private seed SK.seed, public seed PK.seed, tree index 𝑖𝑑𝑥𝑡𝑟𝑒𝑒, leaf index 𝑖𝑑𝑥𝑙𝑒𝑎𝑓.
 // Output: HT signature SIG𝐻𝑇.
 // ht_sign generates a hypertree signature.
-@[direct_array_access; inline]
+@[direct_array_access]
 fn ht_sign(c &Context, m []u8, skseed []u8, pkseed []u8, mut idxtree TreeIndex, idxleaf_ u32) !&HypertreeSignature {
 	mut idxleaf := idxleaf_
 
@@ -122,7 +119,7 @@ fn ht_sign(c &Context, m []u8, skseed []u8, pkseed []u8, mut idxtree TreeIndex, 
 // Verifies a hypertree signature.
 // Input: Message 𝑀,signature SIG𝐻𝑇, public seed PK.seed, tree index 𝑖𝑑𝑥𝑡𝑟𝑒𝑒, leaf index 𝑖𝑑𝑥𝑙𝑒𝑎𝑓, HT public key PK.root.
 // ht_verify verifies a hypertree signature.
-@[direct_array_access; inline]
+@[direct_array_access]
 fn ht_verify(c &Context, m []u8, sight &HypertreeSignature, pkseed []u8, mut idxtree TreeIndex, idxleaf_ u32, pkroot []u8) !bool {
 	// mut idxtree := idxtree
 	mut idxleaf := idxleaf_

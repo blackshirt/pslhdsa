@@ -11,7 +11,7 @@ module pslhdsa
 // Generates a WOTS+ public key.
 // Input: Secret seed SK.seed, public seed PK.seed, address ADRS.
 // Output: WOTS+ public key 𝑝k
-@[direct_array_access; inline]
+@[direct_array_access]
 fn wots_pkgen(c &Context, skseed []u8, pkseed []u8, mut adr Address) ![]u8 {
 	assert adr.get_type()! == .wots_hash
 	// copy address to create key generation key address
@@ -105,7 +105,7 @@ fn wots_sign(c &Context, m []u8, skseed []u8, pkseed []u8, mut adr Address) ![][
 // Computes a WOTS+ public key from a message and its signature.
 // Input: WOTS+ signature 𝑠𝑖𝑔, message 𝑀, public seed
 // Output: WOTS+ public key 𝑝𝑘𝑠𝑖𝑔 derived from 𝑠𝑖𝑔.
-@[direct_array_access; inline]
+@[direct_array_access]
 fn wots_pkfromsig(c &Context, sig [][]u8, m []u8, pkseed []u8, mut adr Address) ![]u8 {
 	// get some context variables
 	length := c.wots_len()
@@ -154,7 +154,8 @@ fn wots_pkfromsig(c &Context, sig [][]u8, m []u8, pkseed []u8, mut adr Address) 
 // Input: Input string 𝑋, start index 𝑖, number of steps 𝑠, public seed PK.seed, address ADRS.
 // Output: Value of F iterated 𝑠 times on 𝑋.
 // (where 𝑖 + 𝑠 < w
-@[direct_array_access; inline]
+// NOTE: should this be inlined ?
+@[direct_array_access]
 fn chain(c &Context, x []u8, i u32, s u32, pkseed []u8, mut adr Address) ![]u8 {
 	assert x.len == c.prm.n
 	if i + s >= w {
@@ -170,7 +171,7 @@ fn chain(c &Context, x []u8, i u32, s u32, pkseed []u8, mut adr Address) ![]u8 {
 	return tmp
 }
 
-@[direct_array_access; inline]
+@[direct_array_access]
 fn wots_csum(c &Context, m []u32) u64 {
 	mut csum := u64(0)
 	t := u32((1 << c.prm.lgw) - 1)

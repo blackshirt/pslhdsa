@@ -14,10 +14,10 @@ import x.json2
 fn name_to_hfunc(name string) !crypto.Hash {
 	match name {
 		'SHAKE-128' {
-			return crypto.Hash.md4
-		} // not availables on crypto.Hash enum, map to md4
+			return crypto.Hash.shake128
+		}
 		'SHAKE-256' {
-			return crypto.Hash.md5
+			return crypto.Hash.shake256
 		} // map to 64-size
 		'SHA2-224' {
 			return crypto.Hash.sha224

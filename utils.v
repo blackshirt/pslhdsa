@@ -5,11 +5,8 @@
 // Some utilities used across the module
 module pslhdsa
 
-import crypto
-
 // Algorithm 1 gen_len2(𝑛, 𝑙𝑔𝑤)
 //
-@[inline]
 fn gen_len2(n int, lgw int) int {
 	ww := u32(1) << u32(lgw)
 	len1 := ((u32(n) << 3) + u32(lgw) - 1) / u32(lgw)
@@ -27,7 +24,7 @@ fn gen_len2(n int, lgw int) int {
 //
 // Converts a byte string to an integer
 // Input: 𝑛-byte string 𝑋.
-@[direct_array_access; inline]
+@[direct_array_access]
 fn to_int(x []u8, n int) u64 {
 	assert n <= 8
 	if n == 0 {
@@ -46,7 +43,6 @@ fn to_int(x []u8, n int) u64 {
 // Converts an integer to a byte string.
 // Input: Integer 𝑥, string length 𝑛.
 // Output: Byte string of length 𝑛 containing binary representation of 𝑥 in big-endian byte-order.
-@[inline]
 fn to_byte(x u64, n int) []u8 {
 	if n == 0 {
 		return []u8{}
@@ -61,7 +57,6 @@ fn to_byte(x u64, n int) []u8 {
 }
 
 // Compute ceil(n/k)
-@[inline]
 fn cdiv(n int, k int) int {
 	return (n + k - 1) / k
 }
@@ -73,7 +68,7 @@ fn cdiv(n int, k int) int {
 // Output: Array of 𝑜𝑢𝑡_𝑙𝑒𝑛 integers in the range [0, … , 2𝑏 − 1].
 // The base_2b function is used to break the message to be signed and the checksum value
 // into arrays of base-𝑤 integers.
-@[direct_array_access; inline]
+@[direct_array_access]
 fn base_2b(x []u8, b int, outlen int) []u32 {
 	mut input := u32(0)
 	mut bits := 0
@@ -99,7 +94,7 @@ fn base_2b(x []u8, b int, outlen int) []u32 {
 }
 
 // is_zero tells whether seed is all zeroes in constant time.
-@[direct_array_access; inline]
+@[direct_array_access]
 fn is_zero(seed []u8) bool {
 	mut acc := u8(0)
 	for b in seed {

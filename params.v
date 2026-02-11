@@ -26,7 +26,6 @@ pub:
 }
 
 // new_context creates a new SLH-DSA Context to operate on
-@[inline]
 pub fn new_context(k Kind) &Context {
 	return &Context{
 		kind: k
@@ -37,19 +36,16 @@ pub fn new_context(k Kind) &Context {
 // new_context_from_name creates a new SLH-DSA Context from name string
 // name should be one of the supported kind name, e.g. 'SLH-DSA-SHA2-192f'
 // See Kind for the list of supported kind names
-@[inline]
 pub fn new_context_from_name(name string) !&Context {
 	return new_context(kind_from_name(name)!)
 }
 
 // name returns the name of this context
-@[inline]
 pub fn (c &Context) name() string {
 	return c.kind.name()
 }
 
 // clone returns a clone of this context
-@[inline]
 fn (c &Context) clone() &Context {
 	return &Context{
 		kind: c.kind
@@ -58,8 +54,7 @@ fn (c &Context) clone() &Context {
 }
 
 // equal returns true if this context is equal to the other context
-@[inline]
-pub fn (c &Context) equal(o &Context) bool {
+fn (c &Context) equal(o &Context) bool {
 	// for sake of simplicity, only check for kind equality, not the parameter set
 	return c.kind == o.kind
 }
@@ -313,7 +308,7 @@ fn (c &Context) f(pkseed []u8, addr Address, m1 []u8, outlen int) ![]u8 {
 
 // Helpers for pseudorandom function
 //
-@[direct_array_access; inline]
+@[direct_array_access]
 fn sha256_caddr_generic(n int, pkseed []u8, addr Address, msg []u8, outlen int) ![]u8 {
 	cadr := addr.compress()
 	mut h := sha256.new()
@@ -326,7 +321,7 @@ fn sha256_caddr_generic(n int, pkseed []u8, addr Address, msg []u8, outlen int) 
 	return out[0..outlen].clone()
 }
 
-@[direct_array_access; inline]
+@[direct_array_access]
 fn sha512_caddr_generic(n int, pkseed []u8, addr Address, msg []u8, outlen int) ![]u8 {
 	cadr := addr.compress()
 	mut h := sha512.new()
@@ -340,7 +335,7 @@ fn sha512_caddr_generic(n int, pkseed []u8, addr Address, msg []u8, outlen int) 
 }
 
 // hmac_sha256 creates HMAC bytes with SHA256 hash
-@[direct_array_access; inline]
+@[direct_array_access]
 fn hmac_sha256(seed []u8, data []u8) []u8 {
 	// fn new(key []u8, data []u8, hash_func fn ([]u8) []u8, blocksize int) []u8
 	// NOTE: use block_size instead of size
@@ -348,7 +343,7 @@ fn hmac_sha256(seed []u8, data []u8) []u8 {
 }
 
 // hmac_sha512 creates new HMAC bytes with SHA512 hash
-@[direct_array_access; inline]
+@[direct_array_access]
 fn hmac_sha512(seed []u8, data []u8) []u8 {
 	// fn new(key []u8, data []u8, hash_func fn ([]u8) []u8, blocksize int) []u8
 	// NOTE: use block_size instead of size
@@ -357,7 +352,6 @@ fn hmac_sha512(seed []u8, data []u8) []u8 {
 
 // for other need, SHA2-based Security category 1 was return SHA256
 // and return SHA512 otherwise
-@[inline]
 fn (c &Context) sha2_prf() !hash.Hash {
 	if c.is_shake_family() {
 		return error('not sha2-based entity')
@@ -369,7 +363,6 @@ fn (c &Context) sha2_prf() !hash.Hash {
 }
 
 // is_shake_family tells if this context was a SHAKE-based family
-@[inline]
 fn (c &Context) is_shake_family() bool {
 	match c.kind {
 		.shake_128f, .shake_128s, .shake_192f, .shake_192s, .shake_256f, .shake_256s {
@@ -382,7 +375,6 @@ fn (c &Context) is_shake_family() bool {
 }
 
 // is_sha2family_cat1 tells if this context was a SHA2-based family with security category 1
-@[inline]
 fn (c &Context) is_sha2family_cat1() bool {
 	match c.kind {
 		.sha2_128f, .sha2_128s { return true }
@@ -391,7 +383,6 @@ fn (c &Context) is_sha2family_cat1() bool {
 }
 
 // is_sha2family_cat1 tells if this context was a SHA2-based family with security category 3
-@[inline]
 fn (c &Context) is_sha2family_cat3() bool {
 	match c.kind {
 		.sha2_192f, .sha2_192s { return true }
@@ -400,7 +391,6 @@ fn (c &Context) is_sha2family_cat3() bool {
 }
 
 // is_sha2family_cat5 tells if this context was a SHA2-based family with security category 5
-@[inline]
 fn (c &Context) is_sha2family_cat5() bool {
 	match c.kind {
 		.sha2_256f, .sha2_256s { return true }
@@ -441,7 +431,6 @@ pub:
 }
 
 // new_param creates SLH-DSA parameter set from Kind k
-@[inline]
 fn new_param(k Kind) Param {
 	return paramset[k.str()]
 }
@@ -509,7 +498,6 @@ pub enum Kind {
 }
 
 // kind_from_name make a Kind from name string
-@[inline]
 fn kind_from_name(name string) !Kind {
 	match name {
 		// SHA2-based family
@@ -531,7 +519,6 @@ fn kind_from_name(name string) !Kind {
 }
 
 // name returns the famous name of this Kind
-@[inline]
 fn (k Kind) name() string {
 	match k {
 		// SHA2-based family
@@ -552,7 +539,6 @@ fn (k Kind) name() string {
 }
 
 // str returns string representation of this Kind k
-@[inline]
 fn (k Kind) str() string {
 	match k {
 		// SHA2-based family
@@ -577,17 +563,15 @@ fn (k Kind) str() string {
 // w := uint32(1 << lgw)
 const w = 16
 
-@[inline]
+// TODO: should be inlined ?
 fn (c &Context) wots_len() int {
 	return 2 * c.prm.n + 3
 }
 
-@[inline]
 fn (c &Context) wots_len1() int {
 	return 2 * c.prm.n
 }
 
-@[inline]
 fn (c &Context) wots_len2() int {
 	return 3
 }

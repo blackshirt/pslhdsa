@@ -28,7 +28,7 @@ pub fn slh_verify(msg []u8, sig []u8, cx []u8, pk &PubKey) !bool {
 // pure SLH-DSA signature verification
 // Input: Message 𝑀, SLHSignature sig , context string 𝑐𝑡𝑥, public key PK.
 // Output: Boolean.
-@[direct_array_access; inline]
+@[direct_array_access]
 fn slh_verify_sig(msg []u8, sig &SLHSignature, cx []u8, pk &PubKey) !bool {
 	// 𝑀′ ← toByte(0, 1) ∥ toByte(|𝑐𝑡𝑥|, 1) ∥ 𝑐𝑡𝑥 ∥ m
 	msgout := encode_msg_purehash(cx, msg)
@@ -43,7 +43,7 @@ fn slh_verify_sig(msg []u8, sig &SLHSignature, cx []u8, pk &PubKey) !bool {
 // Verifies an SLH-DSA signature.
 // Input: Message 𝑀, signature SIG, public key PK = (PK.seed, PK.root).
 // Output: Boolean.
-@[direct_array_access; inline]
+@[direct_array_access]
 fn slh_verify_internal(msg []u8, sig &SLHSignature, pk &PubKey) !bool {
 	// localizes some context variables
 	// n := pk.ctx.prm.n

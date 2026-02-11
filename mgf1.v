@@ -27,7 +27,7 @@ import encoding.binary
 // to a cryptographic hash function except that while a hash function's
 // output has a fixed size, a MGF supports output of a variable length.
 // h is SHA-256 or SHA-512, respectively.
-@[direct_array_access; inline]
+@[direct_array_access]
 fn mgf1(seed []u8, masklen int, mut h hash.Hash) ![]u8 {
 	// If maskLen > 2^32 hLen, output "mask too long" and stop.
 	// Its should never happen, masklen was int-based value

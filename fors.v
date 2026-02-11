@@ -11,7 +11,7 @@ module pslhdsa
 // Generates a FORS private-key value.
 // Input: Secret seed SK.seed, public seed PK.seed, address ADRS, secret key index 𝑖𝑑𝑥.
 // Output: 𝑛-byte FORS private-key value.
-@[direct_array_access; inline]
+@[direct_array_access]
 fn fors_skgen(c &Context, skseed []u8, pkseed []u8, addr Address, idx u32) ![]u8 {
 	// assert idx >=0
 	// copy address to create key generation address
@@ -33,7 +33,7 @@ fn fors_skgen(c &Context, skseed []u8, pkseed []u8, addr Address, idx u32) ![]u8
 // Computes the root of a Merkle subtree of FORS public values.
 // Input: Secret seed SK.seed, target node index 𝑖, target node height 𝑧, public seed PK.seed, address ADRS.
 // Output: 𝑛-byte root 𝑛𝑜𝑑𝑒.
-@[direct_array_access; inline]
+@[direct_array_access]
 fn fors_node(c &Context, skseed []u8, i u32, z u32, pkseed []u8, mut addr Address) ![]u8 {
 	if z == 0 {
 		// 𝑠𝑘 ← fors_skGen(SK.seed, PK.seed, ADRS,𝑖)
@@ -75,7 +75,7 @@ fn fors_node(c &Context, skseed []u8, i u32, z u32, pkseed []u8, mut addr Addres
 // Input: Message digest 𝑚𝑑, secret seed SK.seed, address ADRS, public seed PK.seed.
 // Output: FORS signature SIG𝐹𝑂𝑅𝑆.
 // fors_sign signs a 𝑘 ⋅ 𝑎-bit message digest 𝑚d
-@[direct_array_access; inline]
+@[direct_array_access]
 fn fors_sign(c &Context, md []u8, skseed []u8, pkseed []u8, mut addr Address) ![]u8 {
 	// initialize SIG𝐹𝑂𝑅𝑆 as a zero-length byte string
 	mut sigfors := []u8{cap: c.prm.k}
@@ -111,7 +111,7 @@ fn fors_sign(c &Context, md []u8, skseed []u8, pkseed []u8, mut addr Address) ![
 // Computes a FORS public key from a FORS signature.
 // Input: FORS signature SIG𝐹𝑂𝑅𝑆, message digest 𝑚𝑑, public seed PK.seed, address ADRS.
 // Output: FORS public key
-@[direct_array_access; inline]
+@[direct_array_access]
 fn fors_pkfromsig(c &Context, sigfors []u8, md []u8, pkseed []u8, mut addr Address) ![]u8 {
 	// 𝑖𝑛𝑑𝑖𝑐𝑒𝑠 ← base_2b(𝑚𝑑, 𝑎, 𝑘)
 	indices := base_2b(md, c.prm.a, c.prm.k)

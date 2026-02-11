@@ -23,7 +23,6 @@ enum AddressType as u32 {
 }
 
 // new_addrtype creates a new AddressType from u32 value v.
-@[inline]
 fn new_addrtype(v u32) !AddressType {
 	match v {
 		0 { return .wots_hash }
@@ -53,7 +52,6 @@ mut:
 }
 
 // new_address creates an empty address
-@[inline]
 fn new_address() Address {
 	return Address{}
 }
@@ -104,7 +102,7 @@ fn (ad Address) compress() []u8 {
 }
 
 // clone clones the Address ad into new Address
-@[direct_array_access; inline]
+@[direct_array_access]
 fn (ad Address) clone() Address {
 	mut out := [8]u32{}
 	// directly, copy the address data into out
@@ -119,19 +117,19 @@ fn (ad Address) clone() Address {
 //
 
 // Layer parts
-@[inline]
+
 fn (ad Address) get_layer_address() u32 {
 	return ad.data[0]
 }
 
 // ADRS.setLayerAddress(𝑙) ADRS ← toByte(𝑙, 4) ∥ ADRS[4 ∶ 32]
-@[inline]
+
 fn (mut ad Address) set_layer_address(v u32) {
 	ad.data[0] = v
 }
 
 // Tree parts
-@[inline]
+
 fn (ad Address) get_tree_address() TreeIndex {
 	// TODO: tree address was 12-bytes in size, its currently only handle low 64-bits
 	// return u64(ad.data[2]) << 32 | u64(ad.data[3])
@@ -143,7 +141,7 @@ fn (ad Address) get_tree_address() TreeIndex {
 }
 
 // ADRS.setTreeAddress(𝑡) ADRS ← ADRS[0 ∶ 4] ∥ toByte(𝑡, 12) ∥ ADRS[16 ∶ 32]
-@[inline]
+
 fn (mut ad Address) set_tree_address(v TreeIndex) {
 	// TODO: tree address is 12-bytes in size, its currently only handle 64-bits
 	// bytes a[4:8] of tree address are always zero
@@ -157,35 +155,35 @@ fn (mut ad Address) set_tree_address(v TreeIndex) {
 
 // Address type
 // ADRS.getType() 𝑡𝑦𝑝𝑒 ← toInt(ADRS[16 ∶ 20], 4)
-@[inline]
+
 fn (ad Address) get_type() !AddressType {
 	val := ad.data[4]
 	return new_addrtype(val)!
 }
 
 // set_type only sets the address type
-@[inline]
+
 fn (mut ad Address) set_type(t AddressType) {
 	ad.data[4] = u32(t)
 }
 
 // KEYPAIR
 // ADRS.setKeyPairAddress(𝑖) ADRS ← ADRS[0 ∶ 20] ∥ toByte(𝑖, 4) ∥ ADRS[24 ∶ 32]
-@[inline]
+
 fn (mut ad Address) set_keypair_address(v u32) {
 	ad.data[5] = v
 }
 
 // get_keypair_address returns the key pair address
 // ADRS.getKeyPairAddress() 𝑖 ← toInt(ADRS[20 ∶ 24], 4)
-@[inline]
+
 fn (ad Address) get_keypair_address() u32 {
 	return ad.data[5]
 }
 
 // Set WOTS+ chain address.
 // ADRS.setChainAddress(𝑖) ADRS ← ADRS[0 ∶ 24] ∥ toByte(𝑖, 4) ∥ ADRS[28 ∶ 32]
-@[inline]
+
 fn (mut ad Address) set_chain_address(v u32) {
 	// TODO: assert correct type, 𝑡𝑦𝑝𝑒 = 0 (WOTS_HASH), 𝑡𝑦𝑝𝑒 = 5 (WOTS_PRF)
 	// bytes := to_bytes(x, 4)
@@ -196,7 +194,7 @@ fn (mut ad Address) set_chain_address(v u32) {
 
 // ADRS.setTreeHeight(𝑖) ADRS ← ADRS[0 ∶ 24] ∥ toByte(𝑖, 4) ∥ ADRS[28 ∶ 32]
 // sets FORS tree height
-@[inline]
+
 fn (mut ad Address) set_tree_height(v u32) {
 	// TODO: assert correct type, 𝑡𝑦𝑝𝑒 = 3 (FORS_TREE), 𝑡𝑦𝑝𝑒 = 6 (FORS_PRF), 𝑡𝑦𝑝𝑒 = 2 (TREE)
 	ad.data[6] = v
@@ -204,7 +202,7 @@ fn (mut ad Address) set_tree_height(v u32) {
 
 // ADRS.setTreeIndex(𝑖) ADRS ← ADRS[0 ∶ 28] ∥ toByte(𝑖, 4)
 // Set FORS tree index.
-@[inline]
+
 fn (mut ad Address) set_tree_index(v u32) {
 	// TODO: assert correct type, 𝑡𝑦𝑝𝑒 = 2 (TREE), 𝑡𝑦𝑝𝑒 = 6 (FORS_PRF)
 	// at 28..32
@@ -215,7 +213,7 @@ fn (mut ad Address) set_tree_index(v u32) {
 
 // 𝑖 ← ADRS.getTreeIndex() 𝑖 ← toInt(ADRS[28 ∶ 32], 4)
 // Get FORS tree index.
-@[inline]
+
 fn (ad Address) get_tree_index() u32 {
 	// TODO: assert correct type, 𝑡𝑦𝑝𝑒 = 2 (TREE), 𝑡𝑦𝑝𝑒 = 6 (FORS_PRF)
 	// return u32(to_int(ad.data[28..32], 4))
@@ -232,7 +230,7 @@ fn (mut ad Address) set_hash_address(v u32) {
 }
 
 // ADRS.setTypeAndClear(𝑌) ADRS ← ADRS[0 ∶ 16] ∥ toByte(𝑌 , 4) ∥ toByte(0, 12)
-@[inline]
+
 fn (mut ad Address) set_type_and_clear(t AddressType) {
 	ad.data[4] = u32(t)
 	ad.data[5] = 0
@@ -241,7 +239,7 @@ fn (mut ad Address) set_type_and_clear(t AddressType) {
 }
 
 // set_type_and_clear_not_kp only sets the address type and clears the key pair address
-@[inline]
+
 fn (mut ad Address) set_type_and_clear_not_kp(t AddressType) {
 	ad.data[4] = u32(t)
 	ad.data[6] = 0
@@ -257,13 +255,13 @@ struct TreeIndex {
 }
 
 // new_treeindex creates a new TreeIndex from u32 values hi, mi, lo.
-@[inline]
+
 fn new_treeindex(hi u32, mi u32, lo u32) TreeIndex {
 	return TreeIndex{hi, mi, lo}
 }
 
 // make_treeindex_from64 creates a new TreeIndex from u64 value v.
-@[inline]
+
 fn make_treeindex_from64(v u64) TreeIndex {
 	// u32(v >> 32)
 	// ad.data[3] = u32(v & 0xFFFF_FFFF)
@@ -289,7 +287,6 @@ fn make_treeindex(x []u8, b int) TreeIndex {
 }
 
 // Returns a clone of the tree index.
-@[inline]
 fn (t TreeIndex) clone() TreeIndex {
 	return TreeIndex{
 		hi: t.hi
@@ -299,7 +296,6 @@ fn (t TreeIndex) clone() TreeIndex {
 }
 
 // bytes represents 12-bytes representation of the tree index.
-@[inline]
 fn (t TreeIndex) bytes() []u8 {
 	mut out := []u8{len: 12}
 	binary.big_endian_put_u32(mut out[0..4], t.hi)
@@ -309,14 +305,12 @@ fn (t TreeIndex) bytes() []u8 {
 }
 
 // residue returns the least significant h bits of 𝑖𝑑𝑥𝑡𝑟𝑒e
-@[inline]
 fn (t TreeIndex) residue(h int) u32 {
 	m := u32(1 << h) - 1
 	return t.lo & m
 }
 
 // remove_bits returns the tree index with the least significant h bits removed.
-@[inline]
 fn (t TreeIndex) remove_bits(h int) TreeIndex {
 	m := u32(1 << h) - 1
 	hi := t.hi >> h
@@ -326,7 +320,6 @@ fn (t TreeIndex) remove_bits(h int) TreeIndex {
 }
 
 // mod_2b returns the tree index with the least significant b bits removed.
-@[inline]
 fn (t TreeIndex) mod_2b(b int) TreeIndex {
 	mut hi := t.hi
 	if b < 64 {

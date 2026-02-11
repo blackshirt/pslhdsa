@@ -42,7 +42,7 @@ pub fn slh_sign(msg []u8, cx []u8, sk &SigningKey) ![]u8 {
 // Input: Message 𝑀, private key SK = (SK.seed, SK.prf, PK.seed, PK.root),
 // (optional) additional random 𝑎𝑑𝑑𝑟𝑛𝑑
 // Output: SLH-DSA signature SIG.
-@[direct_array_access; inline]
+@[direct_array_access]
 fn slh_sign_internal(msg []u8, sk &SigningKey, addrnd []u8) !&SLHSignature {
 	// localizes some context variables for the signature generation
 	outlen := sk.ctx.prm.n

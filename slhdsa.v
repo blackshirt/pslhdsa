@@ -43,7 +43,6 @@ mut:
 // bytes returns the signing key bytes.
 // The signing key has a size of 4 * n bytes, which includes the public key components.
 // i.e. It consists of the concatenation of SK.seed, SK.prf, PK.seed and PF.root
-@[inline]
 pub fn (s &SigningKey) bytes() []u8 {
 	mut out := []u8{cap: s.ctx.prm.n * 4}
 	out << s.seed
@@ -55,7 +54,6 @@ pub fn (s &SigningKey) bytes() []u8 {
 }
 
 // pubkey returns the public key.
-@[inline]
 pub fn (s &SigningKey) pubkey() &PubKey {
 	return &PubKey{
 		ctx:  s.ctx.clone()
@@ -65,7 +63,6 @@ pub fn (s &SigningKey) pubkey() &PubKey {
 }
 
 // equal returns true if the signing key is equal to the other signing key.
-@[inline]
 pub fn (s &SigningKey) equal(o &SigningKey) bool {
 	return s.ctx.equal(o.ctx) && subtle.constant_time_compare(s.seed, o.seed) == 1
 		&& subtle.constant_time_compare(s.prf, o.prf) == 1
@@ -143,10 +140,8 @@ pub fn (s &SigningKey) sign(msg []u8, cx []u8, opt Options) ![]u8 {
 const max_entropy_size = 2048
 
 // supported_prehash_algo is a list of supported prehash algorithms in pre-hash message encoding
-// TODO: currently, md4 and md5 are marker for shake128 and shake256 respectively.
-// Add support for shake128 and shake256 into crypto.Hash enum
-const supported_prehash_algo = [crypto.Hash.sha256, .sha512, .sha384, .sha224, .sha512_224,
-	.sha512_256, .sha3_224, .sha3_256, .sha3_384, .sha3_512, .md4, .md5]
+const supported_prehash_algo = [crypto.Hash.sha256, .sha384, .sha224, .sha512, .sha512_224,
+	.sha512_256, .sha3_224, .sha3_256, .sha3_384, .sha3_512, .shake128, .shake256]
 
 // Options is an options struct for SLH-DSA operation, includes key generation,
 // signature generation and signature verification.
@@ -236,7 +231,6 @@ pub fn new_pubkey(ctx &Context, bytes []u8) !&PubKey {
 
 // bytes returns the public key bytes. The public key has a size of 2 * n bytes.
 // i.e. It consists of the concatenation of PK.seed and PK.root
-@[inline]
 pub fn (p &PubKey) bytes() []u8 {
 	mut out := []u8{cap: p.ctx.prm.n * 2}
 	out << p.seed
@@ -246,7 +240,6 @@ pub fn (p &PubKey) bytes() []u8 {
 }
 
 // equal returns true if the public key is equal to the other public key.
-@[inline]
 pub fn (p &PubKey) equal(o &PubKey) bool {
 	return p.ctx.equal(o.ctx) && subtle.constant_time_compare(p.seed, o.seed) == 1
 		&& subtle.constant_time_compare(p.root, o.root) == 1
@@ -312,7 +305,7 @@ mut:
 // parse_slhsignature parses the SLH-DSA signature from the given bytes.
 // The bytes must be ctx.prm.n + ctx.prm.k * (1 + ctx.prm.a) * ctx.prm.n + (ctx.prm.h + ctx.prm.d * ctx.prm.len) * ctx.prm.n bytes long.
 // If not, it returns an error.
-@[direct_array_access; inline]
+@[direct_array_access]
 fn parse_slhsignature(c &Context, bytes []u8) !&SLHSignature {
 	k := c.prm.k
 	a := c.prm.a
@@ -341,7 +334,6 @@ fn parse_slhsignature(c &Context, bytes []u8) !&SLHSignature {
 
 // bytes returns the signature bytes.
 // The signature has a size of n + 𝑘(1 + 𝑎) ⋅ 𝑛 + (ℎ + 𝑑 ⋅ 𝑙𝑒𝑛) ⋅ 𝑛 bytes.
-@[inline]
 fn (s &SLHSignature) bytes() []u8 {
 	ht := s.ht.bytes()
 	size := s.r.len + s.fors.len + ht.len
@@ -374,7 +366,7 @@ pub enum MsgEncoding {
 // encode_msg_purehash combines the message components into a single message.
 // The message is encoded as per the SLH-DSA specification, section 10.2.1.
 // See on 10.2.1 Pure SLH-DSA Signature Generation
-@[direct_array_access; inline]
+@[direct_array_access]
 fn encode_msg_purehash(cx []u8, msg []u8) []u8 {
 	// 𝑀′ ← toByte(me, 1) ∥ toByte(|𝑐𝑡𝑥|, 1) ∥ 𝑐𝑡𝑥 ∥ m
 	mut msgout := []u8{cap: 2 + cx.len + msg.len}
@@ -391,7 +383,7 @@ fn encode_msg_purehash(cx []u8, msg []u8) []u8 {
 // encode_msg_prehash combines the message components into a single message.
 // The message is encoded as per the SLH-DSA specification, section 10.2.2.
 // See on 10.2.2 HashSLH-DSA Signature Generation
-@[direct_array_access; inline]
+@[direct_array_access]
 fn encode_msg_prehash(cx []u8, oid []u8, phm []u8) []u8 {
 	// 𝑀′ ← toByte(1, 1) ∥ toByte(|𝑐𝑡𝑥|, 1) ∥ 𝑐𝑡𝑥 ∥ OID ∥ PHm
 	mut msgout := []u8{cap: 2 + cx.len + oid.len + phm.len}
@@ -410,28 +402,26 @@ fn encode_msg_prehash(cx []u8, oid []u8, phm []u8) []u8 {
 
 // oid_for_hashfunc returns the serialized OID for the given hash function.
 // If the hash function is not supported, it return error.
-@[inline]
 fn oid_for_hashfunc(hfunc crypto.Hash) ![]u8 {
 	return match hfunc {
-		.sha224 { oid_sha224 }
-		.sha256 { oid_sha256 }
-		.sha384 { oid_sha384 }
-		.sha512 { oid_sha512 }
-		.sha512_224 { oid_sha512_224 }
-		.sha512_256 { oid_sha512_256 }
-		.sha3_224 { oid_sha3_224 }
-		.sha3_256 { oid_sha3_256 }
-		.sha3_384 { oid_sha3_384 }
-		.sha3_512 { oid_sha3_512 }
-		.md4 { oid_shake128 }
-		.md5 { oid_shake256 }
+		.sha224 { return oid_sha224 }
+		.sha256 { return oid_sha256 }
+		.sha384 { return oid_sha384 }
+		.sha512 { return oid_sha512 }
+		.sha512_224 { return oid_sha512_224 }
+		.sha512_256 { return oid_sha512_256 }
+		.sha3_224 { return oid_sha3_224 }
+		.sha3_256 { return oid_sha3_256 }
+		.sha3_384 { return oid_sha3_384 }
+		.sha3_512 { return oid_sha3_512 }
+		.shake128 { return oid_shake128 }
+		.shake256 { return oid_shake256 }
 		else { return error('unsupported hash function') }
 	}
 }
 
 // phm_for_hashfunc returns the pre-hashed message for the given hash function.
 // If the hash function is not supported, it returns an error.
-@[inline]
 fn phm_for_hashfunc(hfunc crypto.Hash, msg []u8) ![]u8 {
 	return match hfunc {
 		.sha224 {
@@ -474,11 +464,11 @@ fn phm_for_hashfunc(hfunc crypto.Hash, msg []u8) ![]u8 {
 			// PH𝑀 ← SHA-3-512(𝑀)
 			return sha3.sum512(msg)
 		}
-		.md4 {
+		.shake128 {
 			// 17: PH𝑀 ← SHAKE128(𝑀, 256), 32-bytes
 			return sha3.shake128(msg, 32)
 		}
-		.md5 {
+		.shake256 {
 			// PH𝑀 ← SHAKE256(𝑀, 512), 64-bytes
 			return sha3.shake256(msg, 64)
 		}
@@ -611,49 +601,26 @@ const oid_shake128 = [u8(0x06), 0x09, 0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 
 // OID ← toByte(0x060960864801650304020C, 11) ▷ 2.16.840.1.101.3.4.2.12
 const oid_shake256 = [u8(0x06), 0x09, 0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x02, 0x0C]
 
-// name_to_hfunc get the Hash enum and their size from string name, usually for testing purposes.
-// Its only supports for SHA-2, SHA-3 and SHAKE hash families
-@[inline]
+// name_to_hfunc get the Hash enum from string name, usually for testing purposes.
+// Its only supports for SHA-2, SHA-3 and SHAKE-based families
 fn name_to_hfunc(name string) !crypto.Hash {
 	match name {
-		'SHAKE-128' {
-			return crypto.Hash.md4
-		} // not availables on crypto.Hash enum, map to md4
-		'SHAKE-256' {
-			return crypto.Hash.md5
-		} // map to 64-size
-		'SHA2-224' {
-			return crypto.Hash.sha224
-		} // 224/8-bytes
-		'SHA2-256' {
-			return crypto.Hash.sha256
-		} // 256/8-bytes
-		'SHA2-384' {
-			return crypto.Hash.sha384
-		} // 384/8-bytes
-		'SHA2-512' {
-			return crypto.Hash.sha512
-		} // 512/8-bytes
-		'SHA2-512/224' {
-			return crypto.Hash.sha512_224
-		} // 224/8-bytes
-		'SHA2-512/256' {
-			return crypto.Hash.sha512_256
-		} // 256/8-bytes
-		'SHA3-224' {
-			return crypto.Hash.sha3_224
-		} // 224/8-bytes
-		'SHA3-256' {
-			return crypto.Hash.sha3_256
-		} // 256/8-bytes
-		'SHA3-384' {
-			return crypto.Hash.sha3_384
-		} // 384/8-bytes
-		'SHA3-512' {
-			return crypto.Hash.sha3_512
-		} // 512/8-bytes
+		// vfmt off
+		'SHAKE-128' { return crypto.Hash.shake128 }
+		'SHAKE-256' { return crypto.Hash.shake256 }
+		'SHA2-224' { return crypto.Hash.sha224 }
+		'SHA2-256' { return crypto.Hash.sha256 }
+		'SHA2-384' { return crypto.Hash.sha384 }
+		'SHA2-512' { return crypto.Hash.sha512 }
+		'SHA2-512/224' { return crypto.Hash.sha512_224 }
+		'SHA2-512/256' { return crypto.Hash.sha512_256 }
+		'SHA3-224' { return crypto.Hash.sha3_224 }
+		'SHA3-256' { return crypto.Hash.sha3_256 }
+		'SHA3-384' { return crypto.Hash.sha3_384 }
+		'SHA3-512' { return crypto.Hash.sha3_512 }
 		else {
 			return error('hash algorithm ${name} not supported')
 		}
+		// vfmt on
 	}
 }

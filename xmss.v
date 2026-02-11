@@ -21,7 +21,7 @@ mut:
 }
 
 // no check is performed
-@[inline]
+@[direct_array_access]
 fn new_xmss_signature(wots [][]u8, auth [][]u8) &XmssSignature {
 	return &XmssSignature{
 		wots_sign: wots
@@ -30,13 +30,12 @@ fn new_xmss_signature(wots [][]u8, auth [][]u8) &XmssSignature {
 }
 
 // clone returns a deep copy of XmssSignature x
-@[inline]
 fn (x &XmssSignature) clone() &XmssSignature {
 	return new_xmss_signature(x.get_wots_sig(), x.get_xmss_auth())
 }
 
 // parse_xmss_signature parses bytes into XmssSignature
-@[direct_array_access; inline]
+@[direct_array_access]
 fn parse_xmss_signature(c &Context, bytes []u8) !&XmssSignature {
 	length := c.wots_len()
 	// the size of xmss signatures is (ℎ′ + 𝑙𝑒𝑛) ⋅ 𝑛
@@ -72,7 +71,6 @@ fn parse_xmss_signature(c &Context, bytes []u8) !&XmssSignature {
 }
 
 // get_wots_sig  gets the copies of underlying WOTS+ signatures
-@[inline]
 fn (x &XmssSignature) get_wots_sig() [][]u8 {
 	mut tmp := [][]u8{len: x.wots_sign.len}
 	for i := 0; i < x.wots_sign.len; i++ {
@@ -83,7 +81,6 @@ fn (x &XmssSignature) get_wots_sig() [][]u8 {
 }
 
 // get_xmss_auth gets the copies of underlying xmss authentication path
-@[inline]
 fn (x &XmssSignature) get_xmss_auth() [][]u8 {
 	mut tmp := [][]u8{len: x.auth_path.len}
 	for i := 0; i < x.auth_path.len; i++ {
@@ -94,13 +91,11 @@ fn (x &XmssSignature) get_xmss_auth() [][]u8 {
 }
 
 // xmss_size returns the total size of XmssSignature x, in bytes.
-@[inline]
 fn (x &XmssSignature) xmss_size() int {
 	return x.wots_size() + x.auth_size()
 }
 
 // wots_size returns the length of wots signatures of XmssSignature x
-@[inline]
 fn (x &XmssSignature) wots_size() int {
 	mut n := 0
 	for v in x.wots_sign {
@@ -110,7 +105,6 @@ fn (x &XmssSignature) wots_size() int {
 }
 
 // auth_size returns the length of authentication path of XmssSignature x
-@[inline]
 fn (x &XmssSignature) auth_size() int {
 	mut n := 0
 	for v in x.auth_path {
@@ -120,7 +114,6 @@ fn (x &XmssSignature) auth_size() int {
 }
 
 // bytes returns flatten-ed XmssSignature x into bytes array
-@[inline]
 fn (x &XmssSignature) bytes() []u8 {
 	flattened_wots := arrays.flatten[u8](x.wots_sign)
 	flattened_auth := arrays.flatten[u8](x.auth_path)
@@ -143,7 +136,7 @@ fn (x &XmssSignature) bytes() []u8 {
 // Input: Secret seed SK.seed, target node index 𝑖, target node height 𝑧, public seed PK.seed,
 // address ADRS.
 // Output: 𝑛-byte root 𝑛𝑜𝑑e
-@[direct_array_access; inline]
+@[direct_array_access]
 fn xmss_node(c &Context, skseed []u8, i u32, z u32, pkseed []u8, mut addr Address) ![]u8 {
 	if z == 0 {
 		// ADRS.setTypeAndClear(WOTS_HASH)
@@ -181,7 +174,7 @@ fn xmss_node(c &Context, skseed []u8, i u32, z u32, pkseed []u8, mut addr Addres
 // Input: 𝑛-byte message 𝑀, secret seed SK.seed, index 𝑖𝑑𝑥, public seed PK.seed,
 // address ADRS.
 // Output: XMSS signature SIG𝑋𝑀𝑆𝑆 = (𝑠𝑖𝑔 ∥ AUTH).
-@[direct_array_access; inline]
+@[direct_array_access]
 fn xmss_sign(c &Context, m []u8, skseed []u8, idx u32, pkseed []u8, mut addr Address) !&XmssSignature {
 	mut auth := [][]u8{len: c.prm.hp}
 	// build authentication path
@@ -213,7 +206,7 @@ fn xmss_sign(c &Context, m []u8, skseed []u8, idx u32, pkseed []u8, mut addr Add
 // Computes an XMSS public key from an XMSS signature.
 // Input: Index 𝑖𝑑𝑥, XMSS signature SIG𝑋𝑀𝑆𝑆 = (𝑠𝑖𝑔 ∥ AUTH), 𝑛-byte message, public seed PK.seed, address ADRS.
 // Output: 𝑛-byte root value 𝑛𝑜𝑑𝑒[0].
-@[direct_array_access; inline]
+@[direct_array_access]
 fn xmms_pkfromsig(c &Context, idx u32, sig_xmss &XmssSignature, m []u8, pkseed []u8, mut addr Address) ![]u8 {
 	// compute WOTS+ pk from WOTS+ 𝑠𝑖g, ADRS.setTypeAndClear(WOTS_HASH)
 	addr.set_type_and_clear(.wots_hash)

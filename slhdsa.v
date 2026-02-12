@@ -14,9 +14,6 @@ import crypto.internal.subtle
 
 const max_context_string_size = 255
 
-// the default context used by this SLH-DSA module. it uses the SHA-2 128f hash function
-const default_context = new_context(.sha2_128f)
-
 // The SLH-DSA Private Key
 //
 // The private key contains two random, secret 𝑛-byte values (see Figure 15). SK.seed is
@@ -148,6 +145,16 @@ const supported_prehash_algo = [crypto.Hash.sha256, .sha384, .sha224, .sha512, .
 @[params]
 pub struct Options {
 pub mut:
+	// slh_kind was a default of SLH-DSA type (kind) if you dont specifying into the key generator function.
+	// You should set it into correct SLH-DSA's type do you want to generate.
+	slh_kind Kind = .sha2_128f
+
+	// check zeros perform null-bytes arrays checking on the seed of the key generated (suppplied) into SLH-DSA
+	// key generation phase. If it set into true, it will always do check, or bypass the checking on the false value.
+	// By default was set into true to disallow null-bytes arrays supplied in the key generation seed.
+	// If you not sure, just left it as true.
+	check_zeros bool = true
+
 	// check_pk flag was used in the SLH-DSA key generation process, especially in `slh_keygen_from_bytes`
 	// to tell the routine to perform checking on the PK.root was result in a valid value on the key generation.
 	// By default its set to true, to always to do the check the PK.root on the key generation.

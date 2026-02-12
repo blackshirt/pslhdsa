@@ -80,23 +80,23 @@ fn (ad Address) bytes() []u8 {
 //
 // compress takes the 32-bytes of Address ad and transforms into form of a 22-bytes of compressed address
 // ie, ADRS𝑐 = ADRS[3] ∥ ADRS[8 ∶ 16] ∥ ADRS[19] ∥ ADRS[20 ∶ 32]).
-@[direct_array_access; inline]
-fn (ad Address) compress() []u8 {
-	mut x := []u8{len: 22}
+@[direct_array_access]
+fn (ad Address) compress(mut dst []u8) []u8 {
+	_ = dst[21] // bounds check
 	// 1 byte at 3..4
-	x[0] = u8(ad.data[0] & 0xff)
+	dst[0] = u8(ad.data[0] & 0xff)
 
 	// 8 bytes at 8..16
-	binary.big_endian_put_u32(mut x[1..5], ad.data[2])
-	binary.big_endian_put_u32(mut x[5..9], ad.data[3])
+	binary.big_endian_put_u32(mut dst[1..5], ad.data[2])
+	binary.big_endian_put_u32(mut dst[5..9], ad.data[3])
 
 	// 1 byte at 19..20
-	x[9] = u8(ad.data[4] & 0xff)
+	dst[9] = u8(ad.data[4] & 0xff)
 
 	// 12 bytes at 20..32,
-	binary.big_endian_put_u32(mut x[10..14], ad.data[5])
-	binary.big_endian_put_u32(mut x[14..18], ad.data[6])
-	binary.big_endian_put_u32(mut x[18..22], ad.data[7])
+	binary.big_endian_put_u32(mut dst[10..14], ad.data[5])
+	binary.big_endian_put_u32(mut dst[14..18], ad.data[6])
+	binary.big_endian_put_u32(mut dst[18..22], ad.data[7])
 
 	return x
 }

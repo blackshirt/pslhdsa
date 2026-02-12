@@ -54,6 +54,9 @@ fn slh_sign_internal(msg []u8, sk &SigningKey, addrnd []u8) !&SLHSignature {
 	// Note: hp = h/d
 	hp := sk.ctx.prm.hp
 
+	// mutable local context
+	mut sk_ctx := sk.ctx
+
 	// signature
 
 	// ADRS ← toByte(0, 32) ▷ set layer and tree address to bottom layer	
@@ -62,11 +65,11 @@ fn slh_sign_internal(msg []u8, sk &SigningKey, addrnd []u8) !&SLHSignature {
 	// opt_rand := unsafe { addrnd }
 
 	// generate randomizer, 𝑅 ← PRF𝑚𝑠𝑔(SK.prf, 𝑜𝑝𝑡_𝑟𝑎𝑛𝑑, 𝑀 )
-	r := sk.ctx.prf_msg(sk.prf, addrnd, msg, outlen)!
+	r := sk_ctx.prf_msg(sk.prf, addrnd, msg, outlen)!
 	// SIG ← r
 
 	// compute message digest, ie, 𝑑𝑖𝑔𝑒𝑠𝑡 ← H𝑚𝑠𝑔(𝑅, PK.seed, PK.root, 𝑀 )
-	digest := sk.ctx.hmsg(r, sk.pkseed, sk.pkroot, msg, msize)!
+	digest := sk_ctx.hmsg(r, sk.pkseed, sk.pkroot, msg, msize)!
 
 	// Intermediate values derived from the parameter sets
 	// ceil [0 ∶ ⌈𝑘*𝑎⌉/8]
@@ -104,13 +107,13 @@ fn slh_sign_internal(msg []u8, sk &SigningKey, addrnd []u8) !&SLHSignature {
 	addr.set_keypair_address(idxleaf)
 
 	// SIG𝐹𝑂𝑅𝑆 ← fors_sign(𝑚𝑑, SK.seed, PK.seed, ADRS)
-	fors := fors_sign(sk.ctx, md, sk.seed, sk.pkseed, mut addr)!
+	fors := fors_sign(sk_ctx, md, sk.seed, sk.pkseed, mut addr)!
 	// SIG ← SIG ∥ SIG𝐹𝑂𝑅s
 
 	// get FORS key, PK𝐹𝑂𝑅𝑆 ← fors_pkFromSig(SIG𝐹𝑂𝑅𝑆, 𝑚𝑑, PK.seed, ADRS)
-	pkfors := fors_pkfromsig(sk.ctx, fors, md, sk.pkseed, mut addr)!
+	pkfors := fors_pkfromsig(mut sk_ctx, fors, md, sk.pkseed, mut addr)!
 	// 17: SIG𝐻𝑇 ← ht_sign(PK𝐹𝑂𝑅𝑆, SK.seed, PK.seed,𝑖𝑑𝑥𝑡𝑟𝑒𝑒,𝑖𝑑𝑥𝑙𝑒𝑎𝑓)
-	ht := ht_sign(sk.ctx, pkfors, sk.seed, sk.pkseed, mut idxtree, idxleaf)!
+	ht := ht_sign(mut sk_ctx, pkfors, sk.seed, sk.pkseed, mut idxtree, idxleaf)!
 
 	// : SIG ← SIG ∥ SIG𝐻𝑇
 

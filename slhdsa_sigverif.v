@@ -53,6 +53,9 @@ fn slh_verify_internal(msg []u8, sig &SLHSignature, pk &PubKey) !bool {
 	h := pk.ctx.prm.h
 	hp := pk.ctx.prm.hp
 
+	// mutable local context
+	mut pk_ctx := pk.ctx
+
 	// Intermediate values derived from the parameter sets
 	// ceil [0 ∶ ⌈𝑘*𝑎⌉/8]
 	ka8 := ((k * a) + 7) >> 3
@@ -72,7 +75,7 @@ fn slh_verify_internal(msg []u8, sig &SLHSignature, pk &PubKey) !bool {
 
 	// compute message digest, 𝑑𝑖𝑔𝑒𝑠𝑡 ← H𝑚𝑠𝑔(𝑅, PK.seed, PK.root, 𝑀 )
 	// hmsg(r []u8, pkseed []u8, pkroot []u8, msg []u8, outlen int)
-	digest := pk.ctx.hmsg(sig.r, pk.seed, pk.root, msg, m)!
+	digest := pk_ctx.hmsg(sig.r, pk.seed, pk.root, msg, m)!
 
 	// first (k.a)/8 bytes, 𝑚𝑑 ← 𝑑𝑖𝑔𝑒𝑠𝑡 [0 ∶ ⌈𝑘⋅𝑎)/8]
 	mut tmp_idxtree := []u8{len: 12}
@@ -104,12 +107,12 @@ fn slh_verify_internal(msg []u8, sig &SLHSignature, pk &PubKey) !bool {
 	addr.set_keypair_address(idxleaf)
 
 	// PK𝐹𝑂𝑅𝑆 ← fors_pkFromSig(SIG𝐹𝑂𝑅𝑆, 𝑚𝑑, PK.seed, ADRS)
-	pkfors := fors_pkfromsig(pk.ctx, sig.fors, md, pk.seed, mut addr)!
+	pkfors := fors_pkfromsig(mut pk_ctx, sig.fors, md, pk.seed, mut addr)!
 
 	//
 	// mut idxtree_cloned := idxtree.clone()
 	// return ht_verify(pk.ctx, pkfors, ht, pk.seed, idxtree, idxleaf, pk.root)!
-	return ht_verify(pk.ctx, pkfors, sig.ht, pk.seed, mut idxtree, idxleaf, pk.root)!
+	return ht_verify(mut pk_ctx, pkfors, sig.ht, pk.seed, mut idxtree, idxleaf, pk.root)!
 }
 
 // Algorithm 25 hash_slh_verify(𝑀, SIG, 𝑐𝑡𝑥, PH, PK)

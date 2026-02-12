@@ -1,5 +1,5 @@
 ## pslhdsa
-a SLH-DSA implementation in pure V language
+An experimental Stateless Hash-based Digital Signature Algorithm (SLH-DSA) implementation in pure V language
 
 `pslhdsa` is an (experimental) quantum resistent cryptographic digital signature library based on 
 Stateless Hash-Based Digital Signature Standard (SLH-DSA) implemented in pure V language.

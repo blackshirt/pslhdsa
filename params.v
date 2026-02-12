@@ -186,8 +186,8 @@ fn (c &Context) prf(pkseed []u8, skseed []u8, addr Address, outlen int) ![]u8 {
 	h.write(pkseed)!
 
 	// write toByte(0, 64 − 𝑛) into hash
-	// TODO: use context prm.n number directly
-	h.write(to_byte(0, 64 - c.prm.n))!
+	// Use null-bytes directly, from the fact that to_byte(0, 64 - c.prm.n) == []u8{len: 64-c.prm.n}
+	h.write([]u8{len: 64 - c.prm.n})!
 	// write compressed address and SK.seed
 	h.write(cadrs)!
 	h.write(skseed)!
@@ -239,7 +239,8 @@ fn (c &Context) tl(pkseed []u8, addr Address, msgsln [][]u8, outlen int) ![]u8 {
 	//
 	// setup base number for toByte calculation
 	bnum := if c.is_sha2family_cat1() { 64 } else { 128 }
-	h.write(to_byte(0, bnum - c.prm.n))!
+	// Use null-bytes directly, from the fact that to_byte(0, bnum - c.prm.n) == []u8{len: bnum - c.prm.n}
+	h.write([]u8{len: bnum - c.prm.n})!
 
 	// write compressed address, ADRS𝑐
 	h.write(cadrs)!
@@ -313,7 +314,8 @@ fn sha256_caddr_generic(n int, pkseed []u8, addr Address, msg []u8, outlen int) 
 	cadr := addr.compress()
 	mut h := sha256.new()
 	h.write(pkseed)!
-	h.write(to_byte(0, 64 - n))!
+	// Use bytes directly, ie, to_byte(0, 64 - n) == []u8{len: 64-n}
+	h.write([]u8{len: 64 - n})!
 	h.write(cadr)!
 	h.write(msg)!
 	out := h.sum([]u8{})
@@ -326,7 +328,8 @@ fn sha512_caddr_generic(n int, pkseed []u8, addr Address, msg []u8, outlen int) 
 	cadr := addr.compress()
 	mut h := sha512.new()
 	h.write(pkseed)!
-	h.write(to_byte(0, 128 - n))!
+	// Use bytes directly, ie, to_byte(0, 128 - n) == []u8{len: 128-n}
+	h.write([]u8{len: 128 - n})!
 	h.write(cadr)!
 	h.write(msg)!
 	out := h.sum([]u8{})

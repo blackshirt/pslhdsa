@@ -43,9 +43,12 @@ fn to_int(x []u8, n int) u64 {
 // Converts an integer to a byte string.
 // Input: Integer 𝑥, string length 𝑛.
 // Output: Byte string of length 𝑛 containing binary representation of 𝑥 in big-endian byte-order.
+@[inline]
 fn to_byte(x u64, n int) []u8 {
-	if n == 0 {
-		return []u8{}
+	// n should be > 0
+	if x == 0 {
+		// short curcuit to explicitly return null bytes array
+		return []u8{len: n, init: u8(0x00)}
 	}
 	mut t := x
 	mut out := []u8{len: n}
@@ -75,7 +78,7 @@ fn base_2b(x []u8, b int, outlen int) []u32 {
 	mut total := u32(0)
 
 	// output buffer with outlen capacity
-	mut out := []u32{cap: outlen}
+	mut out := []u32{len: outlen}
 	// set up total mask with u64-value to overcome the wrapping behaviour for u32
 	mask := u32(u64(1) << b - 1)
 
@@ -86,9 +89,7 @@ fn base_2b(x []u8, b int, outlen int) []u32 {
 			bits += 8
 		}
 		bits -= b
-		tmp := (total >> bits) & mask
-
-		out << tmp
+		out[i] = (total >> bits) & mask
 	}
 	return out
 }

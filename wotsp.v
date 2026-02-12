@@ -157,10 +157,11 @@ fn wots_pkfromsig(c &Context, sig [][]u8, m []u8, pkseed []u8, mut adr Address) 
 // NOTE: should this be inlined ?
 @[direct_array_access]
 fn chain(c &Context, x []u8, i u32, s u32, pkseed []u8, mut adr Address) ![]u8 {
-	assert x.len == c.prm.n
-	if i + s >= w {
-		return error('Invalid wots+ params')
-	}
+	// We omit the check, its internal function and controllable
+	// if i + s >= w {
+	// 	return error('Invalid wots+ params')
+	// }
+	// TODO: should we make x as mutable  for performance reason ?
 	mut tmp := x.clone()
 	for j := i; j < i + s; j++ {
 		// ADRS.setHashAddress(𝑗)

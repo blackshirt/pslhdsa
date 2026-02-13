@@ -59,21 +59,23 @@ mut:
 	data [8]u32
 }
 
-// bytes returns the bytes representation of Addres ad in big-endian form
+// encode serializes Addres ad into bytes arrays stored in dst buffer, in big-endian form
 @[direct_array_access; inline]
-fn (ad Address) bytes() []u8 {
-	mut x := []u8{len: 32}
-	binary.big_endian_put_u32(mut x[0..4], u32(ad.data[0]))
-	binary.big_endian_put_u32(mut x[4..8], u32(ad.data[1]))
-	binary.big_endian_put_u32(mut x[8..12], u32(ad.data[2]))
-	binary.big_endian_put_u32(mut x[12..16], u32(ad.data[3]))
-	binary.big_endian_put_u32(mut x[16..20], u32(ad.data[4]))
-	binary.big_endian_put_u32(mut x[20..24], u32(ad.data[5]))
-	binary.big_endian_put_u32(mut x[24..28], u32(ad.data[6]))
-	binary.big_endian_put_u32(mut x[28..32], u32(ad.data[7]))
-	return x
+fn (ad Address) encode(mut dst []u8) {
+	_ = dst[31] // bounds check
+	binary.big_endian_put_u32(mut dst[0..4], u32(ad.data[0]))
+	binary.big_endian_put_u32(mut dst[4..8], u32(ad.data[1]))
+	binary.big_endian_put_u32(mut dst[8..12], u32(ad.data[2]))
+	binary.big_endian_put_u32(mut dst[12..16], u32(ad.data[3]))
+	binary.big_endian_put_u32(mut dst[16..20], u32(ad.data[4]))
+	binary.big_endian_put_u32(mut dst[20..24], u32(ad.data[5]))
+	binary.big_endian_put_u32(mut dst[24..28], u32(ad.data[6]))
+	binary.big_endian_put_u32(mut dst[28..32], u32(ad.data[7]))
 }
 
+// compress compress 32-bytes of Address into 22-bytes of compressed address.
+// It stores the result into first of 22-bytes dst buffer.
+//
 // 18. Compressed address (ADRS ) 22 bytes
 //
 // layer address   1 byte
@@ -81,7 +83,6 @@ fn (ad Address) bytes() []u8 {
 // 𝑡𝑦𝑝𝑒             1 byte
 // final          12 bytes
 //
-// compress takes the 32-bytes of Address ad and transforms into form of a 22-bytes of compressed address
 // ie, ADRS𝑐 = ADRS[3] ∥ ADRS[8 ∶ 16] ∥ ADRS[19] ∥ ADRS[20 ∶ 32]).
 @[direct_array_access]
 fn (ad Address) compress(mut dst []u8) {

@@ -34,14 +34,32 @@ pub fn new_context_from_name(name string) !&Context {
 // defined in the FIPS205 standard.
 @[noinit]
 struct Context {
-pub:
-	// The tipe (type) of this SLH-DSA context, set on context creation
+	// The type of SLH-DSA context, set on the context creation
 	tipe SLHType
-	// Underlying SLH-DSA parameter set described in the doc
+	// An underlying SLH-DSA parameter set described on the standard
 	prm ParamSet
 mut:
-	// compressed address buffer
-	cadrs []u8 = []u8{len: compressed_addr_size}
+	// sha256 and sha512 Digest, defined here to avoid every allocation on the hash addressing routines.
+	// NOTE: the simple rule is that you must call `.reset` before calling `.write` on the hash.
+	// TODO: This is rather a hack than a nice solution, find a better way to do this.
+	// TODO: add support for SHAKE-family hash
+	sha2 &hash.Hash = sha256.new()
+	sha5 &hash.Hash = sha512.new()
+
+	// buffer for storing serialized (or compressed) Address. For compressed address,
+	// it only take on the first 22-bytes of the buffer, where normal Address take full
+	// of the buffer. Stored here to avoid allocation on every calls.
+	buffer []u8 = []u8{len: 32}
+}
+
+// slh_type returns an underlying of SLH-DSA type
+pub fn (c &Context) slh_type() SLHType {
+	return c.tipe
+}
+
+// name returns an underlying of SLH-DSA type name
+pub fn (c &Context) name() string {
+	return c.prm.name
 }
 
 // clone returns a clone of this context
@@ -50,7 +68,7 @@ fn (c &Context) clone() &Context {
 		tipe: c.tipe
 		prm:  c.prm
 		// we dont make a copy
-		cadrs: unsafe { c.cadrs }
+		buffer: unsafe { c.buffer }
 	}
 }
 
@@ -161,12 +179,13 @@ fn (mut c Context) prf(pkseed []u8, skseed []u8, addr Address, outlen int) ![]u8
 	// SHAKE-based PRF
 	//
 	// PRF(PK.seed, SK.seed, ADRS) = SHAKE256(PK.seed ∥ ADRS ∥ SK.seed, 8𝑛)
-	// addr.bytes() == 32
+	// addr.encode(mut c.buffer) == 32
 	if c.is_shake_family() {
 		size := pkseed.len + skseed.len + 32
 		mut data := []u8{cap: size}
+		addr.encode(mut c.buffer)
 		data << pkseed
-		data << addr.bytes()
+		data << c.buffer
 		data << skseed
 		return sha3.shake256(data, outlen)
 	}
@@ -179,7 +198,7 @@ fn (mut c Context) prf(pkseed []u8, skseed []u8, addr Address, outlen int) ![]u8
 	// PRF(PK.seed, SK.seed, ADRS) = Trunc𝑛(SHA-256(PK.seed ∥ toByte(0, 64 − 𝑛) ∥ ADRS𝑐 ∥ SK.seed))
 	//
 	// start by compressing the address
-	addr.compress(mut c.cadrs)
+	addr.compress(mut c.buffer)
 
 	// setup SHA256 hash
 	mut h := sha256.new()
@@ -190,7 +209,7 @@ fn (mut c Context) prf(pkseed []u8, skseed []u8, addr Address, outlen int) ![]u8
 	// Use null-bytes directly, from the fact that to_byte(0, 64 - c.prm.n) == []u8{len: 64-c.prm.n}
 	h.write([]u8{len: 64 - c.prm.n})!
 	// write compressed address and SK.seed
-	h.write(c.cadrs)!
+	h.write(c.buffer[0..compressed_addr_size])!
 	h.write(skseed)!
 
 	// generates the digest, and return it
@@ -213,8 +232,9 @@ fn (mut c Context) tl(pkseed []u8, addr Address, msgsln [][]u8, outlen int) ![]u
 		}
 		size := pkseed.len + 32 + mlsize
 		mut data := []u8{cap: size}
+		addr.encode(mut c.buffer)
 		data << pkseed
-		data << addr.bytes()
+		data << c.buffer
 		// flatten the msg
 		data << arrays.flatten[u8](msgsln)
 
@@ -231,7 +251,7 @@ fn (mut c Context) tl(pkseed []u8, addr Address, msgsln [][]u8, outlen int) ![]u
 	mut h := c.sha2_prf()!
 
 	// Start by compressing the address
-	addr.compress(mut c.cadrs)
+	addr.compress(mut c.buffer)
 	// write PK.seed
 	h.write(pkseed)!
 
@@ -244,7 +264,7 @@ fn (mut c Context) tl(pkseed []u8, addr Address, msgsln [][]u8, outlen int) ![]u
 	h.write([]u8{len: bnum - c.prm.n})!
 
 	// write compressed address, ADRS𝑐
-	h.write(c.cadrs)!
+	h.write(c.buffer[0..compressed_addr_size])!
 	// write every message in the msgsln array into hash
 	for item in msgsln {
 		h.write(item)!
@@ -259,13 +279,18 @@ fn (mut c Context) tl(pkseed []u8, addr Address, msgsln [][]u8, outlen int) ![]u
 // h is a special case of Tℓ that takes a 2𝑛-byte message as input.
 @[direct_array_access]
 fn (mut c Context) h(pkseed []u8, addr Address, m2 []u8, outlen int) ![]u8 {
+	// setup data buffer with enough capacity to hold all size of data
+	mut data := []u8{cap: pkseed.len + 32 + m2.len + 128 - c.prm.n}
 	// SHAKE-based PRF
 	//
 	// H(PK.seed, ADRS, 𝑀2) = SHAKE256(PK.seed ∥ ADRS ∥ 𝑀2, 8𝑛)
 	if c.is_shake_family() {
-		mut data := []u8{cap: pkseed.len + 32 + m2.len}
+		// mut data := []u8{cap: pkseed.len + 32 + m2.len}
+		// Serializes address into context buffer
+		addr.encode(mut c.buffer)
+		// appends the bytes into data buffer and get the shake256 sum
 		data << pkseed
-		data << addr.bytes()
+		data << c.buffer
 		data << m2
 
 		return sha3.shake256(data, outlen)
@@ -275,31 +300,61 @@ fn (mut c Context) h(pkseed []u8, addr Address, m2 []u8, outlen int) ![]u8 {
 	// For Security category 1 use SHA-256 PRF
 	// H(PK.seed, ADRS, 𝑀2) = Trunc𝑛(SHA-256(PK.seed ∥ toByte(0, 64 − 𝑛) ∥ ADRS𝑐 ∥ 𝑀2))
 	if c.is_sha2family_cat1() {
-		addr.compress(mut c.cadrs)
-		mut h := sha256.new()
-		h.write(pkseed)!
-		// Use bytes directly, ie, to_byte(0, 64 - n) == []u8{len: 64-n}
-		h.write([]u8{len: 64 - c.prm.n})!
-		h.write(c.cadrs)!
-		h.write(m2)!
-		out := h.sum([]u8{})
-		unsafe { h.reset() }
+		// compress the address into first 22-bytes of context buffer
+		// Note: you should only take the first of 22-bytes from context buffer
+		addr.compress(mut c.buffer)
+
+		// append the bytes into data buffer
+		data << pkseed
+		// use zeros bytes directly, ie, to_byte(0, 64 - n) == []u8{len: 64-n}
+		data << []u8{len: 64 - c.prm.n}
+		// append 22-bytes of compressed address
+		data << c.buffer[0..compressed_addr_size]
+		// append the message
+		data << m2
+
+		// writes the concatenated data into hash, call .reset() first
+		unsafe { c.sha2.reset() }
+		c.sha2.write(data)!
+		out := c.sha2.sum([]u8{})
+
 		return out[0..outlen].clone()
+
+		// mut h := sha256.new()
+		// h.write(pkseed)!
+
+		// h.write([]u8{len: 64 - c.prm.n})!
+		// h.write(c.buffer[0..compressed_addr_size])!
+		// h.write(m2)!
+		// out := h.sum([]u8{})
+		// unsafe { h.reset() }
+		// return out[0..outlen].clone()
 		// return sha256_caddr_generic(c.prm.n, pkseed, addr, m2, outlen)
 	}
 	// Other else should have a security category 3 or 5 using SHA-512 PRF
 	//
 	// H(PK.seed, ADRS, 𝑀2) = Trunc𝑛(SHA-512(PK.seed ∥ toByte(0, 128 − 𝑛) ∥ ADRS𝑐 ∥ 𝑀2))
-	addr.compress(mut c.cadrs)
-	mut h := sha512.new()
-	h.write(pkseed)!
-	// Use bytes directly, ie, to_byte(0, 128 - n) == []u8{len: 128-n}
-	h.write([]u8{len: 128 - c.prm.n})!
-	h.write(c.cadrs)!
-	h.write(m2)!
-	out := h.sum([]u8{})
-	unsafe { h.reset() }
+	addr.compress(mut c.buffer)
+	data << pkseed
+	data << []u8{len: 128 - c.prm.n}
+	data << c.buffer[0..compressed_addr_size]
+	data << m2
+
+	// call .reset first
+	unsafe { c.sha5.reset() }
+	c.sha5.write(data)!
+	out := c.sha5.sum([]u8{})
 	return out[0..outlen].clone()
+
+	// mut h := sha512.new()
+	// h.write(pkseed)!
+	// Use bytes directly, ie, to_byte(0, 128 - n) == []u8{len: 128-n}
+	// h.write([]u8{len: 128 - c.prm.n})!
+	// h.write(c.buffer[0..compressed_addr_size])!
+	// h.write(m2)!
+	// out := h.sum([]u8{})
+	// unsafe { h.reset() }
+	// return out[0..outlen].clone()
 	// return sha512_caddr_generic(c.prm.n, pkseed, addr, m2, outlen)
 }
 
@@ -311,8 +366,9 @@ fn (mut c Context) f(pkseed []u8, addr Address, m1 []u8, outlen int) ![]u8 {
 	// F(PK.seed, ADRS, 𝑀1) = SHAKE256(PK.seed ∥ ADRS ∥ 𝑀1, 8𝑛)
 	if c.is_shake_family() {
 		mut data := []u8{cap: pkseed.len + 32 + m1.len}
+		addr.encode(mut c.buffer)
 		data << pkseed
-		data << addr.bytes()
+		data << c.buffer
 		data << m1
 
 		return sha3.shake256(data, outlen)
@@ -325,13 +381,18 @@ fn (mut c Context) f(pkseed []u8, addr Address, m1 []u8, outlen int) ![]u8 {
 	// 3 and 5: F(PK.seed, ADRS, 𝑀1) = Trunc𝑛(SHA-256(PK.seed ∥ toByte(0, 64 − 𝑛) ∥ ADRS𝑐 ∥ 𝑀1))
 	// NOTE: use context prm.n number directly
 	//
-	addr.compress(mut c.cadrs)
+	// Compress the address into the first 22-bytes of c.buffer
+	addr.compress(mut c.buffer)
+
+	// concatenates bytes params into data buffer
+	// data << pkseed
+	// Use bytes directly, ie, to_byte(0, 64 - n) == []u8{len: 64-n}
 	mut h := sha256.new()
 
 	h.write(pkseed)!
 	// Use bytes directly, ie, to_byte(0, 64 - n) == []u8{len: 64-n}
 	h.write([]u8{len: 64 - c.prm.n})!
-	h.write(c.cadrs)!
+	h.write(c.buffer[0..compressed_addr_size])!
 	h.write(m1)!
 	out := h.sum([]u8{})
 	unsafe { h.reset() }

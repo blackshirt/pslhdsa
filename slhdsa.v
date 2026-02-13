@@ -232,6 +232,7 @@ mut:
 // components are all zeroes that unallowed in this module. If so, it returns an error.
 @[direct_array_access]
 pub fn new_pubkey(bytes []u8, opt Options) !&PubKey {
+	// makes a SLH-DSA context from the options
 	ctx := new_context(opt.slh_type)
 	// the bytes should have a 2 * n bytes long
 	if bytes.len != 2 * ctx.prm.n {
@@ -258,7 +259,7 @@ pub fn (p &PubKey) bytes() []u8 {
 	mut out := []u8{cap: 2 * p.ctx.prm.n}
 	out << p.seed
 	out << p.root
-
+	// returns the clone of the buffer
 	return out.clone()
 }
 
@@ -311,6 +312,11 @@ pub fn (mut p PubKey) verify(msg []u8, sig []u8, cx []u8, opt Options) !bool {
 		}
 	}
 	return slh_verify_internal(msgout, slh_sig, mut p)!
+}
+
+// name returns a string of common name from underlying SLH-DSA public key type
+pub fn (p &PubKey) name() string {
+	return p.ctx.prm.name
 }
 
 // SLH-DSA signature data format

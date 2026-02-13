@@ -28,7 +28,7 @@ fn test_slhdsa_siggen_fips205_internal_test_vectors() {
 			msg := hex.decode(t.message)!
 			signature := hex.decode(t.signature)!
 
-			mut sk := slh_keygen_from_bytes(skb, slh_type: ctx.tipe)!
+			mut sk := slh_keygen_from_bytes(skb, slh_type: ctx.slh_type())!
 
 			// get optional randomness, if deterministic, use SK.pkseed (PK.seed)
 			// otherwise use decoded additionalrandomness bytes

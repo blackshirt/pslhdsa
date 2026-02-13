@@ -58,6 +58,8 @@ fn (c &Context) clone() &Context {
 	return &Context{
 		tipe: c.tipe
 		prm:  c.prm
+		// we dont make a copy
+		cadrs: unsafe { c.cadrs }
 	}
 }
 
@@ -334,6 +336,7 @@ fn (mut c Context) f(pkseed []u8, addr Address, m1 []u8, outlen int) ![]u8 {
 	//
 	addr.compress(mut c.cadrs)
 	mut h := sha256.new()
+
 	h.write(pkseed)!
 	// Use bytes directly, ie, to_byte(0, 64 - n) == []u8{len: 64-n}
 	h.write([]u8{len: 64 - c.prm.n})!
@@ -347,35 +350,6 @@ fn (mut c Context) f(pkseed []u8, addr Address, m1 []u8, outlen int) ![]u8 {
 
 // Helpers for pseudorandom function
 //
-/*
-@[direct_array_access]
-fn sha256_caddr_generic(n int, pkseed []u8, addr Address, msg []u8, outlen int) ![]u8 {
-	cadr := addr.compress()
-	mut h := sha256.new()
-	h.write(pkseed)!
-	// Use bytes directly, ie, to_byte(0, 64 - n) == []u8{len: 64-n}
-	h.write([]u8{len: 64 - n})!
-	h.write(cadr)!
-	h.write(msg)!
-	out := h.sum([]u8{})
-	unsafe { h.reset() }
-	return out[0..outlen].clone()
-}
-
-@[direct_array_access]
-fn sha512_caddr_generic(n int, pkseed []u8, addr Address, msg []u8, outlen int) ![]u8 {
-	cadr := addr.compress()
-	mut h := sha512.new()
-	h.write(pkseed)!
-	// Use bytes directly, ie, to_byte(0, 128 - n) == []u8{len: 128-n}
-	h.write([]u8{len: 128 - n})!
-	h.write(cadr)!
-	h.write(msg)!
-	out := h.sum([]u8{})
-	unsafe { h.reset() }
-	return out[0..outlen].clone()
-}
-*/
 
 // hmac_sha256 creates HMAC bytes with SHA256 hash
 @[direct_array_access]

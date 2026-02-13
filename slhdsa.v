@@ -41,7 +41,7 @@ mut:
 // The signing key has a size of 4 * n bytes, which includes the public key components.
 // i.e. It consists of the concatenation of SK.seed, SK.prf, PK.seed and PF.root
 pub fn (s &SigningKey) bytes() []u8 {
-	mut out := []u8{cap: s.ctx.prm.n << 2}
+	mut out := []u8{cap: 4 * s.ctx.prm.n}
 	out << s.seed
 	out << s.prf
 	out << s.pkseed
@@ -222,11 +222,11 @@ mut:
 pub fn new_pubkey(bytes []u8, opt Options) !&PubKey {
 	ctx := new_context(opt.slh_type)
 	// the bytes should have a 2 * n bytes long
-	if bytes.len != ctx.prm.n << 1 {
+	if bytes.len != 2 * ctx.prm.n {
 		return error('bytes must be ctx.prm.n * 2 bytes long')
 	}
 	seed := bytes[0..ctx.prm.n].clone()
-	root := bytes[ctx.prm.n..ctx.prm.n << 1].clone()
+	root := bytes[ctx.prm.n..2 * ctx.prm.n].clone()
 	// check if the seed and root are all zeroes
 	if !opt.allow_zeros {
 		if is_zero(seed) || is_zero(root) {
@@ -243,7 +243,7 @@ pub fn new_pubkey(bytes []u8, opt Options) !&PubKey {
 // bytes returns the public key bytes. The public key has a size of 2 * n bytes.
 // i.e. It consists of the concatenation of PK.seed and PK.root
 pub fn (p &PubKey) bytes() []u8 {
-	mut out := []u8{cap: p.ctx.prm.n << 1}
+	mut out := []u8{cap: 2 * p.ctx.prm.n}
 	out << p.seed
 	out << p.root
 

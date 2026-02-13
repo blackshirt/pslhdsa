@@ -32,7 +32,7 @@ fn test_slhdsa_sigverify_fips205_internal_test_vectors() {
 			msg := hex.decode(t.message)!
 			sig := hex.decode(t.signature)!
 
-			pk := new_pubkey(ctx, pkb)!
+			pk := new_pubkey(pkb, slh_type: ctx.tipe)!
 			// some test cases has invalid signature size, with error reason "invalid signature - too large"
 			// skip those test cases
 			slh_sig := parse_slhsignature(ctx, sig) or {

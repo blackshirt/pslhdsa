@@ -26,6 +26,13 @@ fn test_gen_len2() {
 	}
 }
 
+// Test for to_byte with 0 value
+fn test_to_byte_with_null() {
+	assert to_byte(0, 5) == []u8{len: 5}
+	assert to_byte(0, 8) == []u8{len: 8}
+	assert to_byte(0, 10) != []u8{len: 8}
+}
+
 struct ToIntByteTest {
 	x []u8
 	n u64

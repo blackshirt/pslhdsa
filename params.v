@@ -18,8 +18,8 @@ import crypto.sha512
 // defined in the FIPS205 standard.
 @[noinit]
 pub struct Context {
-	// The kind (type) of this SLH-DSA context, set on context creation
-	kind Kind
+	// The tipe (type) of this SLH-DSA context, set on context creation
+	tipe SLHType
 mut:
 	// compressed address buffer
 	cadrs []u8 = []u8{len: 22}
@@ -29,37 +29,37 @@ pub:
 }
 
 // new_context creates a new SLH-DSA Context to operate on
-fn new_context(k Kind) &Context {
+pub fn new_context(k SLHType) &Context {
 	return &Context{
-		kind: k
+		tipe: k
 		prm:  new_param(k)
 	}
 }
 
 // new_context_from_name creates a new SLH-DSA Context from name string
-// name should be one of the supported kind name, e.g. 'SLH-DSA-SHA2-192f'
-// See Kind for the list of supported kind names
-fn new_context_from_name(name string) !&Context {
+// name should be one of the supported tipe name, e.g. 'SLH-DSA-SHA2-192f'
+// See SLHType for the list of supported tipe names
+pub fn new_context_from_name(name string) !&Context {
 	return new_context(kind_from_name(name)!)
 }
 
 // name returns the name of this context
 fn (c &Context) name() string {
-	return c.kind.name()
+	return c.prm.name
 }
 
 // clone returns a clone of this context
 fn (c &Context) clone() &Context {
 	return &Context{
-		kind: c.kind
+		tipe: c.tipe
 		prm:  c.prm
 	}
 }
 
 // equal returns true if this context is equal to the other context
 fn (c &Context) equal(o &Context) bool {
-	// for sake of simplicity, only check for kind equality, not the parameter set
-	return c.kind == o.kind
+	// for sake of simplicity, only check for tipe equality, not the parameter set
+	return c.tipe == o.tipe
 }
 
 // Hash Addressing and Pseudorandom Functions for SLH-DSA context
@@ -175,7 +175,7 @@ fn (mut c Context) prf(pkseed []u8, skseed []u8, addr Address, outlen int) ![]u8
 	// Otherwise, its a SHA2-based PRF
 	//
 	// For SHA2-based PRF using SHA-256, only differs on n number, depends on the security category
-	// of underlying kind of SLH-DSA parameter set
+	// of underlying tipe of SLH-DSA parameter set
 	// ie, n = 16, n = 24 and n = 32 for security category 1, 3 and 5 respectively
 	//
 	// PRF(PK.seed, SK.seed, ADRS) = Trunc𝑛(SHA-256(PK.seed ∥ toByte(0, 64 − 𝑛) ∥ ADRS𝑐 ∥ SK.seed))
@@ -402,7 +402,7 @@ fn (c &Context) sha2_prf() !hash.Hash {
 
 // is_shake_family tells if this context was a SHAKE-based family
 fn (c &Context) is_shake_family() bool {
-	match c.kind {
+	match c.tipe {
 		.shake_128f, .shake_128s, .shake_192f, .shake_192s, .shake_256f, .shake_256s {
 			return true
 		}
@@ -414,7 +414,7 @@ fn (c &Context) is_shake_family() bool {
 
 // is_sha2family_cat1 tells if this context was a SHA2-based family with security category 1
 fn (c &Context) is_sha2family_cat1() bool {
-	match c.kind {
+	match c.tipe {
 		.sha2_128f, .sha2_128s { return true }
 		else { return false }
 	}
@@ -422,7 +422,7 @@ fn (c &Context) is_sha2family_cat1() bool {
 
 // is_sha2family_cat1 tells if this context was a SHA2-based family with security category 3
 fn (c &Context) is_sha2family_cat3() bool {
-	match c.kind {
+	match c.tipe {
 		.sha2_192f, .sha2_192s { return true }
 		else { return false }
 	}
@@ -430,7 +430,7 @@ fn (c &Context) is_sha2family_cat3() bool {
 
 // is_sha2family_cat5 tells if this context was a SHA2-based family with security category 5
 fn (c &Context) is_sha2family_cat5() bool {
-	match c.kind {
+	match c.tipe {
 		.sha2_256f, .sha2_256s { return true }
 		else { return false }
 	}
@@ -468,8 +468,29 @@ pub:
 	sigsize int
 }
 
-// new_param creates SLH-DSA parameter set from Kind k
-fn new_param(k Kind) Param {
+// Table 2. SLH-DSA parameter sets
+//
+// name					𝑛 	ℎ  𝑑 ℎ′ 𝑎 𝑘 𝑙𝑔𝑤 𝑚 securitycategory pkbytes sigbytes
+// SLH-DSA-SHA2-128s	16 63 7 9 12 14 4 30 1 32 7856
+// SLH-DSA-SHAKE-128s 	16 63 7 9 12 14 4 30 1 32 7856
+// ----------------------------------------------------
+// SLH-DSA-SHA2-128f	16 66 22 3 6 33 4 34 1 32 17088
+// SLH-DSA-SHAKE-128f 	16 66 22 3 6 33 4 34 1 32 17088
+// ----------------------------------------------------
+// SLH-DSA-SHA2-192s	24 63 7 9 14 17 4 39 3 48 16224
+// SLH-DSA-SHAKE-192s 	24 63 7 9 14 17 4 39 3 48 16224
+// ----------------------------------------------------
+// SLH-DSA-SHA2-192f	24 66 22 3 8 33 4 42 3 48 35664
+// SLH-DSA-SHAKE-192f 	24 66 22 3 8 33 4 42 3 48 35664
+// ----------------------------------------------------
+// SLH-DSA-SHA2-256s	32 64 8 8 14 22 4 47 5 64 29792
+// SLH-DSA-SHAKE-256s 	32 64 8 8 14 22 4 47 5 64 29792
+// ----------------------------------------------------
+// SLH-DSA-SHA2-256f	32 68 17 4 9 35 4 49 5 64 49856
+// SLH-DSA-SHAKE-256f 	32 68 17 4 9 35 4 49 5 64 49856
+//
+// new_param creates SLH-DSA parameter set from SLHType k
+fn new_param(k SLHType) Param {
 	match k {
 		// SHA2-based family			name     𝑛   ℎ   𝑑  ℎp  𝑎  𝑘  𝑙𝑔𝑤 𝑚  sc pksize sigsize
 		.sha2_128s { return Param{'SLH-DSA-SHA2-128s', 16, 63, 7, 9, 12, 14, 4, 30, 1, 32, 7856} }
@@ -488,44 +509,7 @@ fn new_param(k Kind) Param {
 	}
 }
 
-// Table 2. SLH-DSA parameter sets
-//
-// name					𝑛 	ℎ  𝑑 ℎ′ 𝑎 𝑘 𝑙𝑔𝑤 𝑚 securitycategory pkbytes sigbytes
-// SLH-DSA-SHA2-128s	16 63 7 9 12 14 4 30 1 32 7 856
-// SLH-DSA-SHAKE-128s 	16 63 7 9 12 14 4 30 1 32 7 856
-// ----------------------------------------------------
-// SLH-DSA-SHA2-128f	16 66 22 3 6 33 4 34 1 32 17 088
-// SLH-DSA-SHAKE-128f 	16 66 22 3 6 33 4 34 1 32 17 088
-// ----------------------------------------------------
-// SLH-DSA-SHA2-192s	24 63 7 9 14 17 4 39 3 48 16 224
-// SLH-DSA-SHAKE-192s 	24 63 7 9 14 17 4 39 3 48 16 224
-// ----------------------------------------------------
-// SLH-DSA-SHA2-192f	24 66 22 3 8 33 4 42 3 48 35 664
-// SLH-DSA-SHAKE-192f 	24 66 22 3 8 33 4 42 3 48 35 664
-// ----------------------------------------------------
-// SLH-DSA-SHA2-256s	32 64 8 8 14 22 4 47 5 64 29 792
-// SLH-DSA-SHAKE-256s 	32 64 8 8 14 22 4 47 5 64 29 792
-// ----------------------------------------------------
-// SLH-DSA-SHA2-256f	32 68 17 4 9 35 4 49 5 64 49 856
-// SLH-DSA-SHAKE-256f 	32 68 17 4 9 35 4 49 5 64 49 856
-const paramset = {
-	// SHA2-based family			name     𝑛   ℎ   𝑑  ℎp  𝑎  𝑘  𝑙𝑔𝑤 𝑚  sc pksize sigsize
-	'sha2_128s':  Param{'SLH-DSA-SHA2-128s', 16, 63, 7, 9, 12, 14, 4, 30, 1, 32, 7856}
-	'sha2_128f':  Param{'SLH-DSA-SHA2-128f', 16, 66, 22, 3, 6, 33, 4, 34, 1, 32, 17088}
-	'sha2_192s':  Param{'SLH-DSA-SHA2-192s', 24, 63, 7, 9, 14, 17, 4, 39, 3, 48, 16224}
-	'sha2_192f':  Param{'SLH-DSA-SHA2-192f', 24, 66, 22, 3, 8, 33, 4, 42, 3, 48, 35664}
-	'sha2_256s':  Param{'SLH-DSA-SHA2-256s', 32, 64, 8, 8, 14, 22, 4, 47, 5, 64, 29792}
-	'sha2_256f':  Param{'SLH-DSA-SHA2-256f', 32, 68, 17, 4, 9, 35, 4, 49, 5, 64, 49856}
-	// SHAKE-based family
-	'shake_128s': Param{'SLH-DSA-SHAKE-128s', 16, 63, 7, 9, 12, 14, 4, 30, 1, 32, 7856}
-	'shake_128f': Param{'SLH-DSA-SHAKE-128f', 16, 66, 22, 3, 6, 33, 4, 34, 1, 32, 17088}
-	'shake_192s': Param{'SLH-DSA-SHAKE-192s', 24, 63, 7, 9, 14, 17, 4, 39, 3, 48, 16224}
-	'shake_192f': Param{'SLH-DSA-SHAKE-192f', 24, 66, 22, 3, 8, 33, 4, 42, 3, 48, 35664}
-	'shake_256s': Param{'SLH-DSA-SHAKE-256s', 32, 64, 8, 8, 14, 22, 4, 47, 5, 64, 29792}
-	'shake_256f': Param{'SLH-DSA-SHAKE-256f', 32, 68, 17, 4, 9, 35, 4, 49, 5, 64, 49856}
-}
-
-// Kind is an enumeration type of the SLH-DSA key.
+// SLHType is an enumeration type of the SLH-DSA key.
 // See Table 2. SLH-DSA parameter sets of the Chapter 11. Parameter Sets
 //
 // Each sets name indicates:
@@ -533,7 +517,7 @@ const paramset = {
 //	- the length in bits of the security parameter, in the 128, 192, and 256 respectives number.
 //	- the mnemonic name indicates parameter to create relatively small signatures (`s`)
 //	  or to have relatively fast signature generation (`f`).
-pub enum Kind {
+pub enum SLHType {
 	// SHA2-based family
 	sha2_128s
 	sha2_128f
@@ -550,8 +534,8 @@ pub enum Kind {
 	shake_256f
 }
 
-// kind_from_name make a Kind from name string
-fn kind_from_name(name string) !Kind {
+// kind_from_name make a SLHType from name string
+fn kind_from_name(name string) !SLHType {
 	match name {
 		// SHA2-based family
 		'SLH-DSA-SHA2-128s' { return .sha2_128s }
@@ -571,28 +555,8 @@ fn kind_from_name(name string) !Kind {
 	}
 }
 
-// name returns the famous name of this Kind
-fn (k Kind) name() string {
-	match k {
-		// SHA2-based family
-		.sha2_128s { return 'SLH-DSA-SHA2-128s' }
-		.sha2_128f { return 'SLH-DSA-SHA2-128f' }
-		.sha2_192s { return 'SLH-DSA-SHA2-192s' }
-		.sha2_192f { return 'SLH-DSA-SHA2-192f' }
-		.sha2_256s { return 'SLH-DSA-SHA2-256s' }
-		.sha2_256f { return 'SLH-DSA-SHA2-256f' }
-		// SHAKE-based family
-		.shake_128s { return 'SLH-DSA-SHAKE-128s' }
-		.shake_128f { return 'SLH-DSA-SHAKE-128f' }
-		.shake_192s { return 'SLH-DSA-SHAKE-192s' }
-		.shake_192f { return 'SLH-DSA-SHAKE-192f' }
-		.shake_256s { return 'SLH-DSA-SHAKE-256s' }
-		.shake_256f { return 'SLH-DSA-SHAKE-256f' }
-	}
-}
-
-// str returns string representation of this Kind k
-fn (k Kind) str() string {
+// str returns string representation of this SLHType k
+fn (k SLHType) str() string {
 	match k {
 		// SHA2-based family
 		.sha2_128s { return 'sha2_128s' }

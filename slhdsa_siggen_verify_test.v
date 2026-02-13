@@ -10,7 +10,7 @@ import encoding.hex
 // Test 1
 // Test basic signing and verification
 fn test_sign_verify_internal_basic() ! {
-	sk := slh_keygen(new_context(.sha2_128f))!
+	sk := slh_keygen(.sha2_128f)!
 	pk := sk.pubkey()
 
 	msg := 'hello'.bytes()
@@ -48,13 +48,13 @@ fn test_deterministic_sign_verify_shake128f() ! {
 
 	pkb := hex.decode(item.pk)!
 	assert pkb.len == 2 * c.prm.n
-	pk := new_pubkey(c, pkb)!
+	pk := new_pubkey(pkb, slh_type: c.tipe)!
 
 	msg := hex.decode(item.message)!
 	cx := hex.decode(item.context)!
 	signature := hex.decode(item.signature)!
 
-	seckey := slh_keygen_from_bytes(c, skb)!
+	seckey := slh_keygen_from_bytes(skb, slh_type: c.tipe)!
 	secpk := seckey.pubkey()
 
 	assert seckey.pkseed == pk.seed
@@ -118,8 +118,8 @@ fn test_pure_prehash_signature_generation_verify() ! {
 			sig := hex.decode(t.signature)!
 
 			//
-			sk := slh_keygen_from_bytes(ctx, skb)!
-			pk := new_pubkey(ctx, pkb)!
+			sk := slh_keygen_from_bytes(skb, slh_type: ctx.tipe)!
+			pk := new_pubkey(pkb, slh_type: ctx.tipe)!
 			assert sk.pubkey().bytes() == pkb
 			assert pk.bytes() == pkb
 			assert pk.seed == sk.pkseed

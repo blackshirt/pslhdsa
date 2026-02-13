@@ -41,7 +41,7 @@ mut:
 // The signing key has a size of 4 * n bytes, which includes the public key components.
 // i.e. It consists of the concatenation of SK.seed, SK.prf, PK.seed and PF.root
 pub fn (s &SigningKey) bytes() []u8 {
-	mut out := []u8{cap: s.ctx.prm.n * 4}
+	mut out := []u8{cap: s.ctx.prm.n << 2}
 	out << s.seed
 	out << s.prf
 	out << s.pkseed
@@ -53,7 +53,7 @@ pub fn (s &SigningKey) bytes() []u8 {
 // pubkey returns the public key.
 pub fn (s &SigningKey) pubkey() &PubKey {
 	return &PubKey{
-		ctx:  s.ctx.clone()
+		ctx:  s.ctx
 		seed: s.pkseed
 		root: s.pkroot
 	}
@@ -145,15 +145,15 @@ const supported_prehash_algo = [crypto.Hash.sha256, .sha384, .sha224, .sha512, .
 @[params]
 pub struct Options {
 pub mut:
-	// slh_kind was a default of SLH-DSA type (kind) if you dont specifying into the key generator function.
+	// slh_type was a default of SLH-DSA type if you dont specifying it into the key generator function.
 	// You should set it into correct SLH-DSA's type do you want to generate.
-	slh_kind Kind = .sha2_128f
+	slh_type SLHType = .sha2_128f
 
-	// check zeros perform null-bytes arrays checking on the seed of the key generated (suppplied) into SLH-DSA
-	// key generation phase. If it set into true, it will always do check, or bypass the checking on the false value.
-	// By default was set into true to disallow null-bytes arrays supplied in the key generation seed.
-	// If you not sure, just left it as true.
-	check_zeros bool = true
+	// allow_zeros marks the SLH-DSA key generation routines to allow zeros bytes as a seeed.
+	// By default its has a false value to dissalow zeros bytes used as a seed. Zeros bytes was
+	// commonly marked as a weak keys for cryptographical purposes.
+	// If you not sure, just left it as a false.
+	allow_zeros bool
 
 	// check_pk flag was used in the SLH-DSA key generation process, especially in `slh_keygen_from_bytes`
 	// to tell the routine to perform checking on the PK.root was result in a valid value on the key generation.
@@ -219,18 +219,22 @@ mut:
 // The bytes must be ctx.prm.n * 2 bytes long. Its also check if the seed and root
 // components are all zeroes that unallowed in this module. If so, it returns an error.
 @[direct_array_access]
-pub fn new_pubkey(ctx &Context, bytes []u8) !&PubKey {
-	if bytes.len != ctx.prm.n * 2 {
+pub fn new_pubkey(bytes []u8, opt Options) !&PubKey {
+	ctx := new_context(opt.slh_type)
+	// the bytes should have a 2 * n bytes long
+	if bytes.len != ctx.prm.n << 1 {
 		return error('bytes must be ctx.prm.n * 2 bytes long')
 	}
-	seed := bytes[0..ctx.prm.n]
-	root := bytes[ctx.prm.n..ctx.prm.n * 2]
+	seed := bytes[0..ctx.prm.n].clone()
+	root := bytes[ctx.prm.n..ctx.prm.n << 1].clone()
 	// check if the seed and root are all zeroes
-	if is_zero(seed) || is_zero(root) {
-		return error('seed and root components are all zeroes')
+	if !opt.allow_zeros {
+		if is_zero(seed) || is_zero(root) {
+			return error('seed and root components are all zeroes')
+		}
 	}
 	return &PubKey{
-		ctx:  ctx.clone()
+		ctx:  ctx
 		seed: seed
 		root: root
 	}
@@ -239,7 +243,7 @@ pub fn new_pubkey(ctx &Context, bytes []u8) !&PubKey {
 // bytes returns the public key bytes. The public key has a size of 2 * n bytes.
 // i.e. It consists of the concatenation of PK.seed and PK.root
 pub fn (p &PubKey) bytes() []u8 {
-	mut out := []u8{cap: p.ctx.prm.n * 2}
+	mut out := []u8{cap: p.ctx.prm.n << 1}
 	out << p.seed
 	out << p.root
 
@@ -324,7 +328,7 @@ fn parse_slhsignature(c &Context, bytes []u8) !&SLHSignature {
 	// 	calculated length of the signature
 	clength := n + k * (1 + a) * n + (h + d * len) * n
 	if bytes.len != clength {
-		return error('signature bytes must correct size for ${c.kind}')
+		return error('signature bytes must correct size for ${c.tipe}')
 	}
 	r := bytes[0..n]
 	fors := bytes[n..n + k * (1 + a) * n]

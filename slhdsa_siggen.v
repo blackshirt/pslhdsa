@@ -107,7 +107,7 @@ fn slh_sign_internal(msg []u8, sk &SigningKey, addrnd []u8) !&SLHSignature {
 	addr.set_keypair_address(idxleaf)
 
 	// SIG𝐹𝑂𝑅𝑆 ← fors_sign(𝑚𝑑, SK.seed, PK.seed, ADRS)
-	fors := fors_sign(sk_ctx, md, sk.seed, sk.pkseed, mut addr)!
+	fors := fors_sign(mut sk_ctx, md, sk.seed, sk.pkseed, mut addr)!
 	// SIG ← SIG ∥ SIG𝐹𝑂𝑅s
 
 	// get FORS key, PK𝐹𝑂𝑅𝑆 ← fors_pkFromSig(SIG𝐹𝑂𝑅𝑆, 𝑚𝑑, PK.seed, ADRS)

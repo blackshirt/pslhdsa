@@ -37,7 +37,7 @@ fn fors_skgen(mut c Context, skseed []u8, pkseed []u8, addr Address, idx u32) ![
 fn fors_node(mut c Context, skseed []u8, i u32, z u32, pkseed []u8, mut addr Address) ![]u8 {
 	if z == 0 {
 		// 𝑠𝑘 ← fors_skGen(SK.seed, PK.seed, ADRS,𝑖)
-		skey := fors_skgen(c, skseed, pkseed, addr, i)!
+		skey := fors_skgen(mut c, skseed, pkseed, addr, i)!
 		// 3: ADRS.setTreeHeight(0)
 		addr.set_tree_height(0)
 		// 4: ADRS.setTreeIndex(𝑖)
@@ -76,7 +76,7 @@ fn fors_node(mut c Context, skseed []u8, i u32, z u32, pkseed []u8, mut addr Add
 // Output: FORS signature SIG𝐹𝑂𝑅𝑆.
 // fors_sign signs a 𝑘 ⋅ 𝑎-bit message digest 𝑚d
 @[direct_array_access]
-fn fors_sign(c &Context, md []u8, skseed []u8, pkseed []u8, mut addr Address) ![]u8 {
+fn fors_sign(mut c Context, md []u8, skseed []u8, pkseed []u8, mut addr Address) ![]u8 {
 	// initialize SIG𝐹𝑂𝑅𝑆 as a zero-length byte string
 	mut sigfors := []u8{cap: c.prm.k}
 	//  𝑖𝑛𝑑𝑖𝑐𝑒𝑠 ← base_2b(𝑚𝑑, 𝑎, 𝑘)
@@ -85,7 +85,7 @@ fn fors_sign(c &Context, md []u8, skseed []u8, pkseed []u8, mut addr Address) ![
 	// compute signature elements
 	for i := u32(0); i < c.prm.k; i++ {
 		// fors_skGen(SK.seed, PK.seed, ADRS,𝑖 ⋅ 2^𝑎 + 𝑖𝑛𝑑𝑖𝑐𝑒𝑠[𝑖])
-		fors_item := fors_skgen(c, skseed, pkseed, addr, i << c.prm.a + indices[i])!
+		fors_item := fors_skgen(mut c, skseed, pkseed, addr, i << c.prm.a + indices[i])!
 		sigfors << fors_item
 
 		// compute auth path

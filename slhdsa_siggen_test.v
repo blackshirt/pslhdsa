@@ -90,7 +90,7 @@ fn test_public_purehash_deterministic_siggen() ! {
 		expected_sig := hex.decode(t.signature)!
 
 		sk := slh_keygen_from_bytes(c, skb)!
-		pk := new_pubkey(c, pkb)!
+		pk := new_pubkey(pkb, slh_type: c.tipe)!
 		assert sk.pubkey().equal(pk)
 
 		// sign in deterministic way

@@ -12,6 +12,22 @@ import crypto.sha3
 import crypto.sha256
 import crypto.sha512
 
+// new_context creates a new SLH-DSA Context to operate on
+@[inline]
+pub fn new_context(t SLHType) &Context {
+	return &Context{
+		tipe: t
+		prm:  new_param(t)
+	}
+}
+
+// new_context_from_name creates a new SLH-DSA Context from name string
+// name should be one of the supported tipe name, e.g. 'SLH-DSA-SHA2-192f'
+// See `SLHType` for the list of supported types.
+pub fn new_context_from_name(name string) !&Context {
+	return new_context(slh_type(name)!)
+}
+
 // SLH-DSA Context
 //
 // The Context structure describes SLH-DSA type and underlying parameter set
@@ -20,32 +36,21 @@ import crypto.sha512
 pub struct Context {
 	// The tipe (type) of this SLH-DSA context, set on context creation
 	tipe SLHType
+	// Underlying SLH-DSA parameter set described in the doc
+	prm ParamSet
 mut:
 	// compressed address buffer
-	cadrs []u8 = []u8{len: 22}
-pub:
-	// Underlying SLH-DSA parameter set described in the doc
-	prm Param
+	cadrs []u8 = []u8{len: compressed_addr_size}
 }
 
-// new_context creates a new SLH-DSA Context to operate on
-pub fn new_context(k SLHType) &Context {
-	return &Context{
-		tipe: k
-		prm:  new_param(k)
-	}
-}
-
-// new_context_from_name creates a new SLH-DSA Context from name string
-// name should be one of the supported tipe name, e.g. 'SLH-DSA-SHA2-192f'
-// See SLHType for the list of supported tipe names
-pub fn new_context_from_name(name string) !&Context {
-	return new_context(kind_from_name(name)!)
-}
-
-// name returns the name of this context
-fn (c &Context) name() string {
+// name returns the name of this SLH-DSA Context, for informational purposes.
+pub fn (c &Context) name() string {
 	return c.prm.name
+}
+
+// paramset returns the SLH-DSA Parameter Set of this context, for informational purposes.
+pub fn (c &Context) paramset() ParamSet {
+	return c.prm
 }
 
 // clone returns a clone of this context
@@ -436,10 +441,10 @@ fn (c &Context) is_sha2family_cat5() bool {
 	}
 }
 
-// Param describes SLH-DSA Parameter set
+// ParamSet describes SLH-DSA Parameter set
 //
 @[noinit]
-struct Param {
+struct ParamSet {
 pub:
 	// The name indicates SLH-DSA its belong to
 	name string
@@ -490,22 +495,22 @@ pub:
 // SLH-DSA-SHAKE-256f 	32 68 17 4 9 35 4 49 5 64 49856
 //
 // new_param creates SLH-DSA parameter set from SLHType k
-fn new_param(k SLHType) Param {
+fn new_param(k SLHType) ParamSet {
 	match k {
-		// SHA2-based family			name     𝑛   ℎ   𝑑  ℎp  𝑎  𝑘  𝑙𝑔𝑤 𝑚  sc pksize sigsize
-		.sha2_128s { return Param{'SLH-DSA-SHA2-128s', 16, 63, 7, 9, 12, 14, 4, 30, 1, 32, 7856} }
-		.sha2_128f { return Param{'SLH-DSA-SHA2-128f', 16, 66, 22, 3, 6, 33, 4, 34, 1, 32, 17088} }
-		.sha2_192s { return Param{'SLH-DSA-SHA2-192s', 24, 63, 7, 9, 14, 17, 4, 39, 3, 48, 16224} }
-		.sha2_192f { return Param{'SLH-DSA-SHA2-192f', 24, 66, 22, 3, 8, 33, 4, 42, 3, 48, 35664} }
-		.sha2_256s { return Param{'SLH-DSA-SHA2-256s', 32, 64, 8, 8, 14, 22, 4, 47, 5, 64, 29792} }
-		.sha2_256f { return Param{'SLH-DSA-SHA2-256f', 32, 68, 17, 4, 9, 35, 4, 49, 5, 64, 49856} }
+		// SHA2-based family			name     		  𝑛   ℎ   𝑑  ℎp  𝑎  𝑘  𝑙𝑔𝑤 𝑚  sc pksize sigsize
+		.sha2_128s { return ParamSet{'SLH-DSA-SHA2-128s', 16, 63, 7, 9, 12, 14, 4, 30, 1, 32, 7856} }
+		.sha2_128f { return ParamSet{'SLH-DSA-SHA2-128f', 16, 66, 22, 3, 6, 33, 4, 34, 1, 32, 17088} }
+		.sha2_192s { return ParamSet{'SLH-DSA-SHA2-192s', 24, 63, 7, 9, 14, 17, 4, 39, 3, 48, 16224} }
+		.sha2_192f { return ParamSet{'SLH-DSA-SHA2-192f', 24, 66, 22, 3, 8, 33, 4, 42, 3, 48, 35664} }
+		.sha2_256s { return ParamSet{'SLH-DSA-SHA2-256s', 32, 64, 8, 8, 14, 22, 4, 47, 5, 64, 29792} }
+		.sha2_256f { return ParamSet{'SLH-DSA-SHA2-256f', 32, 68, 17, 4, 9, 35, 4, 49, 5, 64, 49856} }
 		// SHAKE-based family
-		.shake_128s { return Param{'SLH-DSA-SHAKE-128s', 16, 63, 7, 9, 12, 14, 4, 30, 1, 32, 7856} }
-		.shake_128f { return Param{'SLH-DSA-SHAKE-128f', 16, 66, 22, 3, 6, 33, 4, 34, 1, 32, 17088} }
-		.shake_192s { return Param{'SLH-DSA-SHAKE-192s', 24, 63, 7, 9, 14, 17, 4, 39, 3, 48, 16224} }
-		.shake_192f { return Param{'SLH-DSA-SHAKE-192f', 24, 66, 22, 3, 8, 33, 4, 42, 3, 48, 35664} }
-		.shake_256s { return Param{'SLH-DSA-SHAKE-256s', 32, 64, 8, 8, 14, 22, 4, 47, 5, 64, 29792} }
-		.shake_256f { return Param{'SLH-DSA-SHAKE-256f', 32, 68, 17, 4, 9, 35, 4, 49, 5, 64, 49856} }
+		.shake_128s { return ParamSet{'SLH-DSA-SHAKE-128s', 16, 63, 7, 9, 12, 14, 4, 30, 1, 32, 7856} }
+		.shake_128f { return ParamSet{'SLH-DSA-SHAKE-128f', 16, 66, 22, 3, 6, 33, 4, 34, 1, 32, 17088} }
+		.shake_192s { return ParamSet{'SLH-DSA-SHAKE-192s', 24, 63, 7, 9, 14, 17, 4, 39, 3, 48, 16224} }
+		.shake_192f { return ParamSet{'SLH-DSA-SHAKE-192f', 24, 66, 22, 3, 8, 33, 4, 42, 3, 48, 35664} }
+		.shake_256s { return ParamSet{'SLH-DSA-SHAKE-256s', 32, 64, 8, 8, 14, 22, 4, 47, 5, 64, 29792} }
+		.shake_256f { return ParamSet{'SLH-DSA-SHAKE-256f', 32, 68, 17, 4, 9, 35, 4, 49, 5, 64, 49856} }
 	}
 }
 
@@ -534,8 +539,8 @@ pub enum SLHType {
 	shake_256f
 }
 
-// kind_from_name make a SLHType from name string
-fn kind_from_name(name string) !SLHType {
+// slh_type make a SLHType from name string
+fn slh_type(name string) !SLHType {
 	match name {
 		// SHA2-based family
 		'SLH-DSA-SHA2-128s' { return .sha2_128s }
@@ -556,8 +561,8 @@ fn kind_from_name(name string) !SLHType {
 }
 
 // str returns string representation of this SLHType k
-fn (k SLHType) str() string {
-	match k {
+fn (t SLHType) str() string {
+	match t {
 		// SHA2-based family
 		.sha2_128s { return 'sha2_128s' }
 		.sha2_128f { return 'sha2_128f' }

@@ -54,10 +54,8 @@ fn slh_sign_internal(msg []u8, sk &SigningKey, addrnd []u8) !&SLHSignature {
 	// Note: hp = h/d
 	hp := sk.ctx.prm.hp
 
-	// mutable local context
+	// Gets the mutable local context
 	mut sk_ctx := sk.ctx
-
-	// signature
 
 	// ADRS ← toByte(0, 32) ▷ set layer and tree address to bottom layer	
 	mut addr := new_address()

@@ -19,12 +19,12 @@ import crypto.internal.subtle
 // Internally, the signing key result embeds the public key part of the key pair.
 // You can get the public key part by calling the `pk := sk.pubkey()` method.
 pub fn slh_keygen(t SLHType) !&SigningKey {
-	// makes the SLH-DSA context from
+	// makes the SLH-DSA context from tipe t
 	mut c := new_context(t)
 
 	// Set SK.seed, SK.prf, and PK.seed to random 𝑛-byte
 	//
-	// Note: instead of 3 times call on the `rand.read` call, we do single `rand.read` call with 3*n size
+	// Note: instead of 3 times call on the `rand.read`, we do single `rand.read` call with 3*n size
 	seed := rand.read(3 * c.prm.n)!
 	skseed := unsafe { seed[0..c.prm.n] }
 	skprf := unsafe { seed[c.prm.n..2 * c.prm.n] }
@@ -41,7 +41,7 @@ pub fn slh_keygen(t SLHType) !&SigningKey {
 // (i.e., not previously used) random value generated using an approved random bit generator
 @[direct_array_access]
 pub fn slh_keygen_from_bytes(bytes []u8, opt Options) !&SigningKey {
-	// makes the SLH-DSA context from the options
+	// makes the SLH-DSA context from the tipe in the options
 	mut c := new_context(opt.slh_type)
 	// check if the bytes length is equal to n * 4
 	if bytes.len != (c.prm.n << 2) {
@@ -97,7 +97,7 @@ pub fn slh_keygen_from_seed(skseed []u8, skprf []u8, pkseed []u8, opt Options) !
 	if skseed.len != c.prm.n || skprf.len != c.prm.n || pkseed.len != c.prm.n {
 		return error('every seed length must be equal to n bytes')
 	}
-	// check if the seed is all zeroes
+	// check for any (all) zeros seed
 	if !opt.allow_zeros {
 		if is_zero(skseed) || is_zero(skprf) || is_zero(pkseed) {
 			return error('seed is all or one of them are zeros bytes')

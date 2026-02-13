@@ -7,6 +7,9 @@ module pslhdsa
 
 import encoding.binary
 
+// The size of compressed Address, in bytes
+const compressed_addr_size = 22
+
 // The AddressType is an enum of SLH-DSA address type
 // Its value will be 0, 1, 2, 3, 4, 5, or 6.
 // In order to improve readability, these values will be
@@ -36,6 +39,11 @@ fn new_addrtype(v u32) !AddressType {
 	}
 }
 
+// new_address creates an empty address
+fn new_address() Address {
+	return Address{}
+}
+
 // The Address is fundamentally an 32 bytes opaque composed from:
 // -- layer address  4 bytes 	0	0..4
 // -- tree address  12 bytes 	1	4..8
@@ -49,11 +57,6 @@ fn new_addrtype(v u32) !AddressType {
 struct Address {
 mut:
 	data [8]u32
-}
-
-// new_address creates an empty address
-fn new_address() Address {
-	return Address{}
 }
 
 // bytes returns the bytes representation of Addres ad in big-endian form

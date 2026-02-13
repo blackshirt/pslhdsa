@@ -53,7 +53,7 @@ fn slh_verify_internal(msg []u8, sig &SLHSignature, pk &PubKey) !bool {
 	h := pk.ctx.prm.h
 	hp := pk.ctx.prm.hp
 
-	// mutable local context
+	// Gets the mutable local context
 	mut pk_ctx := pk.ctx
 
 	// Intermediate values derived from the parameter sets

@@ -73,7 +73,7 @@ fn (ad Address) encode(mut dst []u8) {
 	binary.big_endian_put_u32(mut dst[28..32], u32(ad.data[7]))
 }
 
-// compress compress 32-bytes of Address into 22-bytes of compressed address.
+// compress serializes 32-bytes of Address into 22-bytes of compressed address.
 // It stores the result into first of 22-bytes dst buffer.
 //
 // 18. Compressed address (ADRS ) 22 bytes

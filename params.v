@@ -25,7 +25,7 @@ pub fn new_context(t SLHType) &Context {
 // name should be one of the supported tipe name, e.g. 'SLH-DSA-SHA2-192f'
 // See `SLHType` for the list of supported types.
 pub fn new_context_from_name(name string) !&Context {
-	return new_context(slh_type(name)!)
+	return new_context(new_slh_type(name)!)
 }
 
 // SLH-DSA Context
@@ -33,7 +33,7 @@ pub fn new_context_from_name(name string) !&Context {
 // The Context structure describes SLH-DSA type and underlying parameter set
 // defined in the FIPS205 standard.
 @[noinit]
-pub struct Context {
+struct Context {
 	// The tipe (type) of this SLH-DSA context, set on context creation
 	tipe SLHType
 	// Underlying SLH-DSA parameter set described in the doc
@@ -41,16 +41,6 @@ pub struct Context {
 mut:
 	// compressed address buffer
 	cadrs []u8 = []u8{len: compressed_addr_size}
-}
-
-// name returns the name of this SLH-DSA Context, for informational purposes.
-pub fn (c &Context) name() string {
-	return c.prm.name
-}
-
-// paramset returns the SLH-DSA Parameter Set of this context, for informational purposes.
-pub fn (c &Context) paramset() ParamSet {
-	return c.prm
 }
 
 // clone returns a clone of this context
@@ -513,8 +503,8 @@ pub enum SLHType {
 	shake_256f
 }
 
-// slh_type make a SLHType from name string
-fn slh_type(name string) !SLHType {
+// new_slh_type make a SLHType from name string
+pub fn new_slh_type(name string) !SLHType {
 	match name {
 		// SHA2-based family
 		'SLH-DSA-SHA2-128s' { return .sha2_128s }

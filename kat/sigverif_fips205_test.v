@@ -111,7 +111,7 @@ fn test_slhdsa_sigverify_fips205_external_test_vectors() {
 			addrnd := hex.decode(t.additionalrandomness)!
 			signature := hex.decode(t.signature)!
 
-			pk := pslhdsa.new_pubkey(ctx, pkb)!
+			mut pk := pslhdsa.new_pubkey(pkb, slh_type: ctx.tipe)!
 			// get hash function when its in pre-hashed mode
 			if opt.msg_encoding == pslhdsa.MsgEncoding.pre {
 				opt.hfunc = name_to_hfunc(t.hashalg)!

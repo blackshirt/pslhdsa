@@ -93,8 +93,8 @@ fn test_slhdsa_siggen_fips205_test_vectors() {
 			sig := hex.decode(t.signature)!
 
 			// generate SigningKey and PubKey opaque
-			sk := pslhdsa.slh_keygen_from_bytes(ctx, skb)!
-			pk := pslhdsa.new_pubkey(ctx, pkb)!
+			mut sk := pslhdsa.slh_keygen_from_bytes(skb, slh_type: ctx.tipe)!
+			mut pk := pslhdsa.new_pubkey(pkb, slh_type: ctx.tipe)!
 			assert sk.pubkey().bytes() == pkb
 			assert pk.bytes() == pkb
 

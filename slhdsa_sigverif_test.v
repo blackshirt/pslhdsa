@@ -24,11 +24,11 @@ fn test_slhdsa_internal_signature_verify() ! {
 	sig := hex.decode(signature)!
 
 	ctx := new_context_from_name(parameterset)!
-	pkey := new_pubkey(pkb, slh_type: ctx.tipe)!
+	mut pkey := new_pubkey(pkb, slh_type: ctx.tipe)!
 
 	slh_sig := parse_slhsignature(ctx, sig)!
 	// slh_verify_internal(msg []u8, sig &SLHSignature, pk &PubKey) !bool
-	result := slh_verify_internal(msg, slh_sig, pkey)!
+	result := slh_verify_internal(msg, slh_sig, mut pkey)!
 
 	assert result == testpassed
 

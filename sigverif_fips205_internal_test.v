@@ -32,14 +32,14 @@ fn test_slhdsa_sigverify_fips205_internal_test_vectors() {
 			msg := hex.decode(t.message)!
 			sig := hex.decode(t.signature)!
 
-			pk := new_pubkey(pkb, slh_type: ctx.tipe)!
+			mut pk := new_pubkey(pkb, slh_type: ctx.tipe)!
 			// some test cases has invalid signature size, with error reason "invalid signature - too large"
 			// skip those test cases
 			slh_sig := parse_slhsignature(ctx, sig) or {
 				assert err == error('signature bytes must correct size for ${ctx.tipe}')
 				continue
 			}
-			verified := slh_verify_internal(msg, slh_sig, pk)!
+			verified := slh_verify_internal(msg, slh_sig, mut pk)!
 			assert verified == t.testpassed
 
 			// explicitly release resources

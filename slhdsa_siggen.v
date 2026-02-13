@@ -16,7 +16,7 @@ import crypto.rand
 // Output: SLH-DSA signature bytes SIG.
 // slh_sign generates a pure SLH-DSA signature with crypto.rand for randomness.
 @[direct_array_access]
-pub fn slh_sign(msg []u8, cx []u8, sk &SigningKey) ![]u8 {
+pub fn slh_sign(msg []u8, cx []u8, mut sk SigningKey) ![]u8 {
 	// Check context string size, should not exceed max_context_string_size
 	if cx.len > max_context_string_size {
 		return error('pure SLH-DSA signature failed: exceed context-string')
@@ -28,9 +28,9 @@ pub fn slh_sign(msg []u8, cx []u8, sk &SigningKey) ![]u8 {
 	// 𝑀′ ← toByte(0, 1) ∥ toByte(|𝑐𝑡𝑥|, 1) ∥ 𝑐𝑡𝑥 ∥ m
 	msgout := encode_msg_purehash(cx, msg)
 
-	// SIG ← slh_sign_internal(msg []u8, sk &SigningKey, addrnd []u8) !&SLHSignature
+	// SIG ← slh_sign_internal(msg []u8, mut sk SigningKey, addrnd []u8) !&SLHSignature
 	// ▷ omit 𝑎𝑑𝑑𝑟𝑛𝑑 for the deterministic variant
-	sigrandom := slh_sign_internal(msgout, sk, opt_rand)!
+	sigrandom := slh_sign_internal(msgout, mut sk, opt_rand)!
 
 	return sigrandom.bytes()
 }
@@ -43,31 +43,27 @@ pub fn slh_sign(msg []u8, cx []u8, sk &SigningKey) ![]u8 {
 // (optional) additional random 𝑎𝑑𝑑𝑟𝑛𝑑
 // Output: SLH-DSA signature SIG.
 @[direct_array_access]
-fn slh_sign_internal(msg []u8, sk &SigningKey, addrnd []u8) !&SLHSignature {
+fn slh_sign_internal(msg []u8, mut sk SigningKey, addrnd []u8) !&SLHSignature {
 	// localizes some context variables for the signature generation
 	outlen := sk.ctx.prm.n
 	msize := sk.ctx.prm.m
-	// d := sk.ctx.prm.d
 	k := sk.ctx.prm.k
 	a := sk.ctx.prm.a
 	h := sk.ctx.prm.h
 	// Note: hp = h/d
 	hp := sk.ctx.prm.hp
 
-	// Gets the mutable local context
-	mut sk_ctx := sk.ctx
-
 	// ADRS ← toByte(0, 32) ▷ set layer and tree address to bottom layer	
 	mut addr := new_address()
 	// 𝑜𝑝𝑡_𝑟𝑎𝑛𝑑 ← 𝑎𝑑𝑑𝑟𝑛, substitute 𝑜𝑝𝑡_𝑟𝑎𝑛𝑑 ← PK.seed for the deterministic variant,
 	// opt_rand := unsafe { addrnd }
 
-	// generate randomizer, 𝑅 ← PRF𝑚𝑠𝑔(SK.prf, 𝑜𝑝𝑡_𝑟𝑎𝑛𝑑, 𝑀 )
-	r := sk_ctx.prf_msg(sk.prf, addrnd, msg, outlen)!
+	// generate randomizer, 𝑅 ← PRF𝑚𝑠𝑔(SK.prf, 𝑜𝑝𝑡_𝑟𝑎𝑛𝑑, 𝑀)
+	r := sk.ctx.prf_msg(sk.prf, addrnd, msg, outlen)!
 	// SIG ← r
 
 	// compute message digest, ie, 𝑑𝑖𝑔𝑒𝑠𝑡 ← H𝑚𝑠𝑔(𝑅, PK.seed, PK.root, 𝑀 )
-	digest := sk_ctx.hmsg(r, sk.pkseed, sk.pkroot, msg, msize)!
+	digest := sk.ctx.hmsg(r, sk.pkseed, sk.pkroot, msg, msize)!
 
 	// Intermediate values derived from the parameter sets
 	// ceil [0 ∶ ⌈𝑘*𝑎⌉/8]
@@ -105,13 +101,13 @@ fn slh_sign_internal(msg []u8, sk &SigningKey, addrnd []u8) !&SLHSignature {
 	addr.set_keypair_address(idxleaf)
 
 	// SIG𝐹𝑂𝑅𝑆 ← fors_sign(𝑚𝑑, SK.seed, PK.seed, ADRS)
-	fors := fors_sign(mut sk_ctx, md, sk.seed, sk.pkseed, mut addr)!
+	fors := fors_sign(mut sk.ctx, md, sk.seed, sk.pkseed, mut addr)!
 	// SIG ← SIG ∥ SIG𝐹𝑂𝑅s
 
 	// get FORS key, PK𝐹𝑂𝑅𝑆 ← fors_pkFromSig(SIG𝐹𝑂𝑅𝑆, 𝑚𝑑, PK.seed, ADRS)
-	pkfors := fors_pkfromsig(mut sk_ctx, fors, md, sk.pkseed, mut addr)!
+	pkfors := fors_pkfromsig(mut sk.ctx, fors, md, sk.pkseed, mut addr)!
 	// 17: SIG𝐻𝑇 ← ht_sign(PK𝐹𝑂𝑅𝑆, SK.seed, PK.seed,𝑖𝑑𝑥𝑡𝑟𝑒𝑒,𝑖𝑑𝑥𝑙𝑒𝑎𝑓)
-	ht := ht_sign(mut sk_ctx, pkfors, sk.seed, sk.pkseed, mut idxtree, idxleaf)!
+	ht := ht_sign(mut sk.ctx, pkfors, sk.seed, sk.pkseed, mut idxtree, idxleaf)!
 
 	// : SIG ← SIG ∥ SIG𝐻𝑇
 
@@ -139,7 +135,7 @@ fn slh_sign_internal(msg []u8, sk &SigningKey, addrnd []u8) !&SLHSignature {
 // Input: Message 𝑀, context string cx, pre-hash function PH, private key SK.
 // Output: SLH-DSA signature SIG.
 @[direct_array_access]
-pub fn hash_slh_sign(msg []u8, cx []u8, ph crypto.Hash, sk &SigningKey) ![]u8 {
+pub fn hash_slh_sign(msg []u8, cx []u8, ph crypto.Hash, mut sk SigningKey) ![]u8 {
 	// check for context string
 	if cx.len > max_context_string_size {
 		return error('pure SLH-DSA signature failed: exceed context-string')
@@ -162,7 +158,7 @@ pub fn hash_slh_sign(msg []u8, cx []u8, ph crypto.Hash, sk &SigningKey) ![]u8 {
 	msgout := encode_msg_prehash(cx, oid, phm)
 
 	// SIG ← slh_sign_internal(𝑀′, SK, 𝑎𝑑𝑑𝑟𝑛𝑑) ▷ omit 𝑎𝑑𝑑𝑟𝑛𝑑 for the deterministic variant
-	sig := slh_sign_internal(msgout, sk, opt_rand)!
+	sig := slh_sign_internal(msgout, mut sk, opt_rand)!
 
 	return sig.bytes()
 }

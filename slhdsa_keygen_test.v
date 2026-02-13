@@ -23,7 +23,7 @@ struct KeygenTest {
 fn test_basic_slh_keygen_from_bytes() ! {
 	// slh_keygen_internal(mut c Context, skseed []u8, skprf []u8, pkseed []u8) !(Sk, Pk)
 	for item in keygen_samples {
-		c := new_context(slh_type(item.tipe)!)
+		c := new_context_from_name(item.tipe)!
 		skseed := hex.decode(item.skseed)!
 		skprf := hex.decode(item.skprf)!
 		pkseed := hex.decode(item.pkseed)!
@@ -48,7 +48,7 @@ fn test_keygen_sha192f() {
 	skprf := hex.decode('1E96B555B153B31DFD650E5FB1DE1AD26C2B001E60A9C628')!
 	pkseed := hex.decode('1EACBB554054B50FFDD3E422160DD0EC7CCBFB78F5444395')!
 
-	ctx := new_context(slh_type('SLH-DSA-SHA2-192f')!)
+	ctx := new_context_from_name('SLH-DSA-SHA2-192f')!
 	sk := slh_keygen_from_seed(skseed, skprf, pkseed, slh_type: ctx.tipe)!
 
 	expected_sk := hex.decode('45508312B19B0D2D0C6D345B26223BFEF245CCDD36163DFF1E96B555B153B31DFD650E5FB1DE1AD26C2B001E60A9C6281EACBB554054B50FFDD3E422160DD0EC7CCBFB78F5444395CFA9D316F9FEDA6650AC3796A7989621D95BF6328D8547BD')!
@@ -64,7 +64,7 @@ fn test_keygen_sha256f() {
 	skprf := hex.decode('34DEEA15C8968E26F9C344375D44CB77726C69D6064C4EE0979284A5F4710D1D')!
 	pkseed := hex.decode('F682CAED17CD784AD9DE06C8652924EA82193972E4E3109613A2302B83A2B063')!
 
-	ctx := new_context(slh_type('SLH-DSA-SHA2-256f')!)
+	ctx := new_context_from_name('SLH-DSA-SHA2-256f')!
 	sk := slh_keygen_from_seed(skseed, skprf, pkseed, slh_type: ctx.tipe)!
 
 	expected_sk := hex.decode('15630D30A19756ECF040BE32C3A8299848249C91C0C6C7410E8BAC1F827E66B734DEEA15C8968E26F9C344375D44CB77726C69D6064C4EE0979284A5F4710D1DF682CAED17CD784AD9DE06C8652924EA82193972E4E3109613A2302B83A2B063A262DE3A300218451FD7882DD12F4F47124C3573825FD862CADD5EBE7AA09C3C')!

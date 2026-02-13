@@ -28,14 +28,14 @@ fn test_slhdsa_siggen_fips205_internal_test_vectors() {
 			msg := hex.decode(t.message)!
 			signature := hex.decode(t.signature)!
 
-			sk := slh_keygen_from_bytes(skb, slh_type: ctx.tipe)!
+			mut sk := slh_keygen_from_bytes(skb, slh_type: ctx.tipe)!
 
 			// get optional randomness, if deterministic, use SK.pkseed (PK.seed)
 			// otherwise use decoded additionalrandomness bytes
 			opt_rand := if deterministic { sk.pkseed } else { hex.decode(t.additionalrandomness)! }
 
 			// slh_sign_internal(msg []u8, sk &SigningKey, addrnd []u8) !&SLHSignature
-			slh_sig := slh_sign_internal(msg, sk, opt_rand)!
+			slh_sig := slh_sign_internal(msg, mut sk, opt_rand)!
 			sigout := slh_sig.bytes()
 			assert sigout == signature
 

@@ -41,12 +41,13 @@ pub fn slh_keygen(t SLHType) !&SigningKey {
 // (i.e., not previously used) random value generated using an approved random bit generator
 @[direct_array_access]
 pub fn slh_keygen_from_bytes(bytes []u8, opt Options) !&SigningKey {
+	// makes the SLH-DSA context from the tipe in the options
+	mut c := new_context(opt.slh_type)
+
 	// check if the bytes length is equal to n * 4
 	if bytes.len != 4 * c.prm.n {
 		return error('seed length must be equal to n * 4')
 	}
-	// makes the SLH-DSA context from the tipe in the options
-	mut c := new_context(opt.slh_type)
 
 	skseed := bytes[..c.prm.n] // 1st of c.prm.n chunk
 	skprf := bytes[c.prm.n..2 * c.prm.n] // 2nd of c.prm.n chunk

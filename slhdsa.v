@@ -12,6 +12,8 @@ import crypto.sha512
 import crypto.sha3
 import crypto.internal.subtle
 
+// The limit of SLH-DSA context string size, in bytes.
+// Its used to bind the context string into signature generation (verification) phase.
 const max_context_string_size = 255
 
 // The SLH-DSA Private Key
@@ -47,7 +49,7 @@ pub fn (s &SigningKey) bytes() []u8 {
 	out << s.pkseed
 	out << s.pkroot
 
-	return out
+	return out.clone()
 }
 
 // pubkey returns the public key.
@@ -70,7 +72,7 @@ pub fn (s &SigningKey) equal(o &SigningKey) bool {
 // sign signs the message msg with the signing key s.
 // The context string cx must be at most max_context_string_size bytes long.
 @[direct_array_access]
-pub fn (s &SigningKey) sign(msg []u8, cx []u8, opt Options) ![]u8 {
+pub fn (mut s SigningKey) sign(msg []u8, cx []u8, opt Options) ![]u8 {
 	// validate the context string
 	if cx.len > max_context_string_size {
 		return error('cx must be at most max_context_string_size bytes long')
@@ -128,9 +130,19 @@ pub fn (s &SigningKey) sign(msg []u8, cx []u8, opt Options) ![]u8 {
 	}
 
 	// use slh_sign_internal to generate the signature
-	sig := slh_sign_internal(msgout, s, opt_rand)!
+	sig := slh_sign_internal(msgout, mut s, opt_rand)!
 
 	return sig.bytes()
+}
+
+// name returns the SLH-DSA key name, as informational purposes
+pub fn (s &SigningKey) name() string {
+	return s.ctx.prm.name
+}
+
+// params returns underlying SLH-DSA parameter set defined in the doc. Its act for informational purposes
+pub fn (s &SigningKey) params() ParamSet {
+	return s.ctx.prm
 }
 
 // default maximum of additional randomness size, 2048 bytes.
@@ -247,7 +259,7 @@ pub fn (p &PubKey) bytes() []u8 {
 	out << p.seed
 	out << p.root
 
-	return out
+	return out.clone()
 }
 
 // equal returns true if the public key is equal to the other public key.
@@ -259,7 +271,7 @@ pub fn (p &PubKey) equal(o &PubKey) bool {
 // verify verifies the signature of the message msg against the public key p.
 // The context string cx must be at most max_context_string_size bytes long.
 @[direct_array_access]
-pub fn (p &PubKey) verify(msg []u8, sig []u8, cx []u8, opt Options) !bool {
+pub fn (mut p PubKey) verify(msg []u8, sig []u8, cx []u8, opt Options) !bool {
 	// check for context string size
 	if cx.len > max_context_string_size {
 		return error('cx must be at most max_context_string_size bytes long')
@@ -298,7 +310,7 @@ pub fn (p &PubKey) verify(msg []u8, sig []u8, cx []u8, opt Options) !bool {
 			encode_msg_prehash(cx, oid, phm)
 		}
 	}
-	return slh_verify_internal(msgout, slh_sig, p)!
+	return slh_verify_internal(msgout, slh_sig, mut p)!
 }
 
 // SLH-DSA signature data format

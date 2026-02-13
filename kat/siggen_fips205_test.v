@@ -67,6 +67,7 @@ fn test_slhdsa_siggen_fips205_test_vectors() {
 	// Test for every test group
 	for tg in siggen_test.testgroups {
 		ctx := pslhdsa.new_context_from_name(tg.parameterset)!
+		tipe := pslhdsa.new_slh_type(tg.parameterset)!
 		// get message encoding mode
 		mode := if tg.prehash == 'pure' {
 			pslhdsa.MsgEncoding.pure
@@ -93,8 +94,8 @@ fn test_slhdsa_siggen_fips205_test_vectors() {
 			sig := hex.decode(t.signature)!
 
 			// generate SigningKey and PubKey opaque
-			mut sk := pslhdsa.slh_keygen_from_bytes(skb, slh_type: ctx.tipe)!
-			mut pk := pslhdsa.new_pubkey(pkb, slh_type: ctx.tipe)!
+			mut sk := pslhdsa.slh_keygen_from_bytes(skb, slh_type: tipe)!
+			mut pk := pslhdsa.new_pubkey(pkb, slh_type: tipe)!
 			assert sk.pubkey().bytes() == pkb
 			assert pk.bytes() == pkb
 

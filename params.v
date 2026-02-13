@@ -34,6 +34,7 @@ pub fn new_context_from_name(name string) !&Context {
 // defined in the FIPS205 standard.
 @[noinit]
 struct Context {
+pub:
 	// The tipe (type) of this SLH-DSA context, set on context creation
 	tipe SLHType
 	// Underlying SLH-DSA parameter set described in the doc

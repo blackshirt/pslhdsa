@@ -19,7 +19,7 @@ fn test_slhdsa_keygen_fips205_test_vectors() {
 	keygen_test := json2.decode[KeygenTest](json_str)!
 	// Test for every test group
 	for tg in keygen_test.testgroups {
-		ctx := pslhdsa.new_context_from_name(tg.parameterset)!
+		tipe := pslhdsa.new_slh_type(tg.parameterset)!
 		for t in tg.tests {
 			skseed := hex.decode(t.skseed)!
 			skprf := hex.decode(t.skprf)!
@@ -28,7 +28,7 @@ fn test_slhdsa_keygen_fips205_test_vectors() {
 			skb := hex.decode(t.sk)!
 			pkb := hex.decode(t.pk)!
 			// check if the generated key is valid
-			sk := pslhdsa.slh_keygen_from_seed(skseed, skprf, pkseed, slh_type: ctx.tipe)!
+			sk := pslhdsa.slh_keygen_from_seed(skseed, skprf, pkseed, slh_type: tipe)!
 			assert sk.bytes() == skb
 			assert sk.pubkey().bytes() == pkb
 			// explicitly release the resources

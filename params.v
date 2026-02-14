@@ -319,7 +319,7 @@ fn (mut c Context) h(pkseed []u8, addr Address, m2 []u8, outlen int) ![]u8 {
 	out := h.sum([]u8{})
 
 	digest := out[0..outlen].clone()
-	// freeing allocated output resources and return the result
+	// freeing allocated resources and return the result
 	unsafe { out.free() }
 
 	return digest

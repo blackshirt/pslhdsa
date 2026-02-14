@@ -74,7 +74,7 @@ fn parse_hypertree(c Context, sig []u8) !&HypertreeSignature {
 // Output: HT signature SIG𝐻𝑇.
 // ht_sign generates a hypertree signature.
 @[direct_array_access]
-fn ht_sign(c &Context, m []u8, skseed []u8, pkseed []u8, mut idxtree TreeIndex, idxleaf_ u32) !&HypertreeSignature {
+fn ht_sign(mut c Context, m []u8, skseed []u8, pkseed []u8, mut idxtree TreeIndex, idxleaf_ u32) !&HypertreeSignature {
 	mut idxleaf := idxleaf_
 
 	// ADRS ← toByte(0, 32)
@@ -83,13 +83,13 @@ fn ht_sign(c &Context, m []u8, skseed []u8, pkseed []u8, mut idxtree TreeIndex, 
 	// NOTE: this does not handle idxtree > 2^64 - 1, where tree address is 12-bytes long
 	adrs.set_tree_address(idxtree)
 	// SIG𝑡𝑚𝑝 ← xmss_sign(𝑀, SK.seed,𝑖𝑑𝑥𝑙𝑒𝑎𝑓, PK.seed, ADRS)
-	// xmss_sign(c &Context, m []u8, skseed []u8, idx u32, pkseed []u8, mut addr Address) !&XmssSignature
-	mut sigtmp := xmss_sign(c, m, skseed, idxleaf, pkseed, mut adrs)!
+	// xmss_sign(mut c Context, m []u8, skseed []u8, idx u32, pkseed []u8, mut addr Address) !&XmssSignature
+	mut sigtmp := xmss_sign(mut c, m, skseed, idxleaf, pkseed, mut adrs)!
 	// SIG𝐻𝑇 ← SIG𝑡𝑚p
 	mut sight := []XmssSignature{len: c.prm.d}
 	sight[0] = sigtmp.clone()
 	// 𝑟𝑜𝑜𝑡 ← xmss_pkFromSig(𝑖𝑑𝑥𝑙𝑒𝑎𝑓, SIG𝑡𝑚𝑝, 𝑀, PK.seed, ADRS)
-	mut root := xmms_pkfromsig(c, idxleaf, sigtmp, m, pkseed, mut adrs)!
+	mut root := xmms_pkfromsig(mut c, idxleaf, sigtmp, m, pkseed, mut adrs)!
 
 	// for 𝑗 from 1 to 𝑑 − 1
 	for j := u32(1); j < c.prm.d; j++ {
@@ -102,12 +102,12 @@ fn ht_sign(c &Context, m []u8, skseed []u8, pkseed []u8, mut idxtree TreeIndex, 
 		// 10: ADRS.setTreeAddress(𝑖𝑑𝑥𝑡𝑟𝑒𝑒)
 		adrs.set_tree_address(idxtree)
 		// SIG𝑡𝑚𝑝 ← xmss_sign(𝑟𝑜𝑜𝑡, SK.seed,𝑖𝑑𝑥𝑙𝑒𝑎𝑓, PK.seed, ADRS)
-		sigtmp = xmss_sign(c, root, skseed, idxleaf, pkseed, mut adrs)!
+		sigtmp = xmss_sign(mut c, root, skseed, idxleaf, pkseed, mut adrs)!
 		// SIG𝐻𝑇 ← SIG𝐻𝑇 ∥ SIG𝑡𝑚p
 		sight[j] = sigtmp.clone()
 		if j < c.prm.d - 1 {
 			// 𝑟𝑜𝑜𝑡 ← xmss_pkFromSig(𝑖𝑑𝑥𝑙𝑒𝑎𝑓, SIG𝑡𝑚𝑝, 𝑟𝑜𝑜𝑡, PK.seed, ADRS)
-			root = xmms_pkfromsig(c, idxleaf, sigtmp, root, pkseed, mut adrs)!
+			root = xmms_pkfromsig(mut c, idxleaf, sigtmp, root, pkseed, mut adrs)!
 		}
 	}
 	return new_hypertree(sight)
@@ -120,7 +120,7 @@ fn ht_sign(c &Context, m []u8, skseed []u8, pkseed []u8, mut idxtree TreeIndex, 
 // Input: Message 𝑀,signature SIG𝐻𝑇, public seed PK.seed, tree index 𝑖𝑑𝑥𝑡𝑟𝑒𝑒, leaf index 𝑖𝑑𝑥𝑙𝑒𝑎𝑓, HT public key PK.root.
 // ht_verify verifies a hypertree signature.
 @[direct_array_access]
-fn ht_verify(c &Context, m []u8, sight &HypertreeSignature, pkseed []u8, mut idxtree TreeIndex, idxleaf_ u32, pkroot []u8) !bool {
+fn ht_verify(mut c Context, m []u8, sight &HypertreeSignature, pkseed []u8, mut idxtree TreeIndex, idxleaf_ u32, pkroot []u8) !bool {
 	// mut idxtree := idxtree
 	mut idxleaf := idxleaf_
 
@@ -133,7 +133,7 @@ fn ht_verify(c &Context, m []u8, sight &HypertreeSignature, pkseed []u8, mut idx
 	// mut sigtmp := sight[0..(c.prm.hp + c.wots_len()) * c.prm.n].clone()
 	mut sigtmp := sight.xmss[0]
 	// 𝑛𝑜𝑑𝑒 ← xmss_pkFromSig(𝑖𝑑𝑥𝑙𝑒𝑎𝑓, SIG𝑡𝑚𝑝, 𝑀, PK.seed, ADRS)
-	mut node := xmms_pkfromsig(c, idxleaf, sigtmp, m, pkseed, mut adrs)!
+	mut node := xmms_pkfromsig(mut c, idxleaf, sigtmp, m, pkseed, mut adrs)!
 
 	// for 𝑗 from 1 to 𝑑 − 1 do
 	for j := u32(1); j < c.prm.d; j++ {
@@ -150,7 +150,7 @@ fn ht_verify(c &Context, m []u8, sight &HypertreeSignature, pkseed []u8, mut idx
 		sigtmp = sight.xmss[j]
 
 		// 𝑛𝑜𝑑𝑒 ← xmss_pkFromSig(𝑖𝑑𝑥𝑙𝑒𝑎𝑓, SIG𝑡𝑚𝑝, 𝑛𝑜𝑑𝑒, PK.seed, ADRS)
-		node = xmms_pkfromsig(c, idxleaf, sigtmp, node, pkseed, mut adrs)!
+		node = xmms_pkfromsig(mut c, idxleaf, sigtmp, node, pkseed, mut adrs)!
 	}
 
 	// if 𝑛𝑜𝑑𝑒 = PK.root { return true }

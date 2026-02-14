@@ -12,7 +12,7 @@ module pslhdsa
 // Input: Secret seed SK.seed, public seed PK.seed, address ADRS.
 // Output: WOTS+ public key 𝑝k
 @[direct_array_access]
-fn wots_pkgen(c &Context, skseed []u8, pkseed []u8, mut adr Address) ![]u8 {
+fn wots_pkgen(mut c Context, skseed []u8, pkseed []u8, mut adr Address) ![]u8 {
 	assert adr.get_type()! == .wots_hash
 	// copy address to create key generation key address
 	mut sk_addr := adr.clone()
@@ -34,7 +34,7 @@ fn wots_pkgen(c &Context, skseed []u8, pkseed []u8, mut adr Address) ![]u8 {
 		adr.set_chain_address(i)
 		// compute public value for chain 𝑖, 𝑡𝑚𝑝[𝑖] ← chain(𝑠𝑘, 0, 𝑤 − 1, PK.seed, ADRS)
 		// w == 16 in this standard
-		tmp[i] = chain(c, sk, 0, 15, pkseed, mut adr)!
+		tmp[i] = chain(mut c, sk, 0, 15, pkseed, mut adr)!
 		// tmp << tmp_i
 	}
 	// copy address to create WOTS+public key address, wotspkADRS ← ADRS
@@ -58,7 +58,7 @@ fn wots_pkgen(c &Context, skseed []u8, pkseed []u8, mut adr Address) ![]u8 {
 // Input: Message 𝑀, secret seed SK.seed, public seed PK.seed, address ADRS.
 // Output: WOTS+ signature 𝑠𝑖𝑔.
 @[direct_array_access]
-fn wots_sign(c &Context, m []u8, skseed []u8, pkseed []u8, mut adr Address) ![][]u8 {
+fn wots_sign(mut c Context, m []u8, skseed []u8, pkseed []u8, mut adr Address) ![][]u8 {
 	// get some context variables
 	length := c.wots_len()
 	len1 := c.wots_len1()
@@ -93,7 +93,7 @@ fn wots_sign(c &Context, m []u8, skseed []u8, pkseed []u8, mut adr Address) ![][
 		// ADRS.setChainAddress(𝑖)
 		adr.set_chain_address(i)
 		// compute chain 𝑖 signature value, 𝑠𝑖𝑔[𝑖] ← chain(𝑠𝑘, 0, 𝑚𝑠𝑔[𝑖], PK.seed, ADRS)
-		sig[i] = chain(c, sk, 0, msg[i], pkseed, mut adr)!
+		sig[i] = chain(mut c, sk, 0, msg[i], pkseed, mut adr)!
 		// sig << sig_i
 	}
 	return sig
@@ -106,7 +106,7 @@ fn wots_sign(c &Context, m []u8, skseed []u8, pkseed []u8, mut adr Address) ![][
 // Input: WOTS+ signature 𝑠𝑖𝑔, message 𝑀, public seed
 // Output: WOTS+ public key 𝑝𝑘𝑠𝑖𝑔 derived from 𝑠𝑖𝑔.
 @[direct_array_access]
-fn wots_pkfromsig(c &Context, sig [][]u8, m []u8, pkseed []u8, mut adr Address) ![]u8 {
+fn wots_pkfromsig(mut c Context, sig [][]u8, m []u8, pkseed []u8, mut adr Address) ![]u8 {
 	// get some context variables
 	length := c.wots_len()
 	len1 := c.wots_len1()
@@ -131,7 +131,7 @@ fn wots_pkfromsig(c &Context, sig [][]u8, m []u8, pkseed []u8, mut adr Address) 
 		adr.set_chain_address(i)
 		// 𝑡𝑚𝑝[𝑖] ← chain(𝑠𝑖𝑔[𝑖], 𝑚𝑠𝑔[𝑖], 𝑤 − 1 − 𝑚𝑠𝑔[𝑖], PK.seed, ADRS)
 		// x := sig[i * c.prm.n..(i + 1) * c.prm.n]
-		tmp[i] = chain(c, sig[i], msg[i], u32(w) - 1 - msg[i], pkseed, mut adr)!
+		tmp[i] = chain(mut c, sig[i], msg[i], u32(w) - 1 - msg[i], pkseed, mut adr)!
 	}
 	// copy address to create WOTS+ public key address, wotspkADRS ← ADRS
 	mut wots_pkadr := adr.clone()
@@ -156,7 +156,7 @@ fn wots_pkfromsig(c &Context, sig [][]u8, m []u8, pkseed []u8, mut adr Address) 
 // (where 𝑖 + 𝑠 < w
 // NOTE: should this be inlined ?
 @[direct_array_access]
-fn chain(c &Context, x []u8, i u32, s u32, pkseed []u8, mut adr Address) ![]u8 {
+fn chain(mut c Context, x []u8, i u32, s u32, pkseed []u8, mut adr Address) ![]u8 {
 	// We omit the check, its internal function and controllable
 	// if i + s >= w {
 	// 	return error('Invalid wots+ params')

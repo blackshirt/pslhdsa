@@ -14,27 +14,27 @@ import crypto
 // Input: Message 𝑀, signature sig , context string 𝑐𝑡𝑥, public key PK.
 // Output: Boolean.
 @[direct_array_access]
-pub fn slh_verify(msg []u8, sig []u8, cx []u8, pk &PubKey) !bool {
+pub fn slh_verify(msg []u8, sig []u8, cx []u8, mut pk PubKey) !bool {
 	if cx.len > max_context_string_size {
 		return error('pure SLH-DSA signature failed: exceed context-string')
 	}
 	// parse signature bytes into SLHSignature struct
 	parsed_sig := parse_slhsignature(pk.ctx, sig)!
 
-	// return slh_verify_sig(msg []u8, sig &SLHSignature, cx []u8, pk &PubKey) !bool
-	return slh_verify_sig(msg, parsed_sig, cx, pk)!
+	// return slh_verify_sig(msg []u8, sig &SLHSignature, cx []u8, mut pk PubKey) !bool
+	return slh_verify_sig(msg, parsed_sig, cx, mut pk)!
 }
 
 // pure SLH-DSA signature verification
 // Input: Message 𝑀, SLHSignature sig , context string 𝑐𝑡𝑥, public key PK.
 // Output: Boolean.
 @[direct_array_access]
-fn slh_verify_sig(msg []u8, sig &SLHSignature, cx []u8, pk &PubKey) !bool {
+fn slh_verify_sig(msg []u8, sig &SLHSignature, cx []u8, mut pk PubKey) !bool {
 	// 𝑀′ ← toByte(0, 1) ∥ toByte(|𝑐𝑡𝑥|, 1) ∥ 𝑐𝑡𝑥 ∥ m
 	msgout := encode_msg_purehash(cx, msg)
 
-	// return slh_verify_internal(msg []u8, sig &SLHSignature, pk &PubKey) !bool
-	return slh_verify_internal(msgout, sig, pk)!
+	// return slh_verify_internal(msg []u8, sig &SLHSignature, mut pk PubKey) !bool
+	return slh_verify_internal(msgout, sig, mut pk)!
 }
 
 // 9.3 SLH-DSA Signature Verification
@@ -44,7 +44,7 @@ fn slh_verify_sig(msg []u8, sig &SLHSignature, cx []u8, pk &PubKey) !bool {
 // Input: Message 𝑀, signature SIG, public key PK = (PK.seed, PK.root).
 // Output: Boolean.
 @[direct_array_access]
-fn slh_verify_internal(msg []u8, sig &SLHSignature, pk &PubKey) !bool {
+fn slh_verify_internal(msg []u8, sig &SLHSignature, mut pk PubKey) !bool {
 	// localizes some context variables
 	// n := pk.ctx.prm.n
 	a := pk.ctx.prm.a
@@ -104,12 +104,12 @@ fn slh_verify_internal(msg []u8, sig &SLHSignature, pk &PubKey) !bool {
 	addr.set_keypair_address(idxleaf)
 
 	// PK𝐹𝑂𝑅𝑆 ← fors_pkFromSig(SIG𝐹𝑂𝑅𝑆, 𝑚𝑑, PK.seed, ADRS)
-	pkfors := fors_pkfromsig(pk.ctx, sig.fors, md, pk.seed, mut addr)!
+	pkfors := fors_pkfromsig(mut pk.ctx, sig.fors, md, pk.seed, mut addr)!
 
 	//
 	// mut idxtree_cloned := idxtree.clone()
 	// return ht_verify(pk.ctx, pkfors, ht, pk.seed, idxtree, idxleaf, pk.root)!
-	return ht_verify(pk.ctx, pkfors, sig.ht, pk.seed, mut idxtree, idxleaf, pk.root)!
+	return ht_verify(mut pk.ctx, pkfors, sig.ht, pk.seed, mut idxtree, idxleaf, pk.root)!
 }
 
 // Algorithm 25 hash_slh_verify(𝑀, SIG, 𝑐𝑡𝑥, PH, PK)
@@ -117,7 +117,7 @@ fn slh_verify_internal(msg []u8, sig &SLHSignature, pk &PubKey) !bool {
 // Input: Message 𝑀, signature SIG, context string 𝑐𝑡𝑥, pre-hash function PH, public key PK.
 // Output: Boolean.
 @[direct_array_access]
-pub fn hash_slh_verify(msg []u8, sig []u8, cx []u8, ph crypto.Hash, p &PubKey) !bool {
+pub fn hash_slh_verify(msg []u8, sig []u8, cx []u8, ph crypto.Hash, mut p PubKey) !bool {
 	if cx.len > max_context_string_size {
 		return error('pure SLH-DSA signature failed: exceed context-string')
 	}
@@ -139,5 +139,5 @@ pub fn hash_slh_verify(msg []u8, sig []u8, cx []u8, ph crypto.Hash, p &PubKey) !
 	msgout := encode_msg_prehash(cx, oid, phm)
 
 	// return slh_verify_internal(𝑀′, SIG, PK)
-	return slh_verify_internal(msgout, slh_sig, p)!
+	return slh_verify_internal(msgout, slh_sig, mut p)!
 }

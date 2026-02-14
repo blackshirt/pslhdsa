@@ -7,6 +7,9 @@ module pslhdsa
 
 import encoding.binary
 
+// The size of compressed Address, in bytes
+const compressed_addr_size = 22
+
 // The AddressType is an enum of SLH-DSA address type
 // Its value will be 0, 1, 2, 3, 4, 5, or 6.
 // In order to improve readability, these values will be
@@ -36,6 +39,11 @@ fn new_addrtype(v u32) !AddressType {
 	}
 }
 
+// new_address creates an empty address
+fn new_address() Address {
+	return Address{}
+}
+
 // The Address is fundamentally an 32 bytes opaque composed from:
 // -- layer address  4 bytes 	0	0..4
 // -- tree address  12 bytes 	1	4..8
@@ -51,26 +59,23 @@ mut:
 	data [8]u32
 }
 
-// new_address creates an empty address
-fn new_address() Address {
-	return Address{}
+// encode serializes an Addres ad into bytes array stored into dst buffer, in big-endian form
+@[direct_array_access]
+fn (ad Address) encode(mut dst []u8) {
+	_ = dst[31] // bounds check
+	binary.big_endian_put_u32(mut dst[0..4], u32(ad.data[0]))
+	binary.big_endian_put_u32(mut dst[4..8], u32(ad.data[1]))
+	binary.big_endian_put_u32(mut dst[8..12], u32(ad.data[2]))
+	binary.big_endian_put_u32(mut dst[12..16], u32(ad.data[3]))
+	binary.big_endian_put_u32(mut dst[16..20], u32(ad.data[4]))
+	binary.big_endian_put_u32(mut dst[20..24], u32(ad.data[5]))
+	binary.big_endian_put_u32(mut dst[24..28], u32(ad.data[6]))
+	binary.big_endian_put_u32(mut dst[28..32], u32(ad.data[7]))
 }
 
-// bytes returns the bytes representation of Addres ad in big-endian form
-@[direct_array_access; inline]
-fn (ad Address) bytes() []u8 {
-	mut x := []u8{len: 32}
-	binary.big_endian_put_u32(mut x[0..4], u32(ad.data[0]))
-	binary.big_endian_put_u32(mut x[4..8], u32(ad.data[1]))
-	binary.big_endian_put_u32(mut x[8..12], u32(ad.data[2]))
-	binary.big_endian_put_u32(mut x[12..16], u32(ad.data[3]))
-	binary.big_endian_put_u32(mut x[16..20], u32(ad.data[4]))
-	binary.big_endian_put_u32(mut x[20..24], u32(ad.data[5]))
-	binary.big_endian_put_u32(mut x[24..28], u32(ad.data[6]))
-	binary.big_endian_put_u32(mut x[28..32], u32(ad.data[7]))
-	return x
-}
-
+// compress serializes 32-bytes of Address into 22-bytes of compressed address.
+// It stores the result into first of 22-bytes dst buffer.
+//
 // 18. Compressed address (ADRS ) 22 bytes
 //
 // layer address   1 byte
@@ -78,27 +83,24 @@ fn (ad Address) bytes() []u8 {
 // 𝑡𝑦𝑝𝑒             1 byte
 // final          12 bytes
 //
-// compress takes the 32-bytes of Address ad and transforms into form of a 22-bytes of compressed address
 // ie, ADRS𝑐 = ADRS[3] ∥ ADRS[8 ∶ 16] ∥ ADRS[19] ∥ ADRS[20 ∶ 32]).
-@[direct_array_access; inline]
-fn (ad Address) compress() []u8 {
-	mut x := []u8{len: 22}
+@[direct_array_access]
+fn (ad Address) compress(mut dst []u8) {
+	_ = dst[21] // bounds check
 	// 1 byte at 3..4
-	x[0] = u8(ad.data[0] & 0xff)
+	dst[0] = u8(ad.data[0] & 0xff)
 
 	// 8 bytes at 8..16
-	binary.big_endian_put_u32(mut x[1..5], ad.data[2])
-	binary.big_endian_put_u32(mut x[5..9], ad.data[3])
+	binary.big_endian_put_u32(mut dst[1..5], ad.data[2])
+	binary.big_endian_put_u32(mut dst[5..9], ad.data[3])
 
 	// 1 byte at 19..20
-	x[9] = u8(ad.data[4] & 0xff)
+	dst[9] = u8(ad.data[4] & 0xff)
 
 	// 12 bytes at 20..32,
-	binary.big_endian_put_u32(mut x[10..14], ad.data[5])
-	binary.big_endian_put_u32(mut x[14..18], ad.data[6])
-	binary.big_endian_put_u32(mut x[18..22], ad.data[7])
-
-	return x
+	binary.big_endian_put_u32(mut dst[10..14], ad.data[5])
+	binary.big_endian_put_u32(mut dst[14..18], ad.data[6])
+	binary.big_endian_put_u32(mut dst[18..22], ad.data[7])
 }
 
 // clone clones the Address ad into new Address
@@ -117,19 +119,19 @@ fn (ad Address) clone() Address {
 //
 
 // Layer parts
-
+@[inline]
 fn (ad Address) get_layer_address() u32 {
 	return ad.data[0]
 }
 
 // ADRS.setLayerAddress(𝑙) ADRS ← toByte(𝑙, 4) ∥ ADRS[4 ∶ 32]
-
+@[inline]
 fn (mut ad Address) set_layer_address(v u32) {
 	ad.data[0] = v
 }
 
 // Tree parts
-
+@[inline]
 fn (ad Address) get_tree_address() TreeIndex {
 	// TODO: tree address was 12-bytes in size, its currently only handle low 64-bits
 	// return u64(ad.data[2]) << 32 | u64(ad.data[3])
@@ -141,7 +143,7 @@ fn (ad Address) get_tree_address() TreeIndex {
 }
 
 // ADRS.setTreeAddress(𝑡) ADRS ← ADRS[0 ∶ 4] ∥ toByte(𝑡, 12) ∥ ADRS[16 ∶ 32]
-
+@[inline]
 fn (mut ad Address) set_tree_address(v TreeIndex) {
 	// TODO: tree address is 12-bytes in size, its currently only handle 64-bits
 	// bytes a[4:8] of tree address are always zero
@@ -155,35 +157,35 @@ fn (mut ad Address) set_tree_address(v TreeIndex) {
 
 // Address type
 // ADRS.getType() 𝑡𝑦𝑝𝑒 ← toInt(ADRS[16 ∶ 20], 4)
-
+@[inline]
 fn (ad Address) get_type() !AddressType {
 	val := ad.data[4]
 	return new_addrtype(val)!
 }
 
 // set_type only sets the address type
-
+@[inline]
 fn (mut ad Address) set_type(t AddressType) {
 	ad.data[4] = u32(t)
 }
 
 // KEYPAIR
 // ADRS.setKeyPairAddress(𝑖) ADRS ← ADRS[0 ∶ 20] ∥ toByte(𝑖, 4) ∥ ADRS[24 ∶ 32]
-
+@[inline]
 fn (mut ad Address) set_keypair_address(v u32) {
 	ad.data[5] = v
 }
 
 // get_keypair_address returns the key pair address
 // ADRS.getKeyPairAddress() 𝑖 ← toInt(ADRS[20 ∶ 24], 4)
-
+@[inline]
 fn (ad Address) get_keypair_address() u32 {
 	return ad.data[5]
 }
 
 // Set WOTS+ chain address.
 // ADRS.setChainAddress(𝑖) ADRS ← ADRS[0 ∶ 24] ∥ toByte(𝑖, 4) ∥ ADRS[28 ∶ 32]
-
+@[inline]
 fn (mut ad Address) set_chain_address(v u32) {
 	// TODO: assert correct type, 𝑡𝑦𝑝𝑒 = 0 (WOTS_HASH), 𝑡𝑦𝑝𝑒 = 5 (WOTS_PRF)
 	// bytes := to_bytes(x, 4)
@@ -194,7 +196,7 @@ fn (mut ad Address) set_chain_address(v u32) {
 
 // ADRS.setTreeHeight(𝑖) ADRS ← ADRS[0 ∶ 24] ∥ toByte(𝑖, 4) ∥ ADRS[28 ∶ 32]
 // sets FORS tree height
-
+@[inline]
 fn (mut ad Address) set_tree_height(v u32) {
 	// TODO: assert correct type, 𝑡𝑦𝑝𝑒 = 3 (FORS_TREE), 𝑡𝑦𝑝𝑒 = 6 (FORS_PRF), 𝑡𝑦𝑝𝑒 = 2 (TREE)
 	ad.data[6] = v
@@ -202,7 +204,7 @@ fn (mut ad Address) set_tree_height(v u32) {
 
 // ADRS.setTreeIndex(𝑖) ADRS ← ADRS[0 ∶ 28] ∥ toByte(𝑖, 4)
 // Set FORS tree index.
-
+@[inline]
 fn (mut ad Address) set_tree_index(v u32) {
 	// TODO: assert correct type, 𝑡𝑦𝑝𝑒 = 2 (TREE), 𝑡𝑦𝑝𝑒 = 6 (FORS_PRF)
 	// at 28..32
@@ -213,7 +215,7 @@ fn (mut ad Address) set_tree_index(v u32) {
 
 // 𝑖 ← ADRS.getTreeIndex() 𝑖 ← toInt(ADRS[28 ∶ 32], 4)
 // Get FORS tree index.
-
+@[inline]
 fn (ad Address) get_tree_index() u32 {
 	// TODO: assert correct type, 𝑡𝑦𝑝𝑒 = 2 (TREE), 𝑡𝑦𝑝𝑒 = 6 (FORS_PRF)
 	// return u32(to_int(ad.data[28..32], 4))
@@ -230,7 +232,7 @@ fn (mut ad Address) set_hash_address(v u32) {
 }
 
 // ADRS.setTypeAndClear(𝑌) ADRS ← ADRS[0 ∶ 16] ∥ toByte(𝑌 , 4) ∥ toByte(0, 12)
-
+@[inline]
 fn (mut ad Address) set_type_and_clear(t AddressType) {
 	ad.data[4] = u32(t)
 	ad.data[5] = 0
@@ -239,7 +241,7 @@ fn (mut ad Address) set_type_and_clear(t AddressType) {
 }
 
 // set_type_and_clear_not_kp only sets the address type and clears the key pair address
-
+@[inline]
 fn (mut ad Address) set_type_and_clear_not_kp(t AddressType) {
 	ad.data[4] = u32(t)
 	ad.data[6] = 0

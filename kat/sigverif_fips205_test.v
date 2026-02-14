@@ -84,7 +84,7 @@ fn test_slhdsa_sigverify_fips205_external_test_vectors() {
 	sigver_test := json2.decode[SigVerifTest](json_str)!
 	// Test for every test group
 	for tg in sigver_test.testgroups {
-		ctx := pslhdsa.new_context_from_name(tg.parameterset)!
+		tipe := pslhdsa.new_slh_type(tg.parameterset)!
 		// get message encoding mode
 		mode := if tg.prehash == 'pure' {
 			pslhdsa.MsgEncoding.pure
@@ -111,7 +111,7 @@ fn test_slhdsa_sigverify_fips205_external_test_vectors() {
 			addrnd := hex.decode(t.additionalrandomness)!
 			signature := hex.decode(t.signature)!
 
-			pk := pslhdsa.new_pubkey(ctx, pkb)!
+			mut pk := pslhdsa.new_pubkey(pkb, slh_type: tipe)!
 			// get hash function when its in pre-hashed mode
 			if opt.msg_encoding == pslhdsa.MsgEncoding.pre {
 				opt.hfunc = name_to_hfunc(t.hashalg)!

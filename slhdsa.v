@@ -12,10 +12,9 @@ import crypto.sha512
 import crypto.sha3
 import crypto.internal.subtle
 
+// The limit of SLH-DSA context string size, in bytes.
+// Its used to bind the context string into signature generation (verification) phase.
 const max_context_string_size = 255
-
-// the default context used by this SLH-DSA module. it uses the SHA-2 128f hash function
-const default_context = new_context(.sha2_128f)
 
 // The SLH-DSA Private Key
 //
@@ -44,19 +43,19 @@ mut:
 // The signing key has a size of 4 * n bytes, which includes the public key components.
 // i.e. It consists of the concatenation of SK.seed, SK.prf, PK.seed and PF.root
 pub fn (s &SigningKey) bytes() []u8 {
-	mut out := []u8{cap: s.ctx.prm.n * 4}
+	mut out := []u8{cap: 4 * s.ctx.prm.n}
 	out << s.seed
 	out << s.prf
 	out << s.pkseed
 	out << s.pkroot
 
-	return out
+	return out.clone()
 }
 
 // pubkey returns the public key.
 pub fn (s &SigningKey) pubkey() &PubKey {
 	return &PubKey{
-		ctx:  s.ctx.clone()
+		ctx:  s.ctx
 		seed: s.pkseed
 		root: s.pkroot
 	}
@@ -73,7 +72,7 @@ pub fn (s &SigningKey) equal(o &SigningKey) bool {
 // sign signs the message msg with the signing key s.
 // The context string cx must be at most max_context_string_size bytes long.
 @[direct_array_access]
-pub fn (s &SigningKey) sign(msg []u8, cx []u8, opt Options) ![]u8 {
+pub fn (mut s SigningKey) sign(msg []u8, cx []u8, opt Options) ![]u8 {
 	// validate the context string
 	if cx.len > max_context_string_size {
 		return error('cx must be at most max_context_string_size bytes long')
@@ -105,15 +104,17 @@ pub fn (s &SigningKey) sign(msg []u8, cx []u8, opt Options) ![]u8 {
 		encode_msg_purehash(cx, msg)
 	} else {
 		if opt.msg_encoding == .noencode {
+			// Currently its disabled and return an error instead
+			return error('.noencode flag was not supported')
 			// Make sure testing flag is also set
-			if !opt.testing {
-				return error('testing not set for no_prehash feature')
-			}
+			// if !opt.testing {
+			//	return error('testing not set for no_prehash feature')
+			// }
 			// with this .noencode was set, the msg was not encoded.
 			// NOTE: this features deviates from the FIPS 205 spec that
 			// only support for pure-hash and pre-hash SLH-DSA generation.
 			// USE WITH CAUTION!!
-			msg
+			// msg
 		} else {
 			// pre-hashed message encoding
 			// TODO: add supported hash algorithms into list
@@ -131,9 +132,19 @@ pub fn (s &SigningKey) sign(msg []u8, cx []u8, opt Options) ![]u8 {
 	}
 
 	// use slh_sign_internal to generate the signature
-	sig := slh_sign_internal(msgout, s, opt_rand)!
+	sig := slh_sign_internal(msgout, mut s, opt_rand)!
 
 	return sig.bytes()
+}
+
+// name returns the SLH-DSA key name, as informational purposes
+pub fn (s &SigningKey) name() string {
+	return s.ctx.prm.name
+}
+
+// params returns underlying SLH-DSA parameter set defined in the doc. Its act for informational purposes
+pub fn (s &SigningKey) params() ParamSet {
+	return s.ctx.prm
 }
 
 // default maximum of additional randomness size, 2048 bytes.
@@ -148,16 +159,19 @@ const supported_prehash_algo = [crypto.Hash.sha256, .sha384, .sha224, .sha512, .
 @[params]
 pub struct Options {
 pub mut:
+	// slh_type was a default of SLH-DSA type if you dont specifying it into the key generator function.
+	// You should set it into correct SLH-DSA's type do you want to generate.
+	slh_type SLHType = .sha2_128f
+
+	// allow_zeros marks the SLH-DSA key generation routines to allow zeros bytes as a seeed.
+	// By default its has a false value to dissalow zeros bytes used as a seed. Zeros bytes was
+	// commonly marked as a weak keys for cryptographical purposes.
+	// If you not sure, just left it as a false.
+	allow_zeros bool
+
 	// check_pk flag was used in the SLH-DSA key generation process, especially in `slh_keygen_from_bytes`
 	// to tell the routine to perform checking on the PK.root was result in a valid value on the key generation.
 	// By default its set to true, to always to do the check the PK.root on the key generation.
-	//
-	// From the docs stated:
-	// In the case of SLH-DSA, where public-key validation is required, implementations
-	// shall verify that the public key is 2𝑛 bytes in length. When the assurance of private
-	// key possession is obtained via regeneration, the owner of the private key shall check
-	// that the private key is 4𝑛 bytes in length and shall use SK.seed and PK.seed to recompute
-	// PK.root and compare the newly generated value with the value in the private key currently held
 	check_pk bool = true
 
 	// The option below was used in signature generation (verification).
@@ -181,6 +195,7 @@ pub mut:
 	// The default value .pure means for 'Pure SLH-DSA Signature Generation (verification)'.
 	// .pre for 'Pre Hash SLH-DSA Signature Generation (verification)' or .noencode for not encode the mesage behaviour,
 	// .noencode was intended for testing. If not sure, just use the default .pure value.
+	// NOTE: .noencode message encoding was disabled and not supported yet. It would return an error.
 	msg_encoding MsgEncoding = .pure
 
 	// hfunc is the hash function used in pre-hashed message encoding,
@@ -212,18 +227,23 @@ mut:
 // The bytes must be ctx.prm.n * 2 bytes long. Its also check if the seed and root
 // components are all zeroes that unallowed in this module. If so, it returns an error.
 @[direct_array_access]
-pub fn new_pubkey(ctx &Context, bytes []u8) !&PubKey {
-	if bytes.len != ctx.prm.n * 2 {
+pub fn new_pubkey(bytes []u8, opt Options) !&PubKey {
+	// makes a SLH-DSA context from the options
+	ctx := new_context(opt.slh_type)
+	// the bytes should have a 2 * n bytes long
+	if bytes.len != 2 * ctx.prm.n {
 		return error('bytes must be ctx.prm.n * 2 bytes long')
 	}
-	seed := bytes[0..ctx.prm.n]
-	root := bytes[ctx.prm.n..ctx.prm.n * 2]
+	seed := bytes[0..ctx.prm.n].clone()
+	root := bytes[ctx.prm.n..2 * ctx.prm.n].clone()
 	// check if the seed and root are all zeroes
-	if is_zero(seed) || is_zero(root) {
-		return error('seed and root components are all zeroes')
+	if !opt.allow_zeros {
+		if is_zero(seed) || is_zero(root) {
+			return error('seed and root components are all zeroes')
+		}
 	}
 	return &PubKey{
-		ctx:  ctx.clone()
+		ctx:  ctx
 		seed: seed
 		root: root
 	}
@@ -232,11 +252,11 @@ pub fn new_pubkey(ctx &Context, bytes []u8) !&PubKey {
 // bytes returns the public key bytes. The public key has a size of 2 * n bytes.
 // i.e. It consists of the concatenation of PK.seed and PK.root
 pub fn (p &PubKey) bytes() []u8 {
-	mut out := []u8{cap: p.ctx.prm.n * 2}
+	mut out := []u8{cap: 2 * p.ctx.prm.n}
 	out << p.seed
 	out << p.root
-
-	return out
+	// returns the clone of the buffer
+	return out.clone()
 }
 
 // equal returns true if the public key is equal to the other public key.
@@ -248,7 +268,7 @@ pub fn (p &PubKey) equal(o &PubKey) bool {
 // verify verifies the signature of the message msg against the public key p.
 // The context string cx must be at most max_context_string_size bytes long.
 @[direct_array_access]
-pub fn (p &PubKey) verify(msg []u8, sig []u8, cx []u8, opt Options) !bool {
+pub fn (mut p PubKey) verify(msg []u8, sig []u8, cx []u8, opt Options) !bool {
 	// check for context string size
 	if cx.len > max_context_string_size {
 		return error('cx must be at most max_context_string_size bytes long')
@@ -263,15 +283,16 @@ pub fn (p &PubKey) verify(msg []u8, sig []u8, cx []u8, opt Options) !bool {
 		encode_msg_purehash(cx, msg)
 	} else {
 		if opt.msg_encoding == .noencode {
+			// .noencode message encoding was not supported and disabled
+			return error('.noencode flag was not supported')
 			// Make sure testing flag is also set
-			if !opt.testing {
-				return error('testing not set for noencode feature')
-			}
-			// with this noencode was set, the msg was not encoded.
-			// NOTE: this features deviates from the FIPS 205 spec that
-			// only support for pure-hash and pre-hash SLH-DSA generation.
-			// USE WITH CAUTION!!
-			msg
+			// if !opt.testing {
+			// 	return error('testing not set for noencode feature')
+			// }
+			// with this .noencode was set, the msg was not encoded at all and left msg as is.
+			// NOTE: this features deviates from the FIPS 205 spec that only support for pure-hash
+			// and pre-hash SLH-DSA generation, so, USE WITH CAUTION!!
+			// msg
 		} else {
 			// pre-hashed message encoding
 			// TODO: add supported hash algorithms into list
@@ -287,7 +308,12 @@ pub fn (p &PubKey) verify(msg []u8, sig []u8, cx []u8, opt Options) !bool {
 			encode_msg_prehash(cx, oid, phm)
 		}
 	}
-	return slh_verify_internal(msgout, slh_sig, p)!
+	return slh_verify_internal(msgout, slh_sig, mut p)!
+}
+
+// name returns a string of common name from underlying SLH-DSA public key type
+pub fn (p &PubKey) name() string {
+	return p.ctx.prm.name
 }
 
 // SLH-DSA signature data format
@@ -317,7 +343,7 @@ fn parse_slhsignature(c &Context, bytes []u8) !&SLHSignature {
 	// 	calculated length of the signature
 	clength := n + k * (1 + a) * n + (h + d * len) * n
 	if bytes.len != clength {
-		return error('signature bytes must correct size for ${c.kind}')
+		return error('signature bytes must correct size for ${c.tipe}')
 	}
 	r := bytes[0..n]
 	fors := bytes[n..n + k * (1 + a) * n]
@@ -356,10 +382,10 @@ pub enum MsgEncoding {
 	pure
 	// Pre-hash SLH-DSA message encoding construct
 	pre
-	// No encode message encoding construct.
-	// This option is NOT STANDARD, and should be used with caution.
-	// It is only provided for testing purposes or to flag the signer
-	// callers that the message was not encoded.
+	// .noencode was message encoding construc with no encode the message at all.
+	// This option is NOT STANDARD, and should be used with caution. It is only provided for testing
+	// purposes or to flag the signer callers that the message was not encoded.
+	// NOTE: Currently its disabled and not supported yet
 	noencode
 }
 

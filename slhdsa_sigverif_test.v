@@ -24,21 +24,27 @@ fn test_slhdsa_internal_signature_verify() ! {
 	sig := hex.decode(signature)!
 
 	ctx := new_context_from_name(parameterset)!
-	pkey := new_pubkey(ctx, pkb)!
+	mut pkey := new_pubkey(pkb, slh_type: ctx.tipe)!
 
 	slh_sig := parse_slhsignature(ctx, sig)!
 	// slh_verify_internal(msg []u8, sig &SLHSignature, pk &PubKey) !bool
-	result := slh_verify_internal(msg, slh_sig, pkey)!
+	result := slh_verify_internal(msg, slh_sig, mut pkey)!
 
 	assert result == testpassed
 
+	// NOTE: .noencode message encoding was not supported for public api.
+	// So, disabled this test
+	//
 	// Test with PubKey.verify API
-	opt := Options{
-		msg_encoding: MsgEncoding.noencode
-		testing:      true
-	}
-	cx := []u8{}
+	// opt := Options{
+	//	msg_encoding: MsgEncoding.noencode
+	//	testing:      true
+	// }
+	// cx := []u8{}
 	// verify(msg []u8, sig []u8, cx []u8, opt Options) !bool
-	result2 := pkey.verify(msg, sig, cx, opt)!
-	assert result2 == testpassed
+	// result2 := pkey.verify(msg, sig, cx, opt) or {
+	// 	assert err == error('.noencode flag was not supported')
+	// 	true
+	// }
+	// assert result2 == testpassed
 }

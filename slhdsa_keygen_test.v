@@ -11,7 +11,7 @@ import encoding.hex
 //
 struct KeygenTest {
 	tcid   int
-	kind   string
+	tipe   string
 	skseed string
 	skprf  string
 	pkseed string
@@ -23,7 +23,7 @@ struct KeygenTest {
 fn test_basic_slh_keygen_from_bytes() ! {
 	// slh_keygen_internal(mut c Context, skseed []u8, skprf []u8, pkseed []u8) !(Sk, Pk)
 	for item in keygen_samples {
-		c := new_context(kind_from_name(item.kind)!)
+		c := new_context_from_name(item.tipe)!
 		skseed := hex.decode(item.skseed)!
 		skprf := hex.decode(item.skprf)!
 		pkseed := hex.decode(item.pkseed)!
@@ -34,7 +34,7 @@ fn test_basic_slh_keygen_from_bytes() ! {
 		// pk_root was splitted from pkout, where its pkseed+pk_root
 		pk_root := pkout[c.prm.n..]
 
-		sk := slh_keygen_from_seed(c, skseed, skprf, pkseed)!
+		sk := slh_keygen_from_seed(skseed, skprf, pkseed, slh_type: c.tipe)!
 
 		assert sk.pkroot == pk_root
 		assert sk.bytes() == skout
@@ -48,8 +48,8 @@ fn test_keygen_sha192f() {
 	skprf := hex.decode('1E96B555B153B31DFD650E5FB1DE1AD26C2B001E60A9C628')!
 	pkseed := hex.decode('1EACBB554054B50FFDD3E422160DD0EC7CCBFB78F5444395')!
 
-	ctx := new_context(kind_from_name('SLH-DSA-SHA2-192f')!)
-	sk := slh_keygen_from_seed(ctx, skseed, skprf, pkseed)!
+	ctx := new_context_from_name('SLH-DSA-SHA2-192f')!
+	sk := slh_keygen_from_seed(skseed, skprf, pkseed, slh_type: ctx.tipe)!
 
 	expected_sk := hex.decode('45508312B19B0D2D0C6D345B26223BFEF245CCDD36163DFF1E96B555B153B31DFD650E5FB1DE1AD26C2B001E60A9C6281EACBB554054B50FFDD3E422160DD0EC7CCBFB78F5444395CFA9D316F9FEDA6650AC3796A7989621D95BF6328D8547BD')!
 	assert expected_sk == sk.bytes()
@@ -64,8 +64,8 @@ fn test_keygen_sha256f() {
 	skprf := hex.decode('34DEEA15C8968E26F9C344375D44CB77726C69D6064C4EE0979284A5F4710D1D')!
 	pkseed := hex.decode('F682CAED17CD784AD9DE06C8652924EA82193972E4E3109613A2302B83A2B063')!
 
-	ctx := new_context(kind_from_name('SLH-DSA-SHA2-256f')!)
-	sk := slh_keygen_from_seed(ctx, skseed, skprf, pkseed)!
+	ctx := new_context_from_name('SLH-DSA-SHA2-256f')!
+	sk := slh_keygen_from_seed(skseed, skprf, pkseed, slh_type: ctx.tipe)!
 
 	expected_sk := hex.decode('15630D30A19756ECF040BE32C3A8299848249C91C0C6C7410E8BAC1F827E66B734DEEA15C8968E26F9C344375D44CB77726C69D6064C4EE0979284A5F4710D1DF682CAED17CD784AD9DE06C8652924EA82193972E4E3109613A2302B83A2B063A262DE3A300218451FD7882DD12F4F47124C3573825FD862CADD5EBE7AA09C3C')!
 	assert expected_sk == sk.bytes()
@@ -80,7 +80,7 @@ fn test_keygen_sha256f() {
 const keygen_samples = [
 	KeygenTest{
 		tcid:   1
-		kind:   'SLH-DSA-SHA2-128s'
+		tipe:   'SLH-DSA-SHA2-128s'
 		skseed: 'AC379F047FAAB2004F3AE32350AC9A3D'
 		skprf:  '829FFF0AA59E956A87F3971C4D58E710'
 		pkseed: '0566D240CC519834322EAFBCC73C79F5'
@@ -89,7 +89,7 @@ const keygen_samples = [
 	},
 	KeygenTest{
 		tcid:   2
-		kind:   'SLH-DSA-SHA2-128s'
+		tipe:   'SLH-DSA-SHA2-128s'
 		skseed: '20D43B51FB11AF1FE3C6459B7BB90D50'
 		skprf:  '4F63BA1D6CC9B355D47E49C958658160'
 		pkseed: 'F420447CFE8F1823CE5BBFF0030CC69D'
@@ -98,7 +98,7 @@ const keygen_samples = [
 	},
 	KeygenTest{
 		tcid:   3
-		kind:   'SLH-DSA-SHA2-128s'
+		tipe:   'SLH-DSA-SHA2-128s'
 		skseed: '94FDCD4EDA1BBF7FB510FE16C42BFC57'
 		skprf:  '2859455BDA66A81FE212501B3D82572B'
 		pkseed: '357DBB62C05296027861917D4AA53CF7'
@@ -107,7 +107,7 @@ const keygen_samples = [
 	},
 	KeygenTest{
 		tcid:   11
-		kind:   'SLH-DSA-SHAKE-128s'
+		tipe:   'SLH-DSA-SHAKE-128s'
 		skseed: '2A2CCF3CD8F9F86E131BE654CFF6C0B4'
 		skprf:  'FDFCEB1AA2F0BA2C3C1388194F6116C7'
 		pkseed: '890CC7F4A46FE6C34D3F26A62FF962E1'
@@ -116,7 +116,7 @@ const keygen_samples = [
 	},
 	KeygenTest{
 		tcid:   12
-		kind:   'SLH-DSA-SHAKE-128s'
+		tipe:   'SLH-DSA-SHAKE-128s'
 		skseed: '35DE5545D627E5AFC8F8669662A8728C'
 		skprf:  '51569550F70E010898462443C877CAAA'
 		pkseed: 'E756D06936FD4C3B6E41C5013D2B36BC'
@@ -125,7 +125,7 @@ const keygen_samples = [
 	},
 	KeygenTest{
 		tcid:   13
-		kind:   'SLH-DSA-SHAKE-128s'
+		tipe:   'SLH-DSA-SHAKE-128s'
 		skseed: '47098E209EADC5C15FEC2B2E58F3016A'
 		skprf:  '9B9054CADFB443724F253FAA7F2178BE'
 		pkseed: 'D4CAD475F7579DD5E29562F962188C27'
@@ -134,7 +134,7 @@ const keygen_samples = [
 	},
 	KeygenTest{
 		tcid:   21
-		kind:   'SLH-DSA-SHA2-128f'
+		tipe:   'SLH-DSA-SHA2-128f'
 		skseed: 'AED6F6F5C5408BBFFA1136BC9049A701'
 		skprf:  '4D4CE0711E176A0C8A023508A692C207'
 		pkseed: '74D98D5000AF53B98F36389A1292BED3'
@@ -143,7 +143,7 @@ const keygen_samples = [
 	},
 	KeygenTest{
 		tcid:   22
-		kind:   'SLH-DSA-SHA2-128f'
+		tipe:   'SLH-DSA-SHA2-128f'
 		skseed: '70B19FCA9B6522347E32344FF3293053'
 		skprf:  'B4ED68C937BBEAE268A4948C72B044BA'
 		pkseed: 'C5BF30C4A6787951315A0126C16566C9'
@@ -152,7 +152,7 @@ const keygen_samples = [
 	},
 	KeygenTest{
 		tcid:   23
-		kind:   'SLH-DSA-SHA2-128f'
+		tipe:   'SLH-DSA-SHA2-128f'
 		skseed: '35C317B8625A0AE432CAA14D3CACCB90'
 		skprf:  'B0144CF517FB109EBC880DC8361D1CA6'
 		pkseed: 'D7036D522C1FE1CD6EEA07DE0ED5D657'
@@ -161,7 +161,7 @@ const keygen_samples = [
 	},
 	KeygenTest{
 		tcid:   41
-		kind:   'SLH-DSA-SHA2-192s'
+		tipe:   'SLH-DSA-SHA2-192s'
 		skseed: '3BFAED208B7DC795BF3647F86E4B48BF9ADB8D6784C50155'
 		skprf:  'A20311739497C3FCB860EE47E09EDE036F7AE8A939155BC0'
 		pkseed: 'A67856A81A6ADBCED7F1A2780CC48A06681BA5E8C7938506'
@@ -170,7 +170,7 @@ const keygen_samples = [
 	},
 	KeygenTest{
 		tcid:   42
-		kind:   'SLH-DSA-SHA2-192s'
+		tipe:   'SLH-DSA-SHA2-192s'
 		skseed: 'A083FDD6DAF6FBFC82F879F69AA2B9AD2B7C722585B67598'
 		skprf:  '4A57A583ED81CDE66ED87634A40A67AD64486E19338C13D7'
 		pkseed: '854D536E8EEC3E703E1248E611AE16F29AB332D1F8A7EDED'
@@ -179,7 +179,7 @@ const keygen_samples = [
 	},
 	KeygenTest{
 		tcid:   43
-		kind:   'SLH-DSA-SHA2-192s'
+		tipe:   'SLH-DSA-SHA2-192s'
 		skseed: '72D9AC9CDCD347FA90479F908A4AFA7CA972DBCF0BF2A5DF'
 		skprf:  '760555465A27F5B47B43EF53C6EC6441B8C2DBAD7FAB3C94'
 		pkseed: '0A3D81B32C499138A1FCF22F927680CB33E3ADFED3FAA546'
@@ -188,7 +188,7 @@ const keygen_samples = [
 	},
 	KeygenTest{
 		tcid:   61
-		kind:   'SLH-DSA-SHA2-192f'
+		tipe:   'SLH-DSA-SHA2-192f'
 		skseed: '45D7131C727DF1CC51DB85B44E37868215DF8AEC5D1B552F'
 		skprf:  '92BC5FC8A2969FE0A522492082E994DE1DDC90FA984F847B'
 		pkseed: '8330589C20701AA9F11B473B67E1D67E1C6A2EB6C86265ED'
@@ -197,7 +197,7 @@ const keygen_samples = [
 	},
 	KeygenTest{
 		tcid:   62
-		kind:   'SLH-DSA-SHA2-192f'
+		tipe:   'SLH-DSA-SHA2-192f'
 		skseed: 'C359F4AA77D938A79B7269C591A5D8120F882F00932CB633'
 		skprf:  '6715B05D2B057DD0E3822C5E316D25381D85591F37EA21E7'
 		pkseed: '7B3C40FBA0598852B9EF5045DFAC695D3E69AA20106F13F4'
@@ -206,7 +206,7 @@ const keygen_samples = [
 	},
 	KeygenTest{
 		tcid:   63
-		kind:   'SLH-DSA-SHA2-192f'
+		tipe:   'SLH-DSA-SHA2-192f'
 		skseed: '809EA380F5D42FBC8DFC75E90C42820B37652EEF2CA7F5B6'
 		skprf:  'DDCFE30EC2D375032F4F3C032A5AF4D6B46C7556D5D84B8D'
 		pkseed: '808AD21AF4358E1696E09055A39F265712FA466CCCE4CB8B'
@@ -215,7 +215,7 @@ const keygen_samples = [
 	},
 	KeygenTest{
 		tcid:   64
-		kind:   'SLH-DSA-SHA2-192f'
+		tipe:   'SLH-DSA-SHA2-192f'
 		skseed: '411191D5555C3C1BADA4F81EE616E79158211EAF57D29702'
 		skprf:  'E14A4DE287CD88FA06F29B8E6BF33AC6AFF7245938585B62'
 		pkseed: '801E3905E31F66F06DFEE8C553F49185717DB104BA382893'
@@ -224,7 +224,7 @@ const keygen_samples = [
 	},
 	KeygenTest{
 		tcid:   81
-		kind:   'SLH-DSA-SHA2-256s'
+		tipe:   'SLH-DSA-SHA2-256s'
 		skseed: '2FBEAB9A6A80FD817E7EFCDF834EFBD4F0A36195D7598408A6A151E93DE6A557'
 		skprf:  '5D0B37D1ECBC68265B0AFEECBBA783DD27EAFDBDF3143E4AF3E5057FD5C2DADA'
 		pkseed: '1322F94917AE67D0DB420203178D591283C08BE8A1385A16CE70CD9FBAFD2AC6'
@@ -233,7 +233,7 @@ const keygen_samples = [
 	},
 	KeygenTest{
 		tcid:   82
-		kind:   'SLH-DSA-SHA2-256s'
+		tipe:   'SLH-DSA-SHA2-256s'
 		skseed: '59DC672E7B975F8911409FA7FDE582BD14AB3CEC31A57710155E8AC44C5A5649'
 		skprf:  'A9E7E3F364C34815AAD9215382250ABBB381CD424E43DF32FBAC3056AE71B809'
 		pkseed: '4F08486D0D98C7DEE706594123BFE3DEBBCFF15BC7CAEAD58DBEFCCB34274B9A'
@@ -242,7 +242,7 @@ const keygen_samples = [
 	},
 	KeygenTest{
 		tcid:   83
-		kind:   'SLH-DSA-SHA2-256s'
+		tipe:   'SLH-DSA-SHA2-256s'
 		skseed: 'C5C3D80CB42286F9C24BB078D3FAB98093B9EFE0083835373F2C7F85A7275704'
 		skprf:  '5E33775CFEAE650C53926A86F9ACB5D749C0F3B9FA5B37534CAE3C86A7CFEF67'
 		pkseed: 'DBEFAF8E209A7B5DFD3FC92C56DDD9C505085054417FAE0A440D121FF1A07371'
@@ -251,7 +251,7 @@ const keygen_samples = [
 	},
 	KeygenTest{
 		tcid:   101
-		kind:   'SLH-DSA-SHA2-256f'
+		tipe:   'SLH-DSA-SHA2-256f'
 		skseed: 'B8ABC485122BE003CF36D677BEE7F47EA1017C39D96D0C56A87A7ADAD24F731A'
 		skprf:  '9222684FFACF803D44CB98222C44B3C519698B798D8F7A759FE2FA6EF173CF64'
 		pkseed: '0D50E82BEDB42E03CC967E7FD24C12777855A946FD49471184330F096A75B561'
@@ -260,7 +260,7 @@ const keygen_samples = [
 	},
 	KeygenTest{
 		tcid:   102
-		kind:   'SLH-DSA-SHA2-256f'
+		tipe:   'SLH-DSA-SHA2-256f'
 		skseed: 'EFBF2801445EA159BFF2C460A3A09FB03C5E47547C9621A97B1CFDB7B265EBBE'
 		skprf:  '8079D79F1559A5F9FA2D75C7C2D0CEA6A531968EE97AB4B28EEFE8A11D685E86'
 		pkseed: 'DAEFD98FFB246D311128FD58339EB970C2310849ACF011AFC79A40DEF5F6A661'
@@ -269,7 +269,7 @@ const keygen_samples = [
 	},
 	KeygenTest{
 		tcid:   103
-		kind:   'SLH-DSA-SHA2-256f'
+		tipe:   'SLH-DSA-SHA2-256f'
 		skseed: '35925CD7C6F00268C3F9481D03D8B9504C249647BD93A4ACCB0D44D404F54657'
 		skprf:  '4FF44753D29B314C0EFFF3C14E3B23E69BB96F25596411604B25215AC4C8FFEA'
 		pkseed: '19F753852878B9FFF6734321B3DF5548F89D9FE40CA38D942EF25FCD48D35E12'

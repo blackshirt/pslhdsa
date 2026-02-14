@@ -1,5 +1,5 @@
 ## pslhdsa
-a SLH-DSA implementation in pure V language
+An experimental Stateless Hash-based Digital Signature Algorithm (SLH-DSA) implementation in pure V language
 
 `pslhdsa` is an (experimental) quantum resistent cryptographic digital signature library based on 
 Stateless Hash-Based Digital Signature Standard (SLH-DSA) implemented in pure V language.
@@ -7,6 +7,10 @@ A SLH-DSA was approved and publicly published by NIST at August, 2024.
 Its availables on NIST FIPS 205. SLH-DSA allow builds relatively big signaturue size with 
 small key (16 - 32 bytes key). 
 The signatures range from ±8K - ±50K depending on the type chosen.
+
+> [!WARNING]    
+> This module was absolutely an experimental library. Its rapidly changed, so, make sure synchronizes 
+> your code with the last thing.
 
 ## Features
 - Support signature types defined on the standard
@@ -16,17 +20,7 @@ The signatures range from ±8K - ±50K depending on the type chosen.
 ## Basic 
 `pslhdsa` provides a simple interface for generating and verifying signatures.
 1. The basic fundamental type that describes SLH-DSA parameter set is a `Context` structure,
-defined as
-```code
-pub struct Context {
-	// The kind (type) of this SLH-DSA context, set on context creation
-	kind Kind
-pub:
-	// Underlying SLH-DSA parameter set described in the doc
-	prm Param
-}
-```
-where `Kind` is an enum that describes the signature type chosen.
+and the `Kind` opaque where it is an enum that describes the signature type chosen.
 You can create a `Context` opaque by calling `new_context(k Kind)` 
 or `new_context_from_name(name string)!` 
 

@@ -137,21 +137,21 @@ fn (x &XmssSignature) bytes() []u8 {
 // address ADRS.
 // Output: 𝑛-byte root 𝑛𝑜𝑑e
 @[direct_array_access]
-fn xmss_node(c &Context, skseed []u8, i u32, z u32, pkseed []u8, mut addr Address) ![]u8 {
+fn xmss_node(mut c Context, skseed []u8, i u32, z u32, pkseed []u8, mut addr Address) ![]u8 {
 	if z == 0 {
 		// ADRS.setTypeAndClear(WOTS_HASH)
 		addr.set_type_and_clear(.wots_hash)
 		// ADRS.setKeyPairAddress(𝑖)
 		addr.set_keypair_address(i)
 		// 𝑛𝑜𝑑𝑒 ← wots_pkGen(SK.seed, PK.seed, ADRS)
-		// wots_pkgen(c &Context, skseed []u8, pkseed []u8, addr Address)
-		return wots_pkgen(c, skseed, pkseed, mut addr)!
+		// wots_pkgen(mut c Context, skseed []u8, pkseed []u8, addr Address)
+		return wots_pkgen(mut c, skseed, pkseed, mut addr)!
 	}
 	// otherwise
 	// 𝑙𝑛𝑜𝑑𝑒 ← xmss_node(SK.seed, 2𝑖, 𝑧 − 1, PK.seed, ADRS)
-	lnode := xmss_node(c, skseed, 2 * i, z - 1, pkseed, mut addr)!
+	lnode := xmss_node(mut c, skseed, 2 * i, z - 1, pkseed, mut addr)!
 	// 𝑟𝑛𝑜𝑑𝑒 ← xmss_node(SK.seed, 2𝑖 + 1, 𝑧 − 1, PK.seed, ADRS)
-	rnode := xmss_node(c, skseed, (2 * i) + 1, z - 1, pkseed, mut addr)!
+	rnode := xmss_node(mut c, skseed, (2 * i) + 1, z - 1, pkseed, mut addr)!
 	// 8: ADRS.setTypeAndClear(TREE)
 	addr.set_type_and_clear(.tree)
 	// 9: ADRS.setTreeHeight(𝑧)
@@ -175,14 +175,14 @@ fn xmss_node(c &Context, skseed []u8, i u32, z u32, pkseed []u8, mut addr Addres
 // address ADRS.
 // Output: XMSS signature SIG𝑋𝑀𝑆𝑆 = (𝑠𝑖𝑔 ∥ AUTH).
 @[direct_array_access]
-fn xmss_sign(c &Context, m []u8, skseed []u8, idx u32, pkseed []u8, mut addr Address) !&XmssSignature {
+fn xmss_sign(mut c Context, m []u8, skseed []u8, idx u32, pkseed []u8, mut addr Address) !&XmssSignature {
 	mut auth := [][]u8{len: c.prm.hp}
 	// build authentication path
 	for j := u32(0); j < c.prm.hp; j++ {
 		// 𝑘 ← ⌊𝑖𝑑𝑥/2^𝑗⌋ ⊕ 1
 		k := (idx >> j) ^ 1
 		// 3: AUTH[𝑗] ← xmss_node(SK.seed, 𝑘, 𝑗, PK.seed, ADRS)
-		auth[j] = xmss_node(c, skseed, k, j, pkseed, mut addr)!
+		auth[j] = xmss_node(mut c, skseed, k, j, pkseed, mut addr)!
 	}
 	// ADRS.setTypeAndClear(WOTS_HASH)
 	addr.set_type_and_clear(.wots_hash)
@@ -191,7 +191,7 @@ fn xmss_sign(c &Context, m []u8, skseed []u8, idx u32, pkseed []u8, mut addr Add
 
 	// 7: 𝑠𝑖𝑔 ← wots_sign(𝑀, SK.seed, PK.seed, ADRS)
 	// wots signature was defined as [][]u8 arrays
-	sig := wots_sign(c, m, skseed, pkseed, mut addr)!
+	sig := wots_sign(mut c, m, skseed, pkseed, mut addr)!
 
 	// 8: SIG𝑋𝑀𝑆𝑆 ← 𝑠𝑖𝑔 ∥ AUTH
 	return &XmssSignature{
@@ -207,7 +207,7 @@ fn xmss_sign(c &Context, m []u8, skseed []u8, idx u32, pkseed []u8, mut addr Add
 // Input: Index 𝑖𝑑𝑥, XMSS signature SIG𝑋𝑀𝑆𝑆 = (𝑠𝑖𝑔 ∥ AUTH), 𝑛-byte message, public seed PK.seed, address ADRS.
 // Output: 𝑛-byte root value 𝑛𝑜𝑑𝑒[0].
 @[direct_array_access]
-fn xmms_pkfromsig(c &Context, idx u32, sig_xmss &XmssSignature, m []u8, pkseed []u8, mut addr Address) ![]u8 {
+fn xmms_pkfromsig(mut c Context, idx u32, sig_xmss &XmssSignature, m []u8, pkseed []u8, mut addr Address) ![]u8 {
 	// compute WOTS+ pk from WOTS+ 𝑠𝑖g, ADRS.setTypeAndClear(WOTS_HASH)
 	addr.set_type_and_clear(.wots_hash)
 	// ADRS.setKeyPairAddress(𝑖𝑑𝑥)
@@ -218,8 +218,8 @@ fn xmms_pkfromsig(c &Context, idx u32, sig_xmss &XmssSignature, m []u8, pkseed [
 	auth := sig_xmss.get_xmss_auth() // sig_xmss[c.wots_len() * c.prm.n..(c.wots_len() + c.prm.hp) * c.prm.n]
 
 	// 𝑛𝑜𝑑𝑒[0] ← wots_pkFromSig(𝑠𝑖𝑔, 𝑀, PK.seed, ADRS)
-	// wots_pkfromsig(c &Context, sig [][]u8, m []u8, pkseed []u8, mut adr Address) ![]u8
-	mut node_0 := wots_pkfromsig(c, sig, m, pkseed, mut addr)!
+	// wots_pkfromsig(mut c Context, sig [][]u8, m []u8, pkseed []u8, mut adr Address) ![]u8
+	mut node_0 := wots_pkfromsig(mut c, sig, m, pkseed, mut addr)!
 	mut node_1 := []u8{}
 
 	// compute root from WOTS+ pk and AUTH

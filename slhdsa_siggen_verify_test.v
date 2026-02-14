@@ -10,14 +10,14 @@ import encoding.hex
 // Test 1
 // Test basic signing and verification
 fn test_sign_verify_internal_basic() ! {
-	sk := slh_keygen(new_context(.sha2_128f))!
-	pk := sk.pubkey()
+	mut sk := slh_keygen(.sha2_128f)!
+	mut pk := sk.pubkey()
 
 	msg := 'hello'.bytes()
 	addrnd := []u8{len: 12, init: 0x0f}
-	sig := slh_sign_internal(msg, sk, addrnd)!
+	sig := slh_sign_internal(msg, mut sk, addrnd)!
 
-	verified := slh_verify_internal(msg, sig, pk)!
+	verified := slh_verify_internal(msg, sig, mut pk)!
 	assert verified == true
 }
 
@@ -48,14 +48,14 @@ fn test_deterministic_sign_verify_shake128f() ! {
 
 	pkb := hex.decode(item.pk)!
 	assert pkb.len == 2 * c.prm.n
-	pk := new_pubkey(c, pkb)!
+	mut pk := new_pubkey(pkb, slh_type: c.tipe)!
 
 	msg := hex.decode(item.message)!
 	cx := hex.decode(item.context)!
 	signature := hex.decode(item.signature)!
 
-	seckey := slh_keygen_from_bytes(c, skb)!
-	secpk := seckey.pubkey()
+	mut seckey := slh_keygen_from_bytes(skb, slh_type: c.tipe)!
+	mut secpk := seckey.pubkey()
 
 	assert seckey.pkseed == pk.seed
 	assert secpk.equal(pk)
@@ -65,16 +65,16 @@ fn test_deterministic_sign_verify_shake128f() ! {
 	// sign in deterministic way, use pk.seed for optional randomness
 	opt_rand := pk.seed.clone()
 	msgout := encode_msg_purehash(cx, msg)
-	sig := slh_sign_internal(msgout, seckey, opt_rand)!
+	sig := slh_sign_internal(msgout, mut seckey, opt_rand)!
 
 	assert sig.bytes() == signature // PASS
 
 	// verified := slh_verify(msg []u8, sig &SLHSignature, cx []u8, pk &PubKey) !bool
-	verified := slh_verify_sig(msg, sig, cx, pk)!
+	verified := slh_verify_sig(msg, sig, cx, mut pk)!
 	assert verified == true
 
 	// the facing public api slh_verify(msg []u8, sig []u8, cx []u8, pk &PubKey) !bool
-	verified2 := slh_verify(msg, sig.bytes(), cx, pk)!
+	verified2 := slh_verify(msg, sig.bytes(), cx, mut pk)!
 	assert verified2 == true
 
 	// Test with SigningKey.sign API
@@ -87,7 +87,7 @@ fn test_deterministic_sign_verify_shake128f() ! {
 	}
 	sig2 := seckey.sign(msg, cx, opt)!
 	assert sig2 == signature
-	verified3 := slh_verify(msg, signature, cx, pk)!
+	verified3 := slh_verify(msg, signature, cx, mut pk)!
 	assert verified3 == true
 
 	verified4 := pk.verify(msg, signature, cx, opt)!
@@ -117,9 +117,9 @@ fn test_pure_prehash_signature_generation_verify() ! {
 			addrnd := hex.decode(t.additionalrandomness)!
 			sig := hex.decode(t.signature)!
 
-			//
-			sk := slh_keygen_from_bytes(ctx, skb)!
-			pk := new_pubkey(ctx, pkb)!
+			// generates key pair
+			mut sk := slh_keygen_from_bytes(skb, slh_type: ctx.tipe)!
+			mut pk := new_pubkey(pkb, slh_type: ctx.tipe)!
 			assert sk.pubkey().bytes() == pkb
 			assert pk.bytes() == pkb
 			assert pk.seed == sk.pkseed

@@ -12,24 +12,26 @@ import crypto.internal.subtle
 //
 // Algorithm 21 slh_keygen()
 // Generates an SLH-DSA signing key.
-// Input: The context of the SLH-DSA algorithm.
+// Input: The optional options for key generation or use default one
 // Output: SLH-DSA signing key
-// slh_keygen generates a SLH-DSA signing key with the given context.
+// slh_keygen generates a SLH-DSA signing key with the given options.
 // By default, it uses crypto.rand to generate random seed for the key generation.
 // Internally, the signing key result embeds the public key part of the key pair.
 // You can get the public key part by calling the `pk := sk.pubkey()` method.
-pub fn slh_keygen(c &Context) !&SigningKey {
-	// set SK.seed, SK.prf, and PK.seed to random 𝑛-byte
-	skseed := rand.read(c.prm.n)!
-	skprf := rand.read(c.prm.n)!
-	pkseed := rand.read(c.prm.n)!
+pub fn slh_keygen(t SLHType) !&SigningKey {
+	// makes the SLH-DSA context from tipe t
+	mut c := new_context(t)
 
-	// check if the seed is all zeroes
-	if is_zero(skseed) || is_zero(skprf) || is_zero(pkseed) {
-		return error('seed is all zeroes')
-	}
+	// Set SK.seed, SK.prf, and PK.seed to random 𝑛-byte
+	//
+	// Note: instead of 3 times call on the `rand.read`, we do single `rand.read` call with 3*n size
+	seed := rand.read(3 * c.prm.n)!
+	skseed := unsafe { seed[0..c.prm.n] }
+	skprf := unsafe { seed[c.prm.n..2 * c.prm.n] }
+	pkseed := unsafe { seed[2 * c.prm.n..3 * c.prm.n] }
+
 	// 10.1.1 Key Generation Steps
-	return slh_keygen_internal(c, skseed, skprf, pkseed)!
+	return slh_keygen_internal(mut c, skseed, skprf, pkseed)!
 }
 
 // slh_keygen_from_bytes generates a SLH-DSA signing key with the given bytes.
@@ -38,30 +40,36 @@ pub fn slh_keygen(c &Context) !&SigningKey {
 // NOTE: For each invocation of key generation, bytes of values shall be a fresh
 // (i.e., not previously used) random value generated using an approved random bit generator
 @[direct_array_access]
-pub fn slh_keygen_from_bytes(ctx &Context, bytes []u8, opt Options) !&SigningKey {
+pub fn slh_keygen_from_bytes(bytes []u8, opt Options) !&SigningKey {
+	// makes the SLH-DSA context from the tipe in the options
+	mut c := new_context(opt.slh_type)
+
 	// check if the bytes length is equal to n * 4
-	if bytes.len != 4 * ctx.prm.n {
+	if bytes.len != 4 * c.prm.n {
 		return error('seed length must be equal to n * 4')
 	}
-	skseed := bytes[..ctx.prm.n]
-	skprf := bytes[ctx.prm.n..2 * ctx.prm.n]
-	pkseed := bytes[2 * ctx.prm.n..3 * ctx.prm.n]
-	pkroot := bytes[3 * ctx.prm.n..]
+
+	skseed := bytes[..c.prm.n] // 1st of c.prm.n chunk
+	skprf := bytes[c.prm.n..2 * c.prm.n] // 2nd of c.prm.n chunk
+	pkseed := bytes[2 * c.prm.n..3 * c.prm.n] // 3rd of c.prm.n chunk
+	pkroot := bytes[3 * c.prm.n..] // the last c.prm.n chunk
 
 	// check for unallowed zeros in the seed
-	if is_zero(skseed) || is_zero(skprf) || is_zero(pkseed) || is_zero(pkroot) {
-		return error('seed is all zeroes')
+	if !opt.allow_zeros {
+		if is_zero(skseed) || is_zero(skprf) || is_zero(pkseed) || is_zero(pkroot) {
+			return error('seed is all or one of them are zeros bytes')
+		}
 	}
 	// check if the public key root is valid for the given context by doing
 	// procedure step in Algorithm 18 of slh_keygen_internal
 	if opt.check_pk {
 		mut addr := new_address()
 		// 2: ADRS.setLayerAddress(𝑑 − 1)
-		addr.set_layer_address(u32(ctx.prm.d - 1))
+		addr.set_layer_address(u32(c.prm.d - 1))
 		// 3: PK.root ← xmss_node(SK.seed, 0, ℎ′ , PK.seed, ADRS)
-		pkroot_node := xmss_node(ctx, skseed, 0, u32(ctx.prm.hp), pkseed, mut addr)!
+		pkroot_node := xmss_node(mut c, skseed, 0, u32(c.prm.hp), pkseed, mut addr)!
 		// Check if the xmss_node function call was successful
-		if pkroot_node.len != ctx.prm.n {
+		if pkroot_node.len != c.prm.n {
 			return error('xmss_node failed')
 		}
 		// 4: Check if the computed root matches the provided root
@@ -71,7 +79,7 @@ pub fn slh_keygen_from_bytes(ctx &Context, bytes []u8, opt Options) !&SigningKey
 	}
 	// otherwise, its ok to return the signing key
 	return &SigningKey{
-		ctx:    ctx.clone()
+		ctx:    c
 		seed:   skseed
 		prf:    skprf
 		pkseed: pkseed
@@ -84,16 +92,20 @@ pub fn slh_keygen_from_bytes(ctx &Context, bytes []u8, opt Options) !&SigningKey
 // NOTE: For each invocation of key generation, these seed of values shall be a fresh
 // (i.e., not previously used) random value generated using an approved random bit generator
 @[direct_array_access]
-pub fn slh_keygen_from_seed(ctx &Context, skseed []u8, skprf []u8, pkseed []u8) !&SigningKey {
+pub fn slh_keygen_from_seed(skseed []u8, skprf []u8, pkseed []u8, opt Options) !&SigningKey {
+	// makes the SLH-DSA context from the options
+	mut c := new_context(opt.slh_type)
 	// check for the length	
-	if skseed.len != ctx.prm.n || skprf.len != ctx.prm.n || pkseed.len != ctx.prm.n {
+	if skseed.len != c.prm.n || skprf.len != c.prm.n || pkseed.len != c.prm.n {
 		return error('every seed length must be equal to n bytes')
 	}
-	// check if the seed is all zeroes
-	if is_zero(skseed) || is_zero(skprf) || is_zero(pkseed) {
-		return error('seed is all zeroes')
+	// check for any (all) zeros seed
+	if !opt.allow_zeros {
+		if is_zero(skseed) || is_zero(skprf) || is_zero(pkseed) {
+			return error('seed is all or one of them are zeros bytes')
+		}
 	}
-	return slh_keygen_internal(ctx, skseed, skprf, pkseed)!
+	return slh_keygen_internal(mut c, skseed, skprf, pkseed)!
 }
 
 // Algorithm 18 slh_keygen_internal(SK.seed, SK.prf, PK.seed)
@@ -102,21 +114,21 @@ pub fn slh_keygen_from_seed(ctx &Context, skseed []u8, skprf []u8, pkseed []u8) 
 // Input: SLH-DSA context, secret seed SK.seed, PRF key SK.prf, public seed PK.seed
 // Output: SLH-DSA signing key.
 @[direct_array_access]
-fn slh_keygen_internal(ctx &Context, skseed []u8, skprf []u8, pkseed []u8) !&SigningKey {
+fn slh_keygen_internal(mut c Context, skseed []u8, skprf []u8, pkseed []u8) !&SigningKey {
 	// generate the public key for the top-level XMSS tree
 	// 1: ADRS ← toByte(0, 32) ▷ set layer and tree address to bottom layer	
 	mut addr := new_address()
 	// 2: ADRS.setLayerAddress(𝑑 − 1)
-	addr.set_layer_address(u32(ctx.prm.d - 1))
+	addr.set_layer_address(u32(c.prm.d - 1))
 	// 3: PK.root ← xmss_node(SK.seed, 0, ℎ′ , PK.seed, ADRS)
-	pkroot_node := xmss_node(ctx, skseed, 0, u32(ctx.prm.hp), pkseed, mut addr)!
+	pkroot_node := xmss_node(mut c, skseed, 0, u32(c.prm.hp), pkseed, mut addr)!
 	// Check if the xmss_node function call was successful
-	if pkroot_node.len != ctx.prm.n {
+	if pkroot_node.len != c.prm.n {
 		return error('xmss_node failed')
 	}
 	// 4: return ( (SK.seed, SK.prf, PK.seed, PK.root), (PK.seed, PK.root) )
 	sk := &SigningKey{
-		ctx:    ctx.clone()
+		ctx:    c
 		seed:   skseed
 		prf:    skprf
 		pkseed: pkseed

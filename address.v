@@ -59,7 +59,7 @@ mut:
 	data [8]u32
 }
 
-// encode serializes Addres ad into bytes arrays stored in dst buffer, in big-endian form
+// encode serializes an Addres ad into bytes array stored into dst buffer, in big-endian form
 @[direct_array_access]
 fn (ad Address) encode(mut dst []u8) {
 	_ = dst[31] // bounds check

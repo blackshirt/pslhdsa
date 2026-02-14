@@ -110,7 +110,7 @@ fn (c &Context) prf_msg(skprf []u8, optrand []u8, msg []u8, outlen int) ![]u8 {
 	// For SHA2-based type with security category 1, use HMAC-SHA-256 PRF
 	//
 	// PRF𝑚𝑠𝑔(SK.prf, 𝑜𝑝𝑡_𝑟𝑎𝑛𝑑, 𝑀 ) = Trunc𝑛(HMAC-SHA-256(SK.prf, 𝑜𝑝𝑡_𝑟𝑎𝑛𝑑 ∥ 𝑀 ))
-	if c.is_sha2family_cat1() {
+	if c.is_sha2_seccat1() {
 		digest := hmac_sha256(skprf, data)
 		return digest[..outlen].clone()
 	}
@@ -153,24 +153,26 @@ fn (c &Context) hmsg(r []u8, pkseed []u8, pkroot []u8, msg []u8, outlen int) ![]
 	rpk_data << r
 	rpk_data << pkseed
 
-	// Gets SHA2-based PRF
-	mut h := c.sha2_prf()!
-	mut inner := c.sha2_prf()!
+	// Based on the security category number, choose the right hash algorithm
+	mut h := if c.is_sha2_seccat1() { c.h2 } else { c.h5 }
 
-	// write the data into hash, SHA-256(or 512) (𝑅 ∥ PK.seed ∥ PK.root ∥ 𝑀 )
-	inner.write(r)!
-	inner.write(pkseed)!
-	inner.write(pkroot)!
-	inner.write(msg)!
+	// write the data into hash, SHA-256 (or SHA-512) (𝑅 ∥ PK.seed ∥ PK.root ∥ 𝑀 )
+	// dont forget to call `.reset` first
+	unsafe { h.reset() }
+	h.write(r)!
+	h.write(pkseed)!
+	h.write(pkroot)!
+	h.write(msg)!
 
-	// The (𝑅 ∥ PK.seed ∥ PK.root ∥ 𝑀 ) digest
-	innerhash := inner.sum([]u8{})
+	// Gets the digest sum
+	digest := h.sum([]u8{})
 
-	// data acts as a new seed
+	// Now data acts as a new seed to mgf1
 	data << rpk_data
-	data << innerhash
+	data << digest
 
-	// mgf1(seed []u8, masklen int, mut h hash.Hash) ![]u8
+	// mgf1 calls `h.reset()` internally, so we dont reset the hash here
+	// unsafe { h.reset() }
 	return mgf1(data, outlen, mut h)!
 }
 
@@ -211,7 +213,7 @@ fn (mut c Context) prf(pkseed []u8, skseed []u8, addr Address, outlen int) ![]u8
 	data << c.buffer[0..compressed_addr_size]
 	data << skseed
 
-	// Gets the sum with SHA256 hash
+	// Gets the digest sum with SHA-256 hash
 	unsafe { c.h2.reset() }
 	c.h2.write(data)!
 	out := c.h2.sum([]u8{})
@@ -249,13 +251,13 @@ fn (mut c Context) tl(pkseed []u8, addr Address, msgsln [][]u8, outlen int) ![]u
 	// where security category 3 and 5 using SHA-512
 	// 		Tℓ(PK.seed, ADRS, 𝑀ℓ) = Trunc𝑛(SHA-512(PK.seed ∥ toByte(0, 128 − 𝑛) ∥ ADRS𝑐 ∥ 𝑀ℓ))
 
-	// setup underlying hash
-	mut h := c.sha2_prf()!
+	// Get correct underlying hash
+	mut h := if c.is_sha2_seccat1() { c.h2 } else { c.h5 }
+	// setup base number for toByte calculation
+	bnum := if c.is_sha2_seccat1() { 64 } else { 128 }
 
 	// Start by compressing the address
 	addr.compress(mut c.buffer)
-	// setup base number for toByte calculation
-	bnum := if c.is_sha2family_cat1() { 64 } else { 128 }
 
 	// Concatenates the bytes into data buffer
 	//
@@ -265,6 +267,7 @@ fn (mut c Context) tl(pkseed []u8, addr Address, msgsln [][]u8, outlen int) ![]u
 	data << flatten_msg
 
 	// write the data into hash and gets the digest
+	unsafe { h.reset() }
 	h.write(data)!
 	digest := h.sum([]u8{})
 
@@ -293,7 +296,7 @@ fn (mut c Context) h(pkseed []u8, addr Address, m2 []u8, outlen int) ![]u8 {
 	}
 	// Otherwise, its a SHA2-based PRF
 	//
-	bnum := if c.is_sha2family_cat1() { 64 } else { 128 }
+	bnum := if c.is_sha2_seccat1() { 64 } else { 128 }
 	// compress the address into first 22-bytes of context buffer
 	// Note: you should only take the first of 22-bytes from context buffer
 	addr.compress(mut c.buffer)
@@ -308,31 +311,17 @@ fn (mut c Context) h(pkseed []u8, addr Address, m2 []u8, outlen int) ![]u8 {
 	// For Security category 1 use SHA-256 PRF
 	// H(PK.seed, ADRS, 𝑀2) = Trunc𝑛(SHA-256(PK.seed ∥ toByte(0, 64 − 𝑛) ∥ ADRS𝑐 ∥ 𝑀2))
 	//
-	digest := if c.is_sha2family_cat1() {
-		// writes the concatenated data into hash, call .reset() first
-		unsafe { c.h2.reset() }
-		c.h2.write(data)!
-		out := c.h2.sum([]u8{})
-		result := out[0..outlen].clone()
+	// For Security category 3 and 5 use SHA-512 PRF
+	// H(PK.seed, ADRS, 𝑀2) = Trunc𝑛(SHA-512(PK.seed ∥ toByte(0, 128 − 𝑛) ∥ ADRS𝑐 ∥ 𝑀2))
+	mut h := if c.is_sha2_seccat1() { c.h2 } else { c.h5 }
+	unsafe { h.reset() }
+	h.write(data)!
+	out := h.sum([]u8{})
 
-		// freeing allocated output resources and return the result
-		unsafe { out.free() }
-		result
-	} else {
-		// Otherwise, handle for security category 3 or 5 using SHA-512 PRF
-		//
-		// H(PK.seed, ADRS, 𝑀2) = Trunc𝑛(SHA-512(PK.seed ∥ toByte(0, 128 − 𝑛) ∥ ADRS𝑐 ∥ 𝑀2))
+	digest := out[0..outlen].clone()
+	// freeing allocated output resources and return the result
+	unsafe { out.free() }
 
-		// call .reset first
-		unsafe { c.h5.reset() }
-		c.h5.write(data)!
-		out := c.h5.sum([]u8{})
-		result := out[0..outlen].clone()
-
-		// explicitly freeing allocated output resources and return the result
-		unsafe { out.free() }
-		result
-	}
 	return digest
 }
 
@@ -372,6 +361,7 @@ fn (mut c Context) f(pkseed []u8, addr Address, m1 []u8, outlen int) ![]u8 {
 	data << m1
 
 	// Get the sum, dont forget to call .reset first
+	// NOTE: Its all using SHA-256 hash
 	unsafe { c.h2.reset() }
 	c.h2.write(data)!
 	out := c.h2.sum([]u8{})
@@ -379,6 +369,7 @@ fn (mut c Context) f(pkseed []u8, addr Address, m1 []u8, outlen int) ![]u8 {
 	result := out[0..outlen].clone()
 	// explicitly free the output resource
 	unsafe { out.free() }
+
 	return result
 }
 
@@ -386,7 +377,7 @@ fn (mut c Context) f(pkseed []u8, addr Address, m1 []u8, outlen int) ![]u8 {
 //
 
 // hmac_sha256 creates HMAC bytes with SHA256 hash
-@[direct_array_access]
+@[direct_array_access; inline]
 fn hmac_sha256(seed []u8, data []u8) []u8 {
 	// fn new(key []u8, data []u8, hash_func fn ([]u8) []u8, blocksize int) []u8
 	// NOTE: use block_size instead of size
@@ -394,23 +385,11 @@ fn hmac_sha256(seed []u8, data []u8) []u8 {
 }
 
 // hmac_sha512 creates new HMAC bytes with SHA512 hash
-@[direct_array_access]
+@[direct_array_access; inline]
 fn hmac_sha512(seed []u8, data []u8) []u8 {
 	// fn new(key []u8, data []u8, hash_func fn ([]u8) []u8, blocksize int) []u8
 	// NOTE: use block_size instead of size
 	return hmac.new(seed, data, sha512.sum512, sha512.block_size)
-}
-
-// for other need, SHA2-based Security category 1 was return SHA256
-// and return SHA512 otherwise
-fn (c &Context) sha2_prf() !hash.Hash {
-	if c.is_shake_family() {
-		return error('not sha2-based entity')
-	}
-	if c.is_sha2family_cat1() {
-		return sha256.new()
-	}
-	return sha512.new()
 }
 
 // is_shake_family tells if this context was a SHAKE-based family
@@ -425,26 +404,10 @@ fn (c &Context) is_shake_family() bool {
 	}
 }
 
-// is_sha2family_cat1 tells if this context was a SHA2-based family with security category 1
-fn (c &Context) is_sha2family_cat1() bool {
+// is_sha2_seccat1 tells if this context was a SHA2-based family with security category 1
+fn (c &Context) is_sha2_seccat1() bool {
 	match c.tipe {
 		.sha2_128f, .sha2_128s { return true }
-		else { return false }
-	}
-}
-
-// is_sha2family_cat1 tells if this context was a SHA2-based family with security category 3
-fn (c &Context) is_sha2family_cat3() bool {
-	match c.tipe {
-		.sha2_192f, .sha2_192s { return true }
-		else { return false }
-	}
-}
-
-// is_sha2family_cat5 tells if this context was a SHA2-based family with security category 5
-fn (c &Context) is_sha2family_cat5() bool {
-	match c.tipe {
-		.sha2_256f, .sha2_256s { return true }
 		else { return false }
 	}
 }

@@ -8,6 +8,10 @@ Its availables on NIST FIPS 205. SLH-DSA allow builds relatively big signaturue 
 small key (16 - 32 bytes key). 
 The signatures range from ±8K - ±50K depending on the type chosen.
 
+> [!WARNING]    
+> This module was absolutely an experimental library. Its rapidly changed, so, make sure synchronizes 
+> your code with the last thing.
+
 ## Features
 - Support signature types defined on the standard
 - Support for pure SLH-DSA hash and pre-hash signature generation
@@ -16,17 +20,7 @@ The signatures range from ±8K - ±50K depending on the type chosen.
 ## Basic 
 `pslhdsa` provides a simple interface for generating and verifying signatures.
 1. The basic fundamental type that describes SLH-DSA parameter set is a `Context` structure,
-defined as
-```code
-pub struct Context {
-	// The kind (type) of this SLH-DSA context, set on context creation
-	kind Kind
-pub:
-	// Underlying SLH-DSA parameter set described in the doc
-	prm Param
-}
-```
-where `Kind` is an enum that describes the signature type chosen.
+and the `Kind` opaque where it is an enum that describes the signature type chosen.
 You can create a `Context` opaque by calling `new_context(k Kind)` 
 or `new_context_from_name(name string)!` 
 

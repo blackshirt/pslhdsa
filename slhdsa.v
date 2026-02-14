@@ -104,15 +104,17 @@ pub fn (mut s SigningKey) sign(msg []u8, cx []u8, opt Options) ![]u8 {
 		encode_msg_purehash(cx, msg)
 	} else {
 		if opt.msg_encoding == .noencode {
+			// Currently its disabled and return an error instead
+			return error('.noencode flag was not supported')
 			// Make sure testing flag is also set
-			if !opt.testing {
-				return error('testing not set for no_prehash feature')
-			}
+			// if !opt.testing {
+			//	return error('testing not set for no_prehash feature')
+			// }
 			// with this .noencode was set, the msg was not encoded.
 			// NOTE: this features deviates from the FIPS 205 spec that
 			// only support for pure-hash and pre-hash SLH-DSA generation.
 			// USE WITH CAUTION!!
-			msg
+			// msg
 		} else {
 			// pre-hashed message encoding
 			// TODO: add supported hash algorithms into list
@@ -170,13 +172,6 @@ pub mut:
 	// check_pk flag was used in the SLH-DSA key generation process, especially in `slh_keygen_from_bytes`
 	// to tell the routine to perform checking on the PK.root was result in a valid value on the key generation.
 	// By default its set to true, to always to do the check the PK.root on the key generation.
-	//
-	// From the docs stated:
-	// In the case of SLH-DSA, where public-key validation is required, implementations
-	// shall verify that the public key is 2𝑛 bytes in length. When the assurance of private
-	// key possession is obtained via regeneration, the owner of the private key shall check
-	// that the private key is 4𝑛 bytes in length and shall use SK.seed and PK.seed to recompute
-	// PK.root and compare the newly generated value with the value in the private key currently held
 	check_pk bool = true
 
 	// The option below was used in signature generation (verification).
@@ -200,6 +195,7 @@ pub mut:
 	// The default value .pure means for 'Pure SLH-DSA Signature Generation (verification)'.
 	// .pre for 'Pre Hash SLH-DSA Signature Generation (verification)' or .noencode for not encode the mesage behaviour,
 	// .noencode was intended for testing. If not sure, just use the default .pure value.
+	// NOTE: .noencode message encoding was disabled and not supported yet. It would return an error.
 	msg_encoding MsgEncoding = .pure
 
 	// hfunc is the hash function used in pre-hashed message encoding,
@@ -287,15 +283,16 @@ pub fn (mut p PubKey) verify(msg []u8, sig []u8, cx []u8, opt Options) !bool {
 		encode_msg_purehash(cx, msg)
 	} else {
 		if opt.msg_encoding == .noencode {
+			// .noencode message encoding was not supported and disabled
+			return error('.noencode flag was not supported')
 			// Make sure testing flag is also set
-			if !opt.testing {
-				return error('testing not set for noencode feature')
-			}
-			// with this noencode was set, the msg was not encoded.
-			// NOTE: this features deviates from the FIPS 205 spec that
-			// only support for pure-hash and pre-hash SLH-DSA generation.
-			// USE WITH CAUTION!!
-			msg
+			// if !opt.testing {
+			// 	return error('testing not set for noencode feature')
+			// }
+			// with this .noencode was set, the msg was not encoded at all and left msg as is.
+			// NOTE: this features deviates from the FIPS 205 spec that only support for pure-hash
+			// and pre-hash SLH-DSA generation, so, USE WITH CAUTION!!
+			// msg
 		} else {
 			// pre-hashed message encoding
 			// TODO: add supported hash algorithms into list
@@ -385,10 +382,10 @@ pub enum MsgEncoding {
 	pure
 	// Pre-hash SLH-DSA message encoding construct
 	pre
-	// No encode message encoding construct.
-	// This option is NOT STANDARD, and should be used with caution.
-	// It is only provided for testing purposes or to flag the signer
-	// callers that the message was not encoded.
+	// .noencode was message encoding construc with no encode the message at all.
+	// This option is NOT STANDARD, and should be used with caution. It is only provided for testing
+	// purposes or to flag the signer callers that the message was not encoded.
+	// NOTE: Currently its disabled and not supported yet
 	noencode
 }
 

@@ -32,13 +32,19 @@ fn test_slhdsa_internal_signature_verify() ! {
 
 	assert result == testpassed
 
+	// NOTE: .noencode message encoding was not supported for public api.
+	// So, disabled this test
+	//
 	// Test with PubKey.verify API
-	opt := Options{
-		msg_encoding: MsgEncoding.noencode
-		testing:      true
-	}
-	cx := []u8{}
+	// opt := Options{
+	//	msg_encoding: MsgEncoding.noencode
+	//	testing:      true
+	// }
+	// cx := []u8{}
 	// verify(msg []u8, sig []u8, cx []u8, opt Options) !bool
-	result2 := pkey.verify(msg, sig, cx, opt)!
-	assert result2 == testpassed
+	// result2 := pkey.verify(msg, sig, cx, opt) or {
+	// 	assert err == error('.noencode flag was not supported')
+	// 	true
+	// }
+	// assert result2 == testpassed
 }

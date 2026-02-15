@@ -115,15 +115,15 @@ fn fors_sign(mut c Context, md []u8, skseed []u8, pkseed []u8, mut addr Address)
 fn fors_pkfromsig(mut c Context, sigfors []u8, md []u8, pkseed []u8, mut addr Address) ![]u8 {
 	// 𝑖𝑛𝑑𝑖𝑐𝑒𝑠 ← base_2b(𝑚𝑑, 𝑎, 𝑘)
 	indices := base_2b(md, c.prm.a, c.prm.k)
-	mut node_0 := []u8{}
-	mut node_1 := []u8{}
+	mut node_0 := []u8{cap: c.prm.n}
+	mut node_1 := []u8{cap: c.prm.n}
 	mut root := [][]u8{cap: c.prm.k}
 	// compute root from leaf and AUTH
 	for i := 0; i < c.prm.k; i++ {
 		// 𝑠𝑘 ← SIG𝐹𝑂𝑅𝑆.getSK(𝑖), SIG𝐹𝑂𝑅𝑆[𝑖 ⋅ (𝑎 + 1) ⋅ 𝑛 ∶ (𝑖 ⋅ (𝑎 + 1) + 1) ⋅ 𝑛]
 		sk_start := i * (c.prm.a + 1) * c.prm.n
 		sk_end := (i * (c.prm.a + 1) + 1) * c.prm.n
-		skey := sigfors[sk_start..sk_end]
+		skey := unsafe { sigfors[sk_start..sk_end] }
 		// compute leaf
 		// ADRS.setTreeHeight(0)
 		addr.set_tree_height(0)
@@ -137,7 +137,7 @@ fn fors_pkfromsig(mut c Context, sigfors []u8, md []u8, pkseed []u8, mut addr Ad
 		// 𝑎𝑢𝑡ℎ ← SIG𝐹𝑂𝑅𝑆.getAUTH(𝑖) ▷ SIG𝐹𝑂𝑅𝑆[(𝑖 ⋅ (𝑎 + 1) + 1) ⋅ 𝑛 ∶ (𝑖 + 1) ⋅ (𝑎 + 1) ⋅ 𝑛]
 		auth_start := (i * (c.prm.a + 1) + 1) * c.prm.n
 		auth_end := (i + 1) * (c.prm.a + 1) * c.prm.n
-		auth := sigfors[auth_start..auth_end]
+		auth := unsafe { sigfors[auth_start..auth_end] }
 		for j := 0; j < c.prm.a; j++ {
 			// ADRS.setTreeHeight(𝑗 + 1)
 			addr.set_tree_height(u32(j + 1))
@@ -146,7 +146,7 @@ fn fors_pkfromsig(mut c Context, sigfors []u8, md []u8, pkseed []u8, mut addr Ad
 				// ADRS.setTreeIndex(ADRS.getTreeIndex()/2)
 				addr.set_tree_index(addr.get_tree_index() >> 1)
 				// 𝑛𝑜𝑑𝑒[1] ← H(PK.seed, ADRS, 𝑛𝑜𝑑𝑒[0] ∥ 𝑎𝑢𝑡ℎ[𝑗])
-				auth_j := auth[j * c.prm.n..(j + 1) * c.prm.n]
+				auth_j := unsafe { auth[j * c.prm.n..(j + 1) * c.prm.n] }
 				mut msi := []u8{cap: node_0.len + auth_j.len}
 				msi << node_0
 				msi << auth_j
@@ -155,7 +155,7 @@ fn fors_pkfromsig(mut c Context, sigfors []u8, md []u8, pkseed []u8, mut addr Ad
 				// ADRS.setTreeIndex((ADRS.getTreeIndex() − 1)/2)
 				addr.set_tree_index((addr.get_tree_index() - 1) >> 1)
 				// 15: 𝑛𝑜𝑑𝑒[1] ← H(PK.seed, ADRS, 𝑎𝑢𝑡ℎ[𝑗] ∥ 𝑛𝑜𝑑𝑒[0])
-				auth_j := auth[j * c.prm.n..(j + 1) * c.prm.n]
+				auth_j := unsafe { auth[j * c.prm.n..(j + 1) * c.prm.n] }
 				mut msi := []u8{cap: auth_j.len + node_0.len}
 				msi << auth_j
 				msi << node_0

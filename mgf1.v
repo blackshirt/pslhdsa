@@ -6,7 +6,6 @@
 module pslhdsa
 
 import hash
-import math
 import encoding.binary
 
 // B.2.1 MGF1
@@ -39,7 +38,8 @@ fn mgf1(seed []u8, masklen int, mut h hash.Hash) ![]u8 {
 
 	// Calculate how many hash outputs we need
 	hlen := h.size()
-	iterations := u32(math.ceil(f64(masklen) / f64(hlen)))
+	// ceiling
+	iterations := (masklen + hlen - 1) / hlen
 
 	mut counter := []u8{len: 4}
 

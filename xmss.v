@@ -45,22 +45,26 @@ fn parse_xmss_signature(c &Context, bytes []u8) !&XmssSignature {
 	}
 	// start with wots+ signature
 	mut start := 0
-	mut wots_sign := [][]u8{len: length}
+	// initialize wots_sign with correct length and their internal length
+	mut wots_sign := [][]u8{len: length, init: []u8{len: c.prm.n}}
 	for i := 0; i < length; i++ {
-		end := start + c.prm.n
-		chunk := bytes[start..end]
-		wots_sign[i] = []u8{len: c.prm.n}
-		copy(mut wots_sign[i], chunk)
+		// end := start + c.prm.n
+		chunk := unsafe { bytes[start..start + c.prm.n] }
+		// wots_sign[i] = []u8{len: c.prm.n}
+		// copy(mut wots_sign[i], chunk)
+		unsafe { vmemcpy(wots_sign[i].data, chunk.data, c.prm.n) }
 		start += c.prm.n
 	}
 
 	// auth path
-	mut auth := [][]u8{len: c.prm.hp}
+	// initialize with correct length and their internal length
+	mut auth := [][]u8{len: c.prm.hp, init: []u8{len: c.prm.n}}
 	for i := 0; i < c.prm.hp; i++ {
-		end := start + c.prm.n
-		chunk := bytes[start..end]
-		auth[i] = []u8{len: c.prm.n}
-		copy(mut auth[i], chunk)
+		// end := start + c.prm.n
+		chunk := unsafe { bytes[start..start + c.prm.n] }
+		// auth[i] = []u8{len: c.prm.n}
+		// copy(mut auth[i], chunk)
+		unsafe { vmemcpy(auth[i].data, chunk.data, c.prm.n) }
 		start += c.prm.n
 	}
 
@@ -176,7 +180,7 @@ fn xmss_node(mut c Context, skseed []u8, i u32, z u32, pkseed []u8, mut addr Add
 // Output: XMSS signature SIG𝑋𝑀𝑆𝑆 = (𝑠𝑖𝑔 ∥ AUTH).
 @[direct_array_access]
 fn xmss_sign(mut c Context, m []u8, skseed []u8, idx u32, pkseed []u8, mut addr Address) !&XmssSignature {
-	mut auth := [][]u8{len: c.prm.hp}
+	mut auth := [][]u8{len: c.prm.hp, init: []u8{len: c.prm.n}}
 	// build authentication path
 	for j := u32(0); j < c.prm.hp; j++ {
 		// 𝑘 ← ⌊𝑖𝑑𝑥/2^𝑗⌋ ⊕ 1

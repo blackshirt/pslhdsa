@@ -24,7 +24,7 @@ fn wots_pkgen(mut c Context, skseed []u8, pkseed []u8, mut adr Address) ![]u8 {
 	// gets wotsp length from the current context
 	length := c.wots_len()
 	// temporary buffer to store output
-	mut tmp := [][]u8{len: length}
+	mut tmp := [][]u8{len: length, init: []u8{len: c.prm.n}}
 	for i := u32(0); i < length; i++ {
 		// skADRS.setChainAddress(𝑖)
 		sk_addr.set_chain_address(i)
@@ -84,7 +84,7 @@ fn wots_sign(mut c Context, m []u8, skseed []u8, pkseed []u8, mut adr Address) !
 	// TODO: handle int > larger than max_int
 	sk_addr.set_keypair_address(adr.get_keypair_address())
 
-	mut sig := [][]u8{len: length}
+	mut sig := [][]u8{len: length, init: []u8{len: c.prm.n}}
 	for i := u32(0); i < length; i++ {
 		// skADRS.setChainAddress(𝑖)
 		sk_addr.set_chain_address(i)
@@ -124,7 +124,7 @@ fn wots_pkfromsig(mut c Context, sig [][]u8, m []u8, pkseed []u8, mut adr Addres
 	msg << base_2b(to_byte(csum, mlen), c.prm.lgw, len2)
 
 	// setup temporary buffers with appropriate length
-	mut tmp := [][]u8{len: length}
+	mut tmp := [][]u8{len: length, init: []u8{len: c.prm.n}}
 
 	for i := u32(0); i < length; i++ {
 		// ADRS.setChainAddress(𝑖)
